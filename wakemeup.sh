@@ -11,6 +11,8 @@ deploy () {
 
 destroy () { 
     podman play kube --down ./manifests/uponlan.yaml 
+    sudo rm -rf ./assets/*
+    sudo rm -rf ./config/*
 }
 
 logs () {

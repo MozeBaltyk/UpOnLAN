@@ -9,7 +9,7 @@ spec:
       image: localhost/uponlan:latest
       env:
         - name: MENU_VERSION
-          value: "2.0.84"
+          value: "0.0.1"
         - name: NGINX_PORT
           value: "80"
         - name: WEB_APP_PORT

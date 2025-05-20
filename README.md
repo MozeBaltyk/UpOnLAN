@@ -6,17 +6,17 @@ This project use Wake-on-LAN and PXEboot to automate bare-metal install in view 
 
 ## Features
 
-For now this is more a roadmap than a list of features:
+For now, this is more a roadmap or wishing list than a list of features:
 
-- [] Provide a *Wake-On-LAN*
-- [] Provide a *PXE server*
-- [] Provide services like *dnsmasq*, *http server*, etc.
-- [] Automated bare-metal install with *PXE boot*
-- [] Provisioning with *Cloud-init* templates
-- [] Display a PXE interface with choices
-- [] Reachability tests
-- [] Build in and operated from a Container
-- [] Proposition of systems: Rocky8/9, Ubuntu, OL8/9, Harvester   
+[] Provide a *Wake-On-LAN*
+[] Provide a *PXE server*
+[] Provide services like *dnsmasq*, *http server*, etc.
+[] Automated bare-metal install with *PXE boot*
+[] Provisioning with *Cloud-init* templates
+[] Display a PXE interface with choices
+[] Reachability tests
+[] Build in and operated from a Container
+[] Proposition of systems: Rocky8/9, Ubuntu, OL8/9, Harvester   
 
 ## Get Started
 

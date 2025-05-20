@@ -62,8 +62,9 @@ io.on('connection', function(socket){
   ///////////////////////////
   // When dashboard info is requested send to client
   socket.on('getdash', function(){
-    var tftpcmd = '/usr/sbin/dnsmasq --version | head -n1';
+    var tftpcmd = '/usr/sbin/dnsmasq --version | head -n1 | cut -d " " -f1-3';
     var nginxcmd = '/usr/sbin/nginx -v';
+    var wolcmd = '/usr/bin/awake --version';
     var dashinfo = {};
     dashinfo['webversion'] = version;
     dashinfo['menuversion'] = fs.readFileSync('/config/menuversion.txt', 'utf8');
@@ -85,8 +86,11 @@ io.on('connection', function(socket){
               exec(tftpcmd, function (err, stdout) {
                 dashinfo['tftpversion'] = stdout;
                 exec(nginxcmd, function (err, stdout, stderr) {
-                   dashinfo['nginxversion'] = stderr;
-                   io.sockets.in(socket.id).emit('renderdash',dashinfo);
+                  dashinfo['nginxversion'] = stderr;
+                  exec(wolcmd, function (err, stdout, stderr) {
+                    dashinfo['wolversion'] = (stdout || stderr || '').trim();
+                  io.sockets.in(socket.id).emit('renderdash',dashinfo);
+                  });
                 });
               });  
             });

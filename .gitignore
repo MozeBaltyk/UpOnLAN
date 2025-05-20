@@ -1,0 +1,5 @@
+config/**
+assets/**
+node_modules
+.c9
+package-lock.json

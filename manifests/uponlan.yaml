@@ -1,0 +1,35 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: uponlan
+spec:
+  containers:
+    - name: webapp
+      image: localhost/uponlan:latest
+      env:
+        - name: MENU_VERSION
+          value: "2.0.84"
+        - name: NGINX_PORT
+          value: "80"
+        - name: WEB_APP_PORT
+          value: "3000"
+        - name: TFTPD_OPTS
+          value: "--tftp-single-port"
+      volumeMounts:
+        - name: uponlan-config
+          mountPath: /config
+        - name: uponlan-assets
+          mountPath: /assets
+      ports:
+        - containerPort: 3000
+        - containerPort: 69
+          protocol: UDP
+        - containerPort: 80
+  volumes:
+    - name: uponlan-config
+      hostPath:
+        path: ./config
+    - name: uponlan-assets
+      hostPath:
+        path: ./assets

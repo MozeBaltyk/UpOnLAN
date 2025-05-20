@@ -539,18 +539,27 @@ function renderwol(){
 }
 socket.on('renderwol', function(wolpoints, remotemenuversion){
   $('#pagecontent').empty();
-  $('#pagecontent').append('\
-  <div class="card mb-3">\
-    <div class="card-header">Wake-On-LAN</div>\
-    <div class="card-body card-deck">\
-      <div class="card mb-3">\
-        <div class="card-body">\
-        <table class="table table-hover">\
-            <thead><tr><th>Hostname</th><th>MAC</th></tr></thead>\
-        </table>\
-        </div>\
-      </div>\
-    </div>\
-  </div>\
-  ');
+  let html = `
+    <div class="card mb-3">
+      <div class="card-header">Wake-On-LAN</div>
+      <div class="card-body">
+        <table class="table table-hover">
+          <thead><tr><th>Name</th><th>MAC</th></tr></thead>
+          <tbody>
+  `;
+  if (wolpoints && Array.isArray(wolpoints.wakeonlan)) {
+    wolpoints.wakeonlan.forEach(function(host) {
+      html += `<tr>
+        <td>${host.hostname || ''}</td>
+        <td>${host.default_mac || ''}</td>
+      </tr>`;
+    });
+  }
+  html += `
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  $('#pagecontent').append(html);
 });

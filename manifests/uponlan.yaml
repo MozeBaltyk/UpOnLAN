@@ -10,6 +10,8 @@ spec:
       env:
         - name: MENU_VERSION
           value: "0.0.1"
+        - name: ENDPOINT_URL
+          value: "https://github.com/mozebaltyk/uponlan"
         - name: NGINX_PORT
           value: "80"
         - name: WEB_APP_PORT

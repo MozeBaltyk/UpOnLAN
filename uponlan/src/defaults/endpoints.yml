@@ -1,0 +1,47 @@
+endpoints:
+  oracle-8-x86_64:
+    path: /asset-mirror/releases/download/6-1525fd25/
+    files:
+    - vmlinuz
+    - initrd
+    - squashfs.img
+    os: oracle
+    version: '8'
+    arch: x86_64
+  oracle-8-aarch64:
+    path: /asset-mirror/releases/download/6-1525fd25/
+    files:
+    - vmlinuz
+    - initrd
+    - squashfs.img
+    os: oracle
+    version: '8'
+    arch: aarch64
+  oracle-9-x86_64:
+    path: /asset-mirror/releases/download/U5-5d86c3df/
+    files:
+    - vmlinuz
+    - initrd
+    - squashfs.img
+    os: oracle
+    version: '9'
+    arch: x86_64
+  oracle-9-aarch64:
+    path: /asset-mirror/releases/download/U5-f2411221/
+    files:
+    - vmlinuz
+    - initrd
+    - squashfs.img
+    os: oracle
+    version: '9'
+    arch: aarch64
+  harvester:
+    path: /asset-mirror/releases/download/v1.5.0-c82c6d22/
+    files:
+    - harvester-vmlinuz-amd64
+    - harvester-initrd-amd64
+    - harvester-rootfs-amd64.squashfs
+    - harvester-amd64.sha512
+    - version.yaml
+    os: harvester
+    version: v1.5.0

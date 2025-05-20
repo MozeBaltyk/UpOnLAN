@@ -13,6 +13,7 @@ destroy () {
     podman play kube --down ./manifests/uponlan.yaml 
     sudo rm -rf ./assets/*
     sudo rm -rf ./config/*
+    podman rmi localhost/uponlan:latest
 }
 
 logs () {

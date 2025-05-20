@@ -25,26 +25,24 @@ mkdir -p \
   /config/menus/remote \
   /config/menus/local
 
-# download menus if not found
-if [[ ! -f /config/menus/remote/menu.ipxe ]]; then
+# Push menus if not found
+if [[ ! -f /config/menus/menu.ipxe ]]; then
   if [[ -z ${MENU_VERSION+x} ]]; then
     MENU_VERSION=$(curl -sL "https://api.github.com/repos/mozebaltyk/uponlan/releases/latest" | jq -r '.tag_name')
   fi
-  echo "[uponlanxyz-init] Downloading uponlan.xyz at ${MENU_VERSION}"
-  # menu files
-  curl -o \
-    /config/endpoints.yml -sL \
-    "https://raw.githubusercontent.com/mozebaltyk/uponlan/${MENU_VERSION}/endpoints.yml"
-  curl -o \
-    /tmp/menus.tar.gz -sL \
-    "https://github.com/mozebaltyk/uponlan/releases/download/${MENU_VERSION}/menus.tar.gz"
-  tar xf \
-    /tmp/menus.tar.gz -C \
-    /config/menus/remote
-  # layer and cleanup
+  echo "[uponlanxyz-init] Import uponlan.xyz at ${MENU_VERSION}"
   echo -n "${MENU_VERSION}" > /config/menuversion.txt
-  cp -r /config/menus/remote/* /config/menus
-  rm -f /tmp/menus.tar.gz
+  cp /defaults/endpoints.yml /config/endpoints.yml
+  cp /defaults/menus/boot.cfg /config/menus/boot.cfg 
+  cp /defaults/menus/*.ipxe /config/menus/
+  cp /defaults/menus/boot.cfg /config/menus/remote/boot.cfg 
+  cp /defaults/menus/*.ipxe /config/menus/remote/
+fi
+
+# init wol.yaml
+if [[ ! -f /config/wol.yml ]]; then
+  echo "[uponlanxyz-init] Import wol.yml"
+  cp /defaults/wol.yml /config/wol.yml
 fi
 
 # Ownership

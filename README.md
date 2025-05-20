@@ -8,9 +8,8 @@ This project use Wake-on-LAN and PXEboot to automate bare-metal install in view 
 
 For now, this is more a roadmap or wishing list than a list of features:
 
-[] Provide a *Wake-On-LAN*
-[] Provide a *PXE server*
-[] Provide services like *dnsmasq*, *http server*, etc.
+[x] Provide a *TFTP server* for pxeboot and editor of ipxe config.
+[] Provide a *Wake-On-LAN* service. 
 [] Automated bare-metal install with *PXE boot*
 [] Provisioning with *Cloud-init* templates
 [] Display a PXE interface with choices
@@ -19,6 +18,51 @@ For now, this is more a roadmap or wishing list than a list of features:
 [] Proposition of systems: Rocky8/9, Ubuntu, OL8/9, Harvester   
 
 ## Get Started
+
+As prerequisites, a `podman engine` install on linux.
+
+```bash
+Usage: ./wakemeup.sh -a <action>
+
+Allowed Actions
+---------------
+1. build
+2. deploy
+3. destroy
+4. logs
+5. connect
+```
+
+## DEV 
+
+* code source:
+
+```bash
+tree -L 2 uponlan/src
+
+uponlan/src
+├── defaults               # Default config used by init.sh during deployement
+│   ├── default
+│   ├── endpoints.yml      # Yaml config with all assets endpoints (combine with env ENDPOINT_URL)
+│   ├── menus              # Default menus if no url with project menus is provided 
+│   └── nginx.conf
+├── etc
+│   └── supervisor.conf    # Config services (TFTP,)
+├── init.sh                # Init script launched by start.sh
+├── start.sh               # Startup script launched by the containerfile 
+└── webapp                 # The webapp folder
+    ├── app.js             # js function called by the .ejs 
+    ├── package.json       # dependencides
+    └── public             # ejs and html rendered site
+```
+
+Manifest/Containerfile map by default `./config` and `./assests`. During the init process, it provisions them.
+
+- `config/menus/remote`: This directory holds the "remote" or upstream versions of the iPXE menu files (e.g., after a download or upgrade).
+
+- `config/menus/local`: This directory holds user-customized or locally edited versions.
+
+- `config/menus/menus`: This is the "active" directory from which the TFTP or HTTP server serves the files to PXE clients.
 
 
 

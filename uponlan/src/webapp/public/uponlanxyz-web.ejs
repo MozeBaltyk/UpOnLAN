@@ -129,6 +129,7 @@ function renderconfig(){
 socket.on('renderconfig', function(remote_files,local_files,filename,islocal){
   $('#pagecontent').empty();
   $('#pagecontent').append('\
+  <div class="card-header">Menus</div>\
   <div class="container-fluid">\
     <div class="row flex-xl-nowrap">\
       <div class="col-12 col-md-3 col-xl-2 bd-sidebar">\
@@ -492,6 +493,7 @@ socket.on('renderlocalhook', function(){
    renderlocal();
   }
 });
+
 // Delete local files
 function deletelocal(){
   var allfiles = $('.localcheck');
@@ -527,4 +529,28 @@ socket.on('dldata', function(url, count, stats){
 });
 socket.on('purgestatus', function(){
   $('#statusbar').empty();
+});
+
+//// Render WOL page ////
+function renderwol(){
+  $('#pagecontent').empty();
+  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting WOL</h2></center>');
+  socket.emit('getwol');
+}
+socket.on('renderwol', function(wolpoints, remotemenuversion){
+  $('#pagecontent').empty();
+  $('#pagecontent').append('\
+  <div class="card mb-3">\
+    <div class="card-header">Wake-On-LAN</div>\
+    <div class="card-body card-deck">\
+      <div class="card mb-3">\
+        <div class="card-body">\
+        <table class="table table-hover">\
+            <thead><tr><th>Hostname</th><th>MAC</th></tr></thead>\
+        </table>\
+        </div>\
+      </div>\
+    </div>\
+  </div>\
+  ');
 });

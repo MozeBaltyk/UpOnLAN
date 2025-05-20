@@ -48,12 +48,6 @@ LABEL org.opencontainers.image.description="uponlan.xyz official docker containe
 # install awake - Python lib so would need a python:3-alpine
 RUN apk --no-cache add awake
 
-# install etherwake for sending WOL packets
-# RUN apk --no-cache add etherwake
-
-# install wakeonlan - Alternative package in perl
-# RUN apk --no-cache add wakeonlan
-
 RUN apk add --no-cache \
     bash \
     busybox \

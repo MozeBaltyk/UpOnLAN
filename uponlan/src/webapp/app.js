@@ -196,6 +196,13 @@ io.on('connection', function(socket){
     }
     io.sockets.in(socket.id).emit('renderlocal',endpoints,assets,remotemenuversion);
   });
+  // When the endpoints Wake On LAN is requested send it to the client.
+  socket.on('getwol', async function(filename){
+    var remotemenuversion = fs.readFileSync('/config/menuversion.txt', 'utf8');
+    var wolfile = fs.readFileSync('/config/wol.yml');
+    var wolpoints = yaml.load(wolfile);
+    io.sockets.in(socket.id).emit('renderwol',wolpoints,remotemenuversion);
+  });
   // When remote downloads are requested make folders and download
   socket.on('dlremote', function(dlfiles){
     dlremote(dlfiles, function(response){
@@ -262,14 +269,6 @@ async function upgrademenu(version, callback){
   }
   // Download files
   var downloads = [];
-  var rom_files = ['netboot.xyz.kpxe',
-                   'netboot.xyz-undionly.kpxe',
-                   'netboot.xyz.efi',
-                   'netboot.xyz-snp.efi',
-                   'netboot.xyz-snponly.efi',
-                   'netboot.xyz-arm64.efi',
-                   'netboot.xyz-arm64-snp.efi',
-                   'netboot.xyz-arm64-snponly.efi'];
 
   // This is a commit sha
   if (version.length == 40){
@@ -303,7 +302,7 @@ async function upgrademenu(version, callback){
   });
 }
 
-// Grab remote files
+// Grab remote files - concatenate with endpoints.yml
 async function dlremote(dlfiles, callback){
   var dlarray = [];
   for (var i in dlfiles){
@@ -392,3 +391,23 @@ if (!Number.isInteger(Number(port)) || port < 1 || port > 65535) {
 http.listen(port, function(){
   console.log('listening on *:' + port);
 });
+
+// Set endpoint url from ENDPOINT_URL env variable
+const isValidUrl = urlString=> {
+       var urlPattern = new RegExp('^(https?:\\/\\/)?'+ // validate protocol
+     '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // validate domain name
+     '((\\d{1,3}\\.){3}\\d{1,3}))'+ // validate OR ip (v4) address
+     '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // validate port and path
+     '(\\?[;&a-z\\d%_.~+=-]*)?'+ // validate query string
+     '(\\#[-a-z\\d_]*)?$','i'); // validate fragment locator
+   return !!urlPattern.test(urlString);
+ }
+
+const defaultEndpointUrl = "https://github.com/mozebaltyk/uponlan";
+
+let endpointurl = process.env.ENDPOINT_URL;
+
+if (!endpointurl || !isValidUrl(endpointurl)) {
+  console.warn(`Invalid URL "${endpointurl}" in environment variable ENDPOINT_URL. Using default URL ${defaultEndpointUrl} instead.`);
+  endpointurl = defaultEndpointUrl;
+}

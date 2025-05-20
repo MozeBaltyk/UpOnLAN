@@ -1,4 +1,5 @@
 config/**
+config2/**
 assets/**
 node_modules
 .c9

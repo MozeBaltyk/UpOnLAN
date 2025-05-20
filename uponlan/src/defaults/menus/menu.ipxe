@@ -1,0 +1,52 @@
+#!ipxe
+
+:start
+isset ${arch} && goto skip_arch_detect ||
+cpuid --ext 29 && set arch x86_64 || set arch i386
+iseq ${buildarch} arm64 && set arch arm64 ||
+:skip_arch_detect
+chain --autofree boot.cfg ||
+ntp 0.pool.ntp.org ||
+iseq ${cls} serial && goto ignore_cls ||
+set cls:hex 1b:5b:4a  # ANSI clear screen sequence - "^[[J"
+set cls ${cls:string}
+:ignore_cls
+
+isset ${menu} && goto ${menu} ||
+isset ${ip} || dhcp
+
+:main_menu
+clear menu
+set space:hex 20:20
+set space ${space:string}
+isset ${next-server} && menu ${site_name} v${version} - next-server: ${next-server} || menu ${site_name}
+item --gap Default:
+item local ${space} Boot from local hdd
+item --gap Distributions:
+iseq ${menu_linux} 1 && item linux ${space} Linux Network Installs (64-bit) ||
+iseq ${menu_linux_arm} 1 && item linux-arm ${space} Linux Network Installs (arm64) ||
+item netinfo ${space} Network card info
+
+isset ${menu} && set timeout 0 || set timeout ${boot_timeout}
+choose --timeout ${timeout} --default ${menu} menu || goto local
+echo ${cls}
+goto ${menu} 
+
+:change_menu
+chain ${menu}.ipxe || goto error
+goto main_menu
+
+:error
+echo Error occurred, press any key to return to menu ...
+prompt
+goto main_menu
+
+:local
+echo Booting from local disks ...
+exit 1
+
+:shell
+echo Type "exit" to return to menu.
+set menu main_menu
+shell
+goto main_menu

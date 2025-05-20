@@ -1,0 +1,24 @@
+#!ipxe
+
+goto ${menu} ||
+
+:linux_menu
+menu Linux Installers - Current Arch [ ${arch} ]
+item --gap Linux Distros:
+item harvester ${space} Harvester
+item oracle ${space} Oracle Linux
+item proxmox ${space} Proxmox
+item rockylinux ${space} Rocky Linux
+item ubuntu ${space} Ubuntu
+choose menu || goto linux_exit
+echo ${cls}
+goto ${menu} ||
+iseq ${sigs_enabled} true && goto verify_sigs || goto change_menu
+
+:change_menu
+chain ${menu}.ipxe || goto error
+goto linux_menu
+
+:linux_exit
+clear menu
+exit 0

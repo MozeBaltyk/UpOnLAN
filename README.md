@@ -9,8 +9,12 @@ This project use Wake-on-LAN and PXEboot to automate bare-metal install in view 
 For now, this is more a roadmap or wishing list than a list of features:
 
 [x] Provide a *TFTP server* for pxeboot and editor of ipxe config.
-[] Provide a *Wake-On-LAN* service. 
-[] Automated bare-metal install with *PXE boot*
+[] Provide a *Wake-On-LAN* service with web GUI:
+    [] Add/delete entries
+    [] Get Status/IP of the hosts
+    [] Scheduler
+    [] Scan network
+[] Automated install with *PXE boot* and 
 [] Provisioning with *Cloud-init* templates
 [] Display a PXE interface with choices
 [] Reachability tests

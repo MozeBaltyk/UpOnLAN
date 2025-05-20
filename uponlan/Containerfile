@@ -69,7 +69,6 @@ RUN apk add --no-cache \
     usermod -G users nbxyz && \
     mkdir /app /config /defaults
 
-
 COPY --from=build /app /app
 
 ENV TFTPD_OPTS=''

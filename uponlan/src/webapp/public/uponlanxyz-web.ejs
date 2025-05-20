@@ -129,8 +129,8 @@ function renderconfig(){
 socket.on('renderconfig', function(remote_files,local_files,filename,islocal){
   $('#pagecontent').empty();
   $('#pagecontent').append('\
-  <div class="card-header">Menus</div>\
   <div class="container-fluid">\
+  <div class="card-header">Menus</div>\
     <div class="row flex-xl-nowrap">\
       <div class="col-12 col-md-3 col-xl-2 bd-sidebar">\
         <button class="btn btn-link bd-search-docs-toggle d-md-none p-0 ml-3" type="button" data-toggle="collapse" data-target="#bd-docs-nav" aria-controls="bd-docs-nav" aria-expanded="false" aria-label="Toggle files navigation">\
@@ -143,7 +143,7 @@ socket.on('renderconfig', function(remote_files,local_files,filename,islocal){
       </div>\
       <div id="configcontent" class="col-12 col-md-9 col-xl-10">\
         <center>\
-          <h1>Please choose a file to edit<br>Or<br></h1>\
+          <h2>Please choose a file to edit<br>Or<br></h2>\
           <div class="form-row">\
             <div class="col-md-4"></div>\
             <div class="col-md-2"><input type="text" class="form-control ipxefilename" placeholder="myfile.ipxe"></div>\
@@ -532,6 +532,25 @@ socket.on('purgestatus', function(){
 });
 
 //// Render WOL page ////
+
+// Display Error message if any
+socket.on('error', function(msg){
+  // Show the error if the WOL form is visible
+  if ($('#wol-error').length) {
+    $('#wol-error').text(msg).show();
+  } else {
+    // Fallback: alert if not on WOL page
+    alert(msg);
+  }
+});
+
+// Re-render WOL hook
+socket.on('renderwolhook', function(){
+  if($('#pagecontent').length){
+    renderwol();
+  }
+});
+
 function renderwol(){
   $('#pagecontent').empty();
   $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting WOL</h2></center>');
@@ -541,10 +560,22 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
   $('#pagecontent').empty();
   let html = `
     <div class="card mb-3">
-      <div class="card-header">Wake-On-LAN</div>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Wake-On-LAN</span>
+        <button id="add-wol-btn" class="btn btn-primary btn-sm rounded-circle" title="Add Host">
+          <span style="font-size:1.2em;line-height:1;">&#10010;</span>
+        </button>
+      </div>
       <div class="card-body">
+        <div id="add-wol-form" style="display:none;" class="mb-3">
+          <form class="form-inline">
+            <input type="text" class="form-control form-control-sm mr-2" id="new-wol-host" placeholder="Name">
+            <input type="text" class="form-control form-control-sm mr-2" id="new-wol-mac" placeholder="MAC">
+            <button type="button" class="btn btn-success btn-sm" id="submit-wol-btn">Add</button>
+          </form>
+        </div>
         <table class="table table-hover">
-          <thead><tr><th>Name</th><th>MAC</th></tr></thead>
+          <thead><tr><th>Name</th><th>MAC</th><th>Actions</th></tr></thead>
           <tbody>
   `;
   if (wolpoints && Array.isArray(wolpoints.wakeonlan)) {
@@ -552,8 +583,18 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
       html += `<tr>
         <td>${host.hostname || ''}</td>
         <td>${host.default_mac || ''}</td>
+        <td>
+          <button class="btn btn-success btn-sm wake-wol-btn" data-mac="${host.default_mac}" title="Wake">
+            <span style="font-size:1.2em;">&#9889;</span>
+          </button>
+          <button class="btn btn-danger btn-sm delete-wol-btn" data-mac="${host.default_mac}">
+            <span style="font-size:1.2em;">&#128465;</span>
+          </button>
+        </td>
       </tr>`;
     });
+  } else {
+    html += `<tr><td colspan="3" class="text-center">No hosts available</td></tr>`;
   }
   html += `
           </tbody>
@@ -562,4 +603,37 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
     </div>
   `;
   $('#pagecontent').append(html);
+
+  // Handle delete button click
+  $('.delete-wol-btn').click(function() {
+    const mac = $(this).data('mac');
+    if (confirm('Delete this host?')) {
+      socket.emit('deletewol', mac);
+    }
+  });  
+
+  // Wake button handler
+  $('.wake-wol-btn').click(function() {
+    const mac = $(this).data('mac');
+    socket.emit('wakewol', mac);
+  });
+
+  // Show/hide form on button click
+  $('#add-wol-btn').click(function() {
+    $('#add-wol-form').toggle();
+  });
+
+  // Handle form submission
+  $('#submit-wol-btn').click(function() {
+    $('#wol-error').hide();
+    const hostname = $('#new-wol-host').val().trim();
+    const mac = $('#new-wol-mac').val().trim();
+    if (hostname && mac) {
+      socket.emit('addwol', { hostname: hostname, default_mac: mac });
+      $('#add-wol-form').hide();
+      $('#new-wol-host').val('');
+      $('#new-wol-mac').val('');
+    }
+  });
+
 });

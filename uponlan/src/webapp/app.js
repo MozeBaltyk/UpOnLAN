@@ -203,6 +203,67 @@ io.on('connection', function(socket){
     var wolpoints = yaml.load(wolfile);
     io.sockets.in(socket.id).emit('renderwol',wolpoints,remotemenuversion);
   });
+  // add entry in wol.yml
+  socket.on('addwol', function(newEntry) {
+    try {
+      // Read the current wol.yml
+      let wolfile = fs.readFileSync('/config/wol.yml', 'utf8');
+      let wolpoints = yaml.load(wolfile) || {};
+      if (!Array.isArray(wolpoints.wakeonlan)) {
+        wolpoints.wakeonlan = [];
+      }
+      if (!isValidMac(newEntry.default_mac)) {
+      socket.emit('error', 'Invalid MAC address format.');
+      return;
+      }
+      if (wolpoints.wakeonlan.some(entry => entry.default_mac.toLowerCase() === newEntry.default_mac.toLowerCase())) {
+      socket.emit('error', 'MAC address already exists.');
+      return;
+      }
+      // Add the new entry
+      wolpoints.wakeonlan.push(newEntry);
+      // Write back to wol.yml
+      fs.writeFileSync('/config/wol.yml', yaml.dump(wolpoints));
+      // Emit updated data to client
+      socket.emit('renderwol', wolpoints);
+    } catch (err) {
+      socket.emit('error', 'Failed to add WOL entry: ' + err.message);
+    }
+  });
+  // wake on lan function
+  const { exec } = require('child_process');
+  socket.on('wakewol', function(mac) {
+    exec(`awake ${mac}`, (error, stdout, stderr) => {
+      if (error) {
+        socket.emit('error', `Failed to wake host: ${stderr || error.message}`);
+      } else {
+        socket.emit('info', `Wake command sent to ${mac}`);
+      }
+    });
+  });
+  // Delete entry in wol.yml
+  socket.on('deletewol', function(mac) {
+    try {
+      let wolfile = fs.readFileSync('/config/wol.yml', 'utf8');
+      let wolpoints = yaml.load(wolfile) || {};
+      if (!Array.isArray(wolpoints.wakeonlan)) {
+        wolpoints.wakeonlan = [];
+      }
+      // Filter out the entry with the matching MAC address (case-insensitive)
+      const before = wolpoints.wakeonlan.length;
+      wolpoints.wakeonlan = wolpoints.wakeonlan.filter(
+        entry => entry.default_mac.toLowerCase() !== mac.toLowerCase()
+      );
+      if (wolpoints.wakeonlan.length === before) {
+        socket.emit('error', 'Entry not found.');
+        return;
+      }
+      fs.writeFileSync('/config/wol.yml', yaml.dump(wolpoints));
+      socket.emit('renderwol', wolpoints);
+    } catch (err) {
+      socket.emit('error', 'Failed to delete WOL entry: ' + err.message);
+    }
+  });
   // When remote downloads are requested make folders and download
   socket.on('dlremote', function(dlfiles){
     dlremote(dlfiles, function(response){
@@ -242,6 +303,12 @@ io.on('connection', function(socket){
 
 
 //// Functions ////
+
+// Validation function
+
+function isValidMac(mac) {
+  return /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(mac);
+}
 
 // Layer remote with local in the main tftp endpoint
 function layermenu(callback){

@@ -1,4 +1,12 @@
 endpoints:
+  oracle-8-cloud-init:
+    path: /asset-mirror/user-data/ol8/
+    files:
+    - cloud-init.cfg
+    - network.cfg
+    os: oracle
+    version: '8'
+    arch: x86_64
   oracle-8-x86_64:
     path: /asset-mirror/releases/download/6-1525fd25/
     files:
@@ -45,3 +53,27 @@ endpoints:
     - version.yaml
     os: harvester
     version: v1.5.0
+  proxmox-backup-server:
+    path: /asset-mirror/releases/download/3.4-1-f308cf4b/
+    files:
+    - initrd
+    - vmlinuz
+    - proxmox.iso
+    os: proxmox-backup-server
+    version: 3.4-1
+  proxmox-ve:
+    path: /asset-mirror/releases/download/8.4-1-613c19ff/
+    files:
+    - initrd
+    - proxmox.iso
+    - vmlinuz
+    os: proxmox-ve
+    version: 8.4-1
+  proxmox-mailgateway:
+    path: /asset-mirror/releases/download/8.2-1-8374c64d/
+    files:
+    - initrd
+    - vmlinuz
+    - proxmox.iso
+    os: proxmox-mailgateway
+    version: 8.2-1

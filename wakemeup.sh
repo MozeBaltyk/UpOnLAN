@@ -16,6 +16,11 @@ destroy () {
     podman rmi localhost/uponlan:latest
 }
 
+redeploy () {
+    destroy
+    deploy
+}
+
 logs () {
     podman pod ps; echo ""
     podman ps -a; echo ""
@@ -25,6 +30,7 @@ logs () {
 connect () {
     podman exec -it $(podman ps --filter ancestor=localhost/uponlan:latest --format "{{.ID}}") /bin/sh
 }
+
 exec_cmd () {
     eval "${action}"
 }
@@ -38,8 +44,9 @@ print_help () {
     echo "1. build"
     echo "2. deploy"
     echo "3. destroy"
-    echo "4. logs"
-    echo "5. connect"
+    echo "4. redeploy"
+    echo "5. logs"
+    echo "6. connect"
     echo ""
 }
 
@@ -60,6 +67,7 @@ case $action in
     build) echo "Action: build";;
     deploy) echo "Action: deploy";;
     destroy) echo "Action: destroy";;
+    redeploy) echo "Action: redeploy";;
     logs) echo "Action: logs";;
     connect) echo "Action: connect";;
     *) echo "Invalid action: $action"; print_help; exit 1;;

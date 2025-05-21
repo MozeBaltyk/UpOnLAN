@@ -4,7 +4,9 @@
 mkdir -p \
   /assets \
   /config/nginx/site-confs \
-  /config/log/nginx \
+  /config/logs/nginx \
+  /config/logs/tftp \
+  /config/logs/webapp \
   /run \
   /var/lib/nginx/tmp/client_body \
   /var/tmp/nginx
@@ -44,6 +46,9 @@ if [[ ! -f /config/wol.yml ]]; then
   echo "[uponlanxyz-init] Import wol.yml"
   cp /defaults/wol.yml /config/wol.yml
 fi
+
+# Avoid errrors with supervisord 
+touch /var/logs/messages
 
 # Ownership
 chown -R nbxyz:nbxyz /config

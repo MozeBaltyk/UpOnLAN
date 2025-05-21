@@ -224,9 +224,12 @@ io.on('connection', function(socket){
       wolpoints.wakeonlan.push(newEntry);
       // Write back to wol.yml
       fs.writeFileSync('/config/wol.yml', yaml.dump(wolpoints));
+      // Log in console
+      console.log(`WOL entry added: ${JSON.stringify(newEntry)}`);
       // Emit updated data to client
       socket.emit('renderwol', wolpoints);
     } catch (err) {
+      console.error('Failed to add WOL entry:', err); 
       socket.emit('error', 'Failed to add WOL entry: ' + err.message);
     }
   });
@@ -235,8 +238,10 @@ io.on('connection', function(socket){
   socket.on('wakewol', function(mac) {
     exec(`awake ${mac}`, (error, stdout, stderr) => {
       if (error) {
+        console.error(`Failed to wake host ${mac}:`, stderr || error.message); 
         socket.emit('error', `Failed to wake host: ${stderr || error.message}`);
       } else {
+        console.log(`Wake command sent to ${mac}: ${stdout.trim()}`); 
         socket.emit('info', `Wake command sent to ${mac}`);
       }
     });
@@ -259,8 +264,10 @@ io.on('connection', function(socket){
         return;
       }
       fs.writeFileSync('/config/wol.yml', yaml.dump(wolpoints));
+      console.log(`WOL entry deleted: ${mac}`);
       socket.emit('renderwol', wolpoints);
     } catch (err) {
+      console.error('Failed to delete WOL entry:', err); 
       socket.emit('error', 'Failed to delete WOL entry: ' + err.message);
     }
   });

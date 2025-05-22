@@ -1,6 +1,6 @@
 {
   "name": "WebApp",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Configuration and mirroring application for uponlan.xyz stack",
   "main": "app.js",
   "scripts": {

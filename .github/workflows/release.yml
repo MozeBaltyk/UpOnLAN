@@ -1,0 +1,56 @@
+name: release
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  release:
+    name: Build Release
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: master
+
+    - name: Get current webapp version
+      id: get_version
+      run: echo "TAG_VERSION=$(jq -r '.version' ./uponlan/src/webapp/package.json)" >> $GITHUB_OUTPUT
+
+    - name: Check if tag exists
+      id: check_tag
+      run: echo "TAG_EXISTS=$(git tag | grep ${{ steps.get_version.outputs.TAG_VERSION }})" >> $GITHUB_OUTPUT
+
+    - name: Fail if tag exists
+      env:
+        tag_version: ${{ steps.get_version.outputs.TAG_VERSION }}
+        tag_exists: ${{ steps.check_tag.outputs.TAG_EXISTS }}
+      if: ${{ steps.get_version.outputs.TAG_VERSION == steps.check_tag.outputs.TAG_EXISTS }}
+      uses: actions/github-script@v7
+      with:
+        script: |
+            core.setFailed('Release tag already exists in git (tag_exists var: ${tag_exists} and tag_version: ${tag_version})')
+
+    - name: Build release
+      run: |
+        ./release/release.sh ${{ steps.get_version.outputs.TAG_VERSION }}
+
+    - name: Extract release notes
+      id: extract-release-notes
+      uses: ffurrer2/extract-release-notes@v2
+
+    - name: Create Release and Upload Assets
+      uses: svenstaro/upload-release-action@v2
+      with:
+        file: release/githubout/*
+        file_glob: true
+        overwrite: true
+        prerelease: false
+        release_name: ${{ env.release_tag }}
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        tag: ${{ env.release_tag }}
+        body: ${{ steps.extract-release-notes.outputs.release_notes }}

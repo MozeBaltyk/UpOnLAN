@@ -39,6 +39,65 @@ function disablesigs(){
   }
 }
 
+// set menu version from menuversion.txt
+let menuversion = '';
+if (fs.existsSync('/config/menuversion.txt')) {
+  menuversion = fs.readFileSync('/config/menuversion.txt', 'utf8');
+} else {
+  menuversion = 'none'; // or ''
+}
+// set menu origin from menuorigin.txt
+let menuorigin = '';
+if (fs.existsSync('/config/menuorigin.txt')) {
+  menuorigin = fs.readFileSync('/config/menuorigin.txt', 'utf8');
+} else {
+  menuorigin = 'none'; // or ''
+}
+
+// Set endpoint url from ENDPOINT_URL env variable
+const isValidUrl = urlString=> {
+       var urlPattern = new RegExp('^(https?:\\/\\/)?'+ // validate protocol
+     '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // validate domain name
+     '((\\d{1,3}\\.){3}\\d{1,3}))'+ // validate OR ip (v4) address
+     '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // validate port and path
+     '(\\?[;&a-z\\d%_.~+=-]*)?'+ // validate query string
+     '(\\#[-a-z\\d_]*)?$','i'); // validate fragment locator
+   return !!urlPattern.test(urlString);
+ }
+
+const defaultEndpointUrl = "https://github.com/mozebaltyk/uponlan";
+let endpoint_url = process.env.ENDPOINT_URL;
+
+if (!endpoint_url || !isValidUrl(endpoint_url)) {
+  console.warn(`Invalid URL "${endpoint_url}" in environment variable ENDPOINT_URL. Using default URL ${defaultEndpointUrl} instead.`);
+  endpoint_url = defaultEndpointUrl;
+}
+
+// Define API and raw URLs based on endpoint_url
+let api_url, raw_url;
+
+if (endpoint_url.includes("github.com")) {
+  // For GitHub, construct API and raw URLs
+  const match = endpoint_url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+  if (match) {
+    const user = match[1];
+    const repo = match[2];
+    api_url = `https://api.github.com/repos/${user}/${repo}/`;
+    raw_url = `https://raw.githubusercontent.com/${user}/${repo}/main/`;
+  } else {
+    // fallback if parsing fails
+    api_url = endpoint_url;
+    raw_url = endpoint_url;
+  }
+} else {
+  // For other endpoints, just use the base URL
+  api_url = endpoint_url;
+  raw_url = endpoint_url;
+}
+
+console.log("API URL:", api_url);
+console.log("RAW URL:", raw_url);
+console.log("Endpoint URL:", endpoint_url);
 ////// PATHS //////
 //// Main ////
 baserouter.get("/", function (req, res) {
@@ -62,12 +121,20 @@ io.on('connection', function(socket){
   ///////////////////////////
   // When dashboard info is requested send to client
   socket.on('getdash', function(){
+    // Always read the latest values from disk
+    let menuversion = fs.existsSync('/config/menuversion.txt') ? fs.readFileSync('/config/menuversion.txt', 'utf8') : 'none';
+    let menuorigin = fs.existsSync('/config/menuorigin.txt') ? fs.readFileSync('/config/menuorigin.txt', 'utf8') : 'none';
+    // Commands to get versions
     var tftpcmd = '/usr/sbin/dnsmasq --version | head -n1 | cut -d " " -f1-3';
     var nginxcmd = '/usr/sbin/nginx -v';
     var wolcmd = '/usr/bin/awake --version';
     var dashinfo = {};
+    // Webapp version
     dashinfo['webversion'] = version;
-    dashinfo['menuversion'] = fs.readFileSync('/config/menuversion.txt', 'utf8');
+    // Menu version
+    dashinfo['menuversion'] = menuversion;
+    // Menu origin (endpoint_url or netbook.xyz)
+    dashinfo['menuorigin'] = menuorigin;
     fetch('https://api.github.com/repos/mozebaltyk/uponlan/releases/latest', {headers: {'user-agent': 'node.js'}})
       .then(response => {
         if (!response.ok) {
@@ -101,14 +168,21 @@ io.on('connection', function(socket){
         console.log('There was a problem with the fetch operation: ' + error.message);
       });
     });
-  // When upgrade is requested run it
+  // When Menu from Endpoint URL is requested run it from dashboard
   socket.on('upgrademenus', function(version){
     upgrademenu(version, function(response){
       io.sockets.in(socket.id).emit('renderdashhook');
     });
   });
+  // When Menu from Endpoint URL is requested run it in the Dev Menu
   socket.on('upgrademenusdev', function(version){
     upgrademenu(version, function(response){
+      io.sockets.in(socket.id).emit('renderconfighook');
+    });
+  });
+  // When Menu from Netboot.xyz is requested run it in the Dev Menu
+  socket.on('upgrademenusdevnetboot', function(version){
+    upgrademenunetboot(version, function(response){
       io.sockets.in(socket.id).emit('renderconfighook');
     });
   });
@@ -184,7 +258,7 @@ io.on('connection', function(socket){
   });
   // When the endpoints content is requested send it to the client
   socket.on('getlocal', async function(filename){
-    var remotemenuversion = fs.readFileSync('/config/menuversion.txt', 'utf8');
+    //var remotemenuversion = fs.readFileSync('/config/menuversion.txt', 'utf8');
     var endpointsfile = fs.readFileSync('/config/endpoints.yml');
     var endpoints = yaml.load(endpointsfile);
     var localfiles = await readdirp.promise('/assets/.');
@@ -194,14 +268,56 @@ io.on('connection', function(socket){
         assets.push('/' + localfiles[i].path);
       }
     }
-    io.sockets.in(socket.id).emit('renderlocal',endpoints,assets,remotemenuversion);
+    io.sockets.in(socket.id).emit('renderlocal',endpoints,assets,menuversion);
+  });
+  // Empty Menu
+  socket.on('emptymenu', function(){
+    try {
+      // Helper to delete all files in a directory
+      function deleteAllFilesInDir(dir) {
+        if (fs.existsSync(dir)) {
+          fs.readdirSync(dir).forEach(file => {
+            const filePath = path.join(dir, file);
+            if (fs.lstatSync(filePath).isFile()) {
+              fs.unlinkSync(filePath);
+              console.log('Deleted', filePath);
+            }
+          });
+        }
+      }
+      // Delete all files in local and remote directories
+      deleteAllFilesInDir('/config/menus/local');
+      deleteAllFilesInDir('/config/menus/remote');
+      deleteAllFilesInDir('/config/menus');
+
+      // Delete /config/menuversion.txt
+      const menuVersionFile = '/config/menuversion.txt';
+      if (fs.existsSync(menuVersionFile)) {
+        fs.unlinkSync(menuVersionFile);
+        console.log('Deleted', menuVersionFile);
+      }
+
+      // Delete /config/menuorigin.txt
+      const menuOriginFile = '/config/menuorigin.txt';
+      if (fs.existsSync(menuOriginFile)) {
+        fs.unlinkSync(menuOriginFile);
+        console.log('Deleted', menuOriginFile);
+      }
+
+      // Optionally, re-render the config for the client
+      var local_files = fs.readdirSync('/config/menus/local',{withFileTypes: true}).filter(dirent => !dirent.isDirectory()).map(dirent => dirent.name);
+      var remote_files = fs.readdirSync('/config/menus/remote',{withFileTypes: true}).filter(dirent => !dirent.isDirectory()).map(dirent => dirent.name);
+      io.sockets.in(socket.id).emit('renderconfig', remote_files, local_files);
+    } catch (err) {
+      console.error('Failed to reset menu:', err);
+      socket.emit('error', 'Failed to reset menu: ' + err.message);
+    }
   });
   // When the endpoints Wake On LAN is requested send it to the client.
   socket.on('getwol', async function(filename){
-    var remotemenuversion = fs.readFileSync('/config/menuversion.txt', 'utf8');
     var wolfile = fs.readFileSync('/config/wol.yml');
     var wolpoints = yaml.load(wolfile);
-    io.sockets.in(socket.id).emit('renderwol',wolpoints,remotemenuversion);
+    io.sockets.in(socket.id).emit('renderwol',wolpoints);
   });
   // add entry in wol.yml
   socket.on('addwol', function(newEntry) {
@@ -290,21 +406,41 @@ io.on('connection', function(socket){
     }
     io.sockets.in(socket.id).emit('renderlocalhook');
   });
-  // When Dev Browser is requested reach out to github for versions
+  // When Get Browser is requested reach out to github Netboot.xyz for versions
+  socket.on('nbgetbrowser', async function(){
+    try {
+      var nb_api_url = 'https://api.github.com/repos/netbootxyz/netboot.xyz/';
+      var options = {headers: {'user-agent': 'node.js'}};
+      var releasesResponse = await fetch(nb_api_url + 'releases', options);
+      if (!releasesResponse.ok) {
+        throw new Error(`HTTP error! status: ${releasesResponse.status}`);
+      }
+      var releases = await releasesResponse.json();
+      var commitsResponse = await fetch(nb_api_url + 'commits', options);
+      if (!commitsResponse.ok) {
+        throw new Error(`HTTP error! status: ${commitsResponse.status}`);
+      }
+      var commits = await commitsResponse.json()
+      io.sockets.in(socket.id).emit('nbrenderbrowser', releases, commits);
+    } catch (error) {
+      console.error('nbgetbrowser error:', error.stack || error);
+      socket.emit('error', 'Failed to fetch Netboot.xyz browser data: ' + error.message);
+    }
+  });
+  // When Get Browser is requested reach out to github Mozebaltyk for versions
   socket.on('devgetbrowser', async function(){
-    var api_url = 'https://api.github.com/repos/netbootxyz/netboot.xyz/';
-    var options = {headers: {'user-agent': 'node.js'}};
-    var releasesResponse = await fetch(api_url + 'releases', options);
-    if (!releasesResponse.ok) {
-      throw new Error(`HTTP error! status: ${releasesResponse.status}`);
+    try {
+      var options = {headers: {'user-agent': 'node.js'}};
+      var releasesResponse = await fetch(api_url + 'releases', options);
+      if (!releasesResponse.ok) {
+        throw new Error(`HTTP error! status: ${releasesResponse.status}`);
+      }
+      var releases = await releasesResponse.json();
+      io.sockets.in(socket.id).emit('devrenderbrowser', releases);
+    } catch (error) {
+      console.error('devgetbrowser error:', error.stack || error);
+      socket.emit('error', 'Failed to fetch UpOnLAN.xyz browser data: ' + error.message);
     }
-    var releases = await releasesResponse.json();
-    var commitsResponse = await fetch(api_url + 'commits', options);
-    if (!commitsResponse.ok) {
-      throw new Error(`HTTP error! status: ${commitsResponse.status}`);
-    }
-    var commits = await commitsResponse.json()
-    io.sockets.in(socket.id).emit('devrenderbrowser', releases, commits);
   });
 });
 
@@ -343,6 +479,46 @@ async function upgrademenu(version, callback){
   }
   // Download files
   var downloads = [];
+  var download_endpoint = endpoint_url + '/releases/download/' + version + '/';
+  downloads.push({'url':download_endpoint + 'menus.tar.gz','path':remote_folder});
+  
+  // static config for endpoints
+  downloads.push({'url': raw_url + version +'/endpoints.yml','path':'/config/'});
+  await downloader(downloads);
+  var untarcmd = 'tar xf ' + remote_folder + 'menus.tar.gz -C ' + remote_folder;
+
+  var origin = endpoint_url;
+
+  exec(untarcmd, function (err, stdout) {
+    fs.unlinkSync(remote_folder + 'menus.tar.gz');
+    fs.writeFileSync('/config/menuversion.txt', version);
+    fs.writeFileSync('/config/menuorigin.txt', origin);
+    layermenu(function(response){
+      disablesigs();
+      callback(null, 'done');
+    });
+  });
+}
+
+// Download menus from netboot.xyz
+async function upgrademenunetboot(version, callback){
+  var remote_folder = '/config/menus/remote/';
+  // Wipe current remote
+  var remote_files = fs.readdirSync('/config/menus/remote',{withFileTypes: true}).filter(dirent => !dirent.isDirectory()).map(dirent => dirent.name);
+  for (var i in remote_files){
+    var file = remote_files[i];
+    fs.unlinkSync(remote_folder + file);
+  }
+  // Download files
+  var downloads = [];
+  var rom_files = ['netboot.xyz.kpxe',
+                   'netboot.xyz-undionly.kpxe',
+                   'netboot.xyz.efi',
+                   'netboot.xyz-snp.efi',
+                   'netboot.xyz-snponly.efi',
+                   'netboot.xyz-arm64.efi',
+                   'netboot.xyz-arm64-snp.efi',
+                   'netboot.xyz-arm64-snponly.efi'];
 
   // This is a commit sha
   if (version.length == 40){
@@ -366,9 +542,12 @@ async function upgrademenu(version, callback){
   if (version.length == 40){
     var version = 'Development';
   }
+  var origin = download_endpoint.replace(/releases\/download\/.*$/, '');
+
   exec(untarcmd, function (err, stdout) {
     fs.unlinkSync(remote_folder + 'menus.tar.gz');
     fs.writeFileSync('/config/menuversion.txt', version);
+    fs.writeFileSync('/config/menuorigin.txt', origin);
     layermenu(function(response){
       disablesigs();
       callback(null, 'done');
@@ -465,23 +644,3 @@ if (!Number.isInteger(Number(port)) || port < 1 || port > 65535) {
 http.listen(port, function(){
   console.log('listening on *:' + port);
 });
-
-// Set endpoint url from ENDPOINT_URL env variable
-const isValidUrl = urlString=> {
-       var urlPattern = new RegExp('^(https?:\\/\\/)?'+ // validate protocol
-     '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // validate domain name
-     '((\\d{1,3}\\.){3}\\d{1,3}))'+ // validate OR ip (v4) address
-     '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // validate port and path
-     '(\\?[;&a-z\\d%_.~+=-]*)?'+ // validate query string
-     '(\\#[-a-z\\d_]*)?$','i'); // validate fragment locator
-   return !!urlPattern.test(urlString);
- }
-
-const defaultEndpointUrl = "https://github.com/mozebaltyk/uponlan";
-
-let endpointurl = process.env.ENDPOINT_URL;
-
-if (!endpointurl || !isValidUrl(endpointurl)) {
-  console.warn(`Invalid URL "${endpointurl}" in environment variable ENDPOINT_URL. Using default URL ${defaultEndpointUrl} instead.`);
-  endpointurl = defaultEndpointUrl;
-}

@@ -23,6 +23,7 @@ socket.on('renderdash', function(response){
   var wolversion = response.wolversion;
   var webversion = response.webversion;
   var menuversion = response.menuversion;
+  var menuorigin = response.menuorigin;
   var remotemenuversion = response.remotemenuversion;
   var cpustats = response.cpu;
   var cpupercent = response.CPUpercent;
@@ -50,7 +51,7 @@ socket.on('renderdash', function(response){
         <div class="card-body">\
         <table class="table table-hover">\
           <tr><td>Webapp Version: </td><td><a target="_blank" href="https://github.com/mozebaltyk/uponlan/releases/' + webversion + '">' + webversion + '</a></td></tr>\
-          <tr><td>Menus Version:</td><td><a target="_blank" href="https://github.com/mozebaltyk/uponlan/releases/' + menuversion + '">' + menuversion + '</a></td></tr>\
+          <tr><td>Menus Version:</td><td><a target="_blank" href="' + menuorigin + '/releases/' + menuversion + '">' + menuversion + '</a></td></tr>\
           <tr><td>Upgrade Menus to latest</td><td><div id="upgradebutton">' + upgradebutton + '</div></td></tr>\
         </table>\
         </div>\
@@ -113,6 +114,11 @@ function upgrademenusdev(version){
   $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Pulling menus at version requested</h2></center>');
   socket.emit('upgrademenusdev', version);
 }
+function upgrademenusdevnetboot(version){
+  $('#configcontent').empty();
+  $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Pulling menus at version requested</h2></center>');
+  socket.emit('upgrademenusdevnetboot', version);
+}
 // Re-render dash hook
 socket.on('renderdashhook', function(){
   if($('#upgradebutton').length){
@@ -129,7 +135,9 @@ function renderconfig(){
 socket.on('renderconfig', function(remote_files,local_files,filename,islocal){
   $('#pagecontent').empty();
   $('#pagecontent').append('\
-  <div class="card-header">Menus</div>\
+  <div class="card">\
+    <div class="card-header">Menus</div>\
+  </div>\
   <div class="container-fluid">\
     <div class="row flex-xl-nowrap">\
       <div class="col-12 col-md-3 col-xl-2 bd-sidebar">\
@@ -143,22 +151,36 @@ socket.on('renderconfig', function(remote_files,local_files,filename,islocal){
       </div>\
       <div id="configcontent" class="col-12 col-md-9 col-xl-10">\
         <center>\
-          <h2>Please choose a file to edit<br>Or<br></h2>\
+          <h3>Choose file to edit on the left panel<br><br></h3>\
+          <h3>Create a new file:</h3>\
           <div class="form-row">\
             <div class="col-md-4"></div>\
             <div class="col-md-2"><input type="text" class="form-control ipxefilename" placeholder="myfile.ipxe"></div>\
             <div class="col-md-2"><button onclick="createipxe()" class="btn btn-primary form-control">Create New</button></div>\
             <div class="col-md-4"></div>\
-          </div><br>\
+          </div><br><br>\
+          <h3>Import a menu:</h3>\
           <div class="form-row">\
             <div class="col-md-4"></div>\
-            <div class="col-md-4"><button onclick="devbrowser()" class="btn btn-outline-info form-control">Menu Development Versions</button></div>\
+            <div class="col-md-4"><button onclick="devbrowser()" class="btn btn-outline-info form-control">Menu From Endpoint URL</button></div>\
+            <div class="col-md-4"></div>\
+          </div><br><br>\
+          <div class="form-row">\
+            <div class="col-md-4"></div>\
+            <div class="col-md-4"><button onclick="nbbrowser()" class="btn btn-outline-info form-control">Menu Netboot.xyz</button></div>\
+            <div class="col-md-4"></div>\
+          </div><br><br>\
+          <h3>Erase menus:</h3>\
+          <div class="form-row">\
+            <div class="col-md-4"></div>\
+            <div class="col-md-4"><button onclick="resetmenu()" class="btn btn-outline-danger form-control">Reset Menus</button></div>\
             <div class="col-md-4"></div>\
           </div>\
         </center>\
       </div>\
     </div>\
   </div>');
+  // Render the file list
   $(local_files).each(function( index, value ) {
     $('#bd-docs-nav').append('\
     <div class="bd-toc-item">\
@@ -183,6 +205,16 @@ socket.on('renderconfig', function(remote_files,local_files,filename,islocal){
     });
   });
 });
+// Empty menu
+function resetmenu() {
+  if (confirm('Are you sure you want to reset the menu?')) {
+    $('#configcontent').empty();
+    $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Empty Menu</h2></center>');
+    socket.emit('emptymenu');
+    // Refresh the config page after a short delay
+    setTimeout(renderconfig, 1000)
+  }
+}
 // Render edit window
 function editgetfile(filename,islocal){
   $('#configcontent').empty();
@@ -246,13 +278,65 @@ function createipxe(){
   $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Creating File</h2></center>');
   }
 }
-// Render edit window
+// Render edit window DEV Menus From var ENDPOINT_URL
+// This function fetches and displays remote development versions of menus from an endpoint URL.
 function devbrowser(){
   $('#configcontent').empty();
   $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Remote Development Versions</h2></center>');
   socket.emit('devgetbrowser');
 }
-socket.on('devrenderbrowser', function(releases,commits){
+socket.on('devrenderbrowser', function(releases){
+  $('#configcontent').empty();
+  $('#configcontent').append('\
+  <div class="card-group">\
+    <div class="card">\
+      <div class="card-header">\
+        Releases\
+      </div>\
+      <div class="card-body">\
+      <table class="table table-sm" id="releases" style=".dataTables_filter {display:none;}">\
+        <thead>\
+          <tr>\
+            <th>Releases</th>\
+            <th></th>\
+          </tr>\
+        </thead>\
+      </table>\
+      </div>\
+    </div>\
+  </div>');
+  var tableoptions = {
+    "paging": false,
+    "bInfo" : false,
+    'sDom': 't',
+    "order": []
+  };
+  $("#releases").dataTable().fnDestroy();
+  var releasestable = $('#releases').DataTable(tableoptions);
+  releasestable.clear();
+  if (Array.isArray(releases)) {
+    $.each(releases, function(index,value){
+      releasestable.row.add( 
+        [
+          '<a target="_blank" href="' + value.html_url + '">' + value.tag_name + '</a>',
+          '<span style="float:right;"><button onclick="upgrademenusdev(\'' + value.tag_name + '\')" class="btn btn-outline-success btn-sm">Download</button></span>'
+        ]
+      );
+    });
+  } else {
+    console.error('Invalid data received for releases:', releases);
+  }
+  releasestable.draw();
+});
+
+// Render edit window DEV Menus From Netboot.xyz github
+// This function fetches and displays remote development versions of menus from the Netboot.xyz GitHub repository.
+function nbbrowser(){
+  $('#configcontent').empty();
+  $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Remote Netboot.xyz Versions</h2></center>');
+  socket.emit('nbgetbrowser');
+}
+socket.on('nbrenderbrowser', function(releases,commits){
   $('#configcontent').empty();
   $('#configcontent').append('\
   <div class="card-group">\
@@ -303,7 +387,7 @@ socket.on('devrenderbrowser', function(releases,commits){
     releasestable.row.add( 
       [
         '<a target="_blank" href="' + value.html_url + '">' + value.tag_name + '</a>',
-        '<span style="float:right;"><button onclick="upgrademenusdev(\'' + value.tag_name + '\')" class="btn btn-outline-success btn-sm">Download</button></span>'
+        '<span style="float:right;"><button onclick="upgrademenusdevnetboot(\'' + value.tag_name + '\')" class="btn btn-outline-success btn-sm">Download</button></span>'
       ]
     );
   });
@@ -311,13 +395,14 @@ socket.on('devrenderbrowser', function(releases,commits){
     commitstable.row.add( 
       [
         '<a target="_blank" href="' + value.html_url + '">' + value.sha + '</a>',
-        '<span style="float:right;"><button onclick="upgrademenusdev(\'' + value.sha + '\')" class="btn btn-outline-success btn-sm">Download</button></span>'
+        '<span style="float:right;"><button onclick="upgrademenusdevnetboot(\'' + value.sha + '\')" class="btn btn-outline-success btn-sm">Download</button></span>'
       ]
     );
   });
   commitstable.draw();
   releasestable.draw();
 });
+
 // Re-render menus hook
 socket.on('renderconfighook', function(){
   if($('#bd-docs-nav').length){

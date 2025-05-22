@@ -27,24 +27,40 @@ mkdir -p \
   /config/menus/remote \
   /config/menus/local
 
-# Push menus if not found
-if [[ ! -f /config/menus/menu.ipxe ]]; then
+# Import UpOnLAN menus if ENDPOINT_URL is not set
+if [[ -z ${ENDPOINT_URL} ]]; then
   if [[ -z ${MENU_VERSION+x} ]]; then
     MENU_VERSION=$(curl -sL "https://api.github.com/repos/mozebaltyk/uponlan/releases/latest" | jq -r '.tag_name')
   fi
-  echo "[uponlanxyz-init] Import uponlan.xyz at ${MENU_VERSION}"
+  echo "[uponlanxyz-init] Import default menu from uponlan.xyz:${MENU_VERSION}"
   echo -n "${MENU_VERSION}" > /config/menuversion.txt
-  cp /defaults/endpoints.yml /config/endpoints.yml
-  cp /defaults/menus/boot.cfg /config/menus/boot.cfg 
-  cp /defaults/menus/*.ipxe /config/menus/
-  cp /defaults/menus/boot.cfg /config/menus/remote/boot.cfg 
-  cp /defaults/menus/*.ipxe /config/menus/remote/
+  echo -n "https://github.com/mozebaltyk/uponlan" > /config/menuorigin.txt
+  curl -L https://github.com/mozebaltyk/uponlan/releases/download/${MENU_VERSION}/menus.tar.gz -o /config/menus/menus.tar.gz
+  tar -xzf /config/menus/menus.tar.gz -C /config/menus
+  rm -f /config/menus/menus.tar.gz
+# Import menus if ENDPOINT_URL is set
+else
+  if [[ -z ${MENU_VERSION+x} ]]; then
+    MENU_VERSION="latest"
+  fi
+  echo "[uponlanxyz-init] Import menu from ${ENDPOINT_URL}"
+  echo -n "${MENU_VERSION}" > /config/menuversion.txt
+  echo -n "${ENDPOINT_URL}" > /config/menuorigin.txt
+  curl -L ${ENDPOINT_URL} -o /config/menus/menus.tar.gz
+  tar -xzf /config/menus/menus.tar.gz -C /config/menus
+  rm -f /config/menus/menus.tar.gz
 fi
 
-# init wol.yaml
+# init wol.yml
 if [[ ! -f /config/wol.yml ]]; then
   echo "[uponlanxyz-init] Import wol.yml"
   cp /defaults/wol.yml /config/wol.yml
+fi
+
+# init endpoints.yml
+if [[ ! -f /config/endpoints.yml ]]; then
+  echo "[uponlanxyz-init] Import endpoints.yml"
+  cp /defaults/endpoints.yml /config/endpoints.yml
 fi
 
 # Avoid errrors with supervisord 

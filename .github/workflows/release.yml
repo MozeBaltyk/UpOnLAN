@@ -38,6 +38,9 @@ jobs:
         script: |
             core.setFailed('Release tag already exists in git (tag_exists var: ${tag_exists} and tag_version: ${tag_version})')
 
+    - name: Set release tag
+      run: echo "release_tag=${{ steps.get_version.outputs.TAG_VERSION }}" >> $GITHUB_ENV
+
     - name: Build release
       run: |
         pwd

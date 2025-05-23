@@ -7,9 +7,14 @@ jobs:
   release:
     name: Build Release
     runs-on: ubuntu-latest
+    if: github.repository == 'mozebaltyk/uponlan'
     permissions:
-      id-token: write
+      actions: write
+      checks: write
       contents: write
+      deployments: write
+      packages: write
+      id-token: write
     steps:
     - uses: actions/checkout@v4
       with:

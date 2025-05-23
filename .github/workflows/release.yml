@@ -18,7 +18,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: master
+        ref: main
 
     - name: Get current webapp version
       id: get_version

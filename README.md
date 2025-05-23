@@ -2,23 +2,23 @@
 
 **[Features](#features) • [Get Started](#get-started)**
 
-This project use Wake-on-LAN and PXEboot to automate bare-metal install in view to experiment new setup, help to develop ipxe menu and test it. It attends to be the first milestone for a homelab.
+This project is a cold fork of Netboot.xyz with a goal unify and simplify the upstream project. It also aims to get new functionalities as Wake-on-LAN, test of the pxe menu and install, a webapp which allow to develop custom pxe menus, etc.
+PXEboot is relevant to automate bare-metal installation in view to experiment new setup.
 
 ## Features
 
-For now, this is more a roadmap or wishing list than a list of features:
+For now, this is more a roadmap or a wishing list than a list of features:
 
 [x] Provide a *TFTP server* for pxeboot and editor of ipxe config.
-[] Provide a *Wake-On-LAN* service with web GUI:
+[x] Provide a *Wake-On-LAN* service with web GUI:
     [x] Add/delete entries
     [x] Send WOL signal
     [] Get Status/IP of the hosts
     [] Scheduler
-    [] Scan network
-[] Custom Endpoint URL
-[] *Cloud-init* listed in the Assets
+[x] New Actions on Menus choices
+[x] Custom Endpoint URL
+[] *Cloud-init* listed in the Assets (column category)
 [] Test *PXE boot* with a VM trigger by *Tofu*
-[] Display a PXE interface with choices
 [] Reachability tests
 [] Build in and operated from a Container
 [] Proposition of systems: Rocky8/9, Ubuntu, OL8/9, Harvester, Proxmox   
@@ -50,17 +50,24 @@ tree -L 2 uponlan/src
 uponlan/src
 ├── defaults               # Default config used by init.sh during deployement
 │   ├── default
-│   ├── endpoints.yml      # Yaml config with all assets endpoints (combine with env ENDPOINT_URL)
-│   ├── menus              # Default menus if no url with project menus is provided 
+│   ├── endpoints.yml      # Yaml config with all assets endpoints (combine with env ENDPOINT_URL)provided 
 │   └── nginx.conf
 ├── etc
-│   └── supervisor.conf    # Config services (TFTP,)
+│   └── supervisor.conf    # Config services (TFTP,nginx,webapp)
 ├── init.sh                # Init script launched by start.sh
 ├── start.sh               # Startup script launched by the containerfile 
 └── webapp                 # The webapp folder
-    ├── app.js             # js function called by the .ejs 
+    ├── app.js             # Backend with js functions. 
     ├── package.json       # dependencides
-    └── public             # ejs and html rendered site
+    └── public             # Frontend ejs/html rendered site
+```
+
+* artifacts
+
+```bash
+├── release
+│   ├── assets             # Defaults assets if no endpoint url given
+│   ├── menus              # Default menus if no endpoint url given
 ```
 
 Manifest/Containerfile map by default `./config` and `./assests`. During the init process, it provisions them.

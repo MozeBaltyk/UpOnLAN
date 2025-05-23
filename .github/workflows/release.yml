@@ -40,6 +40,8 @@ jobs:
 
     - name: Build release
       run: |
+        pwd
+        ls -la
         ./release/release.sh ${{ steps.get_version.outputs.TAG_VERSION }}
 
     - name: Extract release notes

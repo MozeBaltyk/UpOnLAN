@@ -12,6 +12,7 @@ For now, this is more a roadmap or a wishing list than a list of features:
 [x] Provide a *TFTP server* for pxeboot and editor of ipxe config.
 [x] New Actions on Menus choices
 [x] Custom Endpoint URL
+[] Webapp displaying logs
 [] *Cloud-init* listed in the Assets (column category)
 [x] Test *PXE boot* with a VM
 [x] Reachability tests

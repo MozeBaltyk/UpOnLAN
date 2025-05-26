@@ -101,7 +101,81 @@ socket.on('renderdash', function(response){
       </div>\
     </div>\
   </div>\
+  <div class="card mb-3">\
+  <div class="card-header d-flex justify-content-between align-items-center">\
+    Logs\
+  </div>\
+  <div class="card mb-3">\
+    <div class="card-header">\
+      <ul class="nav nav-tabs card-header-tabs" id="logTabs" role="tablist">\
+        <li class="nav-item">\
+          <a class="nav-link active" id="webapp-tab" data-toggle="tab" href="#webapp-log" role="tab" aria-controls="webapp-log" aria-selected="true">Webapp Logs</a>\
+        </li>\
+        <li class="nav-item">\
+          <a class="nav-link" id="tftp-tab" data-toggle="tab" href="#tftp-log" role="tab" aria-controls="tftp-log" aria-selected="false">TFTP Logs</a>\
+        </li>\
+        <li class="nav-item">\
+          <a class="nav-link" id="nginx-tab" data-toggle="tab" href="#nginx-log" role="tab" aria-controls="nginx-log" aria-selected="false">Nginx Logs</a>\
+        </li>\
+      </ul>\
+    </div>\
+    <div class="card-body" style="max-height:2000px; overflow:auto; background:#222; color:#eee; font-family:monospace; font-size:0.9em;">\
+      <div class="tab-content" id="logTabsContent">\
+        <div class="tab-pane fade show active" id="webapp-log" role="tabpanel" aria-labelledby="webapp-tab">\
+          <div id="weblog-content">Click tab to load logs...</div>\
+        </div>\
+        <div class="tab-pane fade" id="tftp-log" role="tabpanel" aria-labelledby="tftp-tab">\
+          <div id="tftplog-content">Click tab to load logs...</div>\
+        </div>\
+        <div class="tab-pane fade" id="nginx-log" role="tabpanel" aria-labelledby="nginx-tab">\
+          <div id="nginxlog-content">Click tab to load logs...</div>\
+        </div>\
+      </div>\
+    </div>\
+  </div>\
+  <br>\
+  <div class="card-footer text-center" style="background: #f8f9fa;">\
+    <span class="text-muted">\
+      <a href="https://github.com/MozeBaltyk/UpOnLAN" target="_blank" class="text-secondary" style="text-decoration:none;">\
+        <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub" style="height:2em;vertical-align:middle;margin-right:12px;">\
+        UpOnLAN.xyz\
+      </a>\
+    </span>\
+  </div>\
   ');
+  renderweblog();
+  rendertftplog();
+  rendernginxlog();
+});
+// Render webapp logs functions
+function renderweblog(){
+  $('#webapp-tab').on('click', function() {
+    $('#weblog-content').text('Loading...');
+    socket.emit('getweblog');
+  });
+}
+socket.on('renderweblog', function(logContent){
+  $('#weblog-content').text(logContent).show();
+});
+// Render tftp logs functions
+function rendertftplog(){
+  $('#tftp-tab').on('click', function() {
+    $('#tftplog-content').text('Loading...');
+    socket.emit('gettftplog');
+  });
+}
+socket.on('rendertftplog', function(logContent){
+  $('#tftplog-content').text(logContent);
+});
+// Render nginx logs functions
+function rendernginxlog(){
+  $('#nginx-tab').on('click', function() {
+    $('#nginxlog-content').text('Loading...');
+    socket.emit('getnginxlog');
+  });
+}
+socket.on('rendernginxlog', function(logContent){
+  $('#nginxlog-content').html(logContent.replace(/\n/g, '<br>'));
 });
 // Upgrade menu files
 function upgrademenus(version){

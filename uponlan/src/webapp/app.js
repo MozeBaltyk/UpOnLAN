@@ -168,6 +168,49 @@ io.on('connection', function(socket){
         console.log('There was a problem with the fetch operation: ' + error.message);
       });
     });
+  // Show logs - webapp.log
+  socket.on('getweblog', function(){
+  const fs = require('fs');
+  const logPath = '/config/logs/webapp/webapp.log';
+  let logContent = '';
+  try {
+    logContent = fs.readFileSync(logPath, 'utf8');
+  } catch (e) {
+    console.log('Error reading log file:', e);
+    logContent = 'Log file not found or unreadable.';
+  }
+  io.sockets.in(socket.id).emit('renderweblog', logContent);
+  });
+  // Show logs - tftp.log
+  socket.on('gettftplog', function(){
+  const fs = require('fs');
+  const logPath = '/config/logs/tftp/tftpd.log';
+  let logContent = '';
+  try {
+    logContent = fs.readFileSync(logPath, 'utf8');
+  } catch (e) {
+    console.log('Error reading log file:', e);
+    logContent = 'Log file not found or unreadable.';
+  }
+  io.sockets.in(socket.id).emit('rendertftplog', logContent);
+  });
+  // Show logs - nginx.log
+  socket.on('getnginxlog', function(){
+  const fs = require('fs');
+  const errorLogPath = '/config/logs/nginx/error.log';
+  const accessLogPath = '/config/logs/nginx/access.log';
+  let logContent = '';
+
+  try {
+    const errorLog = fs.existsSync(errorLogPath) ? fs.readFileSync(errorLogPath, 'utf8') : 'error.log not found or unreadable.\n';
+    const accessLog = fs.existsSync(accessLogPath) ? fs.readFileSync(accessLogPath, 'utf8') : 'access.log not found or unreadable.\n';
+    logContent = '=== NGINX error.log ===\n' + errorLog + '\n\n=== NGINX access.log ===\n' + accessLog;
+  } catch (e) {
+    console.log('Error reading log file:', e);
+    logContent = 'Log files not found or unreadable.';
+  }
+  io.sockets.in(socket.id).emit('rendernginxlog', logContent);
+  });
   // When Menu from Endpoint URL is requested run it from dashboard
   socket.on('upgrademenus', function(version){
     upgrademenu(version, function(response){

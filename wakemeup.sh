@@ -2,18 +2,18 @@
 set -eu
 
 build () {
-    podman build -t localhost/uponlan:latest ./uponlan
+    sudo podman build -t localhost/uponlan:latest ./uponlan
 }
 
 deploy () {
-    podman play kube ./manifests/uponlan.yaml --publish 8080:80 --publish 3000:3000 --publish 6969:69/udp
+    sudo podman play kube ./manifests/uponlan.yaml --publish 8080:80 --publish 3000:3000 --publish 69:69/udp
 }
 
 destroy () { 
-    podman play kube --down ./manifests/uponlan.yaml 
+    sudo podman play kube --down ./manifests/uponlan.yaml 
     sudo rm -rf ./assets/*
     sudo rm -rf ./config/*
-    podman rmi localhost/uponlan:latest
+    sudo podman rmi localhost/uponlan:latest
 }
 
 redeploy () {
@@ -22,13 +22,27 @@ redeploy () {
 }
 
 logs () {
-    podman pod ps; echo ""
-    podman ps -a; echo ""
-    podman logs -f $(podman ps -q)
+    sudo podman pod ps; echo ""
+    sudo podman ps -a; echo ""
+    sudo podman logs -f $(sudo podman ps -q)
 }
 
 connect () {
-    podman exec -it $(podman ps --filter ancestor=localhost/uponlan:latest --format "{{.ID}}") /bin/sh
+    sudo podman exec -it $(sudo podman ps --filter ancestor=localhost/uponlan:latest --format "{{.ID}}") /bin/sh
+}
+
+network () {
+    sudo chmod +x ./scripts/display_networks_info.sh
+    ./scripts/display_networks_info.sh
+}
+
+test () {
+    read -p "Which pxe_config do you want to test? [uponlan]: " pxe_config
+    pxe_config=${pxe_config:-"uponlan"}
+    sudo chmod +x ./scripts/create_kvm_test_network.sh
+    sudo ./scripts/create_kvm_test_network.sh ${pxe_config} ${pxe_config}
+    sudo chmod +x ./scripts/create_kvm_test_vm.sh
+    sudo ./scripts/create_kvm_test_vm.sh ${pxe_config}
 }
 
 exec_cmd () {
@@ -41,12 +55,14 @@ print_help () {
     echo ""
     echo "Allowed Actions"
     echo "---------------"
-    echo "1. build"
-    echo "2. deploy"
-    echo "3. destroy"
-    echo "4. redeploy"
-    echo "5. logs"
-    echo "6. connect"
+    echo "1. build - build uponlan image"
+    echo "2. deploy - deploy uponlan container"
+    echo "3. destroy - destroy uponlan container"
+    echo "4. redeploy - redeploy uponlan container"
+    echo "5. logs - display logs from uponlan container"
+    echo "6. connect - connect to uponlan container"
+    echo "7. test - test pxe boot with a kvm domain"
+    echo "8. network - check kvm/podman networks info"
     echo ""
 }
 
@@ -64,12 +80,14 @@ do
 done
 
 case $action in
-    build) echo "Action: build";;
-    deploy) echo "Action: deploy";;
-    destroy) echo "Action: destroy";;
-    redeploy) echo "Action: redeploy";;
-    logs) echo "Action: logs";;
-    connect) echo "Action: connect";;
+    build) echo "Action: build uponlan image";;
+    deploy) echo "Action: deploy uponlan container";;
+    destroy) echo "Action: destroy uponlan container";;
+    redeploy) echo "Action: redeploy uponlan container";;
+    logs) echo "Action: display logs from uponlan container";;
+    connect) echo "Action: connect to uponlan container";;
+    test) echo "Action: test pxe boot with a kvm domain";;
+    network) echo "Action: check kvm/podman networks info";;
     *) echo "Invalid action: $action"; print_help; exit 1;;
 esac
 

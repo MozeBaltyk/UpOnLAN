@@ -31,6 +31,8 @@ spec:
         - containerPort: 69
           protocol: UDP
         - containerPort: 80
+      cap_add:
+        - NET_ADMIN
   volumes:
     - name: host-arp
       hostPath:

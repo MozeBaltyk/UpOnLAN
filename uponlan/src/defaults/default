@@ -4,4 +4,10 @@ server {
 		root /assets;
 		autoindex on;
 	}
+
+    location /status {
+        stub_status;
+        allow 127.0.0.1;
+        deny all;
+    }
 }

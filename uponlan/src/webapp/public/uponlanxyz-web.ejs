@@ -21,6 +21,7 @@ socket.on('renderdash', function(response){
   var tftpversion = response.tftpversion;
   var nginxversion = response.nginxversion;
   var wolversion = response.wolversion;
+  var otelversion = response.otelversion;
   var webversion = response.webversion;
   var menuversion = response.menuversion;
   var menuorigin = response.menuorigin;
@@ -102,33 +103,45 @@ socket.on('renderdash', function(response){
     </div>\
   </div>\
   <div class="card mb-3">\
-  <div class="card-header d-flex justify-content-between align-items-center">\
-    Logs\
-  </div>\
-  <div class="card mb-3">\
-    <div class="card-header">\
-      <ul class="nav nav-tabs card-header-tabs" id="logTabs" role="tablist">\
-        <li class="nav-item">\
-          <a class="nav-link active" id="webapp-tab" data-toggle="tab" href="#webapp-log" role="tab" aria-controls="webapp-log" aria-selected="true">Webapp Logs</a>\
-        </li>\
-        <li class="nav-item">\
-          <a class="nav-link" id="tftp-tab" data-toggle="tab" href="#tftp-log" role="tab" aria-controls="tftp-log" aria-selected="false">TFTP Logs</a>\
-        </li>\
-        <li class="nav-item">\
-          <a class="nav-link" id="nginx-tab" data-toggle="tab" href="#nginx-log" role="tab" aria-controls="nginx-log" aria-selected="false">Nginx Logs</a>\
-        </li>\
-      </ul>\
+    <div class="card-header d-flex justify-content-between align-items-center">\
+      Logs & Metrics\
     </div>\
-    <div class="card-body" style="max-height:2000px; overflow:auto; background:#222; color:#eee; font-family:monospace; font-size:0.9em;">\
-      <div class="tab-content" id="logTabsContent">\
-        <div class="tab-pane fade show active" id="webapp-log" role="tabpanel" aria-labelledby="webapp-tab">\
-          <div id="weblog-content">Click tab to load logs...</div>\
+    <div class="card-body card-deck">\
+      <div class="card mb-3" style="min-width:350px;flex:2;">\
+        <!-- Logs Tabs Card -->\
+        <div class="card-header">\
+          <ul class="nav nav-tabs card-header-tabs" id="logTabs" role="tablist">\
+            <li class="nav-item">\
+              <a class="nav-link active" id="webapp-tab" data-toggle="tab" href="#webapp-log" role="tab" aria-controls="webapp-log" aria-selected="true">Webapp Logs</a>\
+            </li>\
+            <li class="nav-item">\
+              <a class="nav-link" id="tftp-tab" data-toggle="tab" href="#tftp-log" role="tab" aria-controls="tftp-log" aria-selected="false">TFTP Logs</a>\
+            </li>\
+            <li class="nav-item">\
+              <a class="nav-link" id="nginx-tab" data-toggle="tab" href="#nginx-log" role="tab" aria-controls="nginx-log" aria-selected="false">Nginx Logs</a>\
+            </li>\
+          </ul>\
         </div>\
-        <div class="tab-pane fade" id="tftp-log" role="tabpanel" aria-labelledby="tftp-tab">\
-          <div id="tftplog-content">Click tab to load logs...</div>\
+        <div class="card-body" style="max-height:2000px; overflow:auto; background:#222; color:#eee; font-family:monospace; font-size:0.9em;">\
+          <div class="tab-content" id="logTabsContent">\
+            <div class="tab-pane fade show active" id="webapp-log" role="tabpanel" aria-labelledby="webapp-tab">\
+              <div id="weblog-content">Click tab to load logs...</div>\
+            </div>\
+            <div class="tab-pane fade" id="tftp-log" role="tabpanel" aria-labelledby="tftp-tab">\
+              <div id="tftplog-content">Click tab to load logs...</div>\
+            </div>\
+            <div class="tab-pane fade" id="nginx-log" role="tabpanel" aria-labelledby="nginx-tab">\
+              <div id="nginxlog-content">Click tab to load logs...</div>\
+            </div>\
+          </div>\
         </div>\
-        <div class="tab-pane fade" id="nginx-log" role="tabpanel" aria-labelledby="nginx-tab">\
-          <div id="nginxlog-content">Click tab to load logs...</div>\
+      </div>\
+      <div class="card mb-3" style="min-width:200px;flex:1;">\
+        <!-- Live Metrics Card -->\
+        <div class="card-header">Live Metrics</div>\
+        <div class="card-body">\
+            <!-- Placeholder for metrics, graphs, or other cards here -->\
+            <p>Metrics, graphs, or other cards can be added here.</p>\
         </div>\
       </div>\
     </div>\

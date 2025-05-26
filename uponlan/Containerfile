@@ -35,11 +35,13 @@ RUN \
  apk del --purge build-dependencies && \
  rm -rf /tmp/*
 
+# Final stage
 FROM alpine:3.21.3
 
 # set version label
 ARG BUILD_DATE
 ARG VERSION
+ARG OTELCOL_VERSION=0.126.0
 
 LABEL build_version="uponlan.xyz version: ${VERSION} Build-date: ${BUILD_DATE}"
 LABEL maintainer="mozebaltyk"

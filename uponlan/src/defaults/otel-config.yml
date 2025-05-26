@@ -1,0 +1,14 @@
+receivers:
+  nginx:
+    endpoint: "http://localhost:80/status"
+    collection_interval: 10s
+
+exporters:
+  file:
+    path: /tmp/otel-nginx-metrics.json
+
+service:
+  pipelines:
+    metrics:
+      receivers: [nginx]
+      exporters: [file]

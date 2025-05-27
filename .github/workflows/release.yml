@@ -43,9 +43,10 @@ jobs:
 
     - name: Build release
       run: |
-        pwd
-        ls -la
-        ./release/release.sh ${{ steps.get_version.outputs.TAG_VERSION }}
+        pwd 
+        ls 
+        echo "Building release for version ${{ steps.get_version.outputs.TAG_VERSION }}"
+        ./scripts/release_menu.sh ${{ steps.get_version.outputs.TAG_VERSION }}
 
     - name: Extract release notes
       id: extract-release-notes

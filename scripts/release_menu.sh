@@ -23,5 +23,5 @@ sed -i -e "s/set menu_version .*$/set menu_version ${HARD_RELEASE}/" ./release/m
 mv ./release/menus/ipxe/* ./release/githubout/ 2> /dev/null || true
 
 # tar all Menus Artefacts
-tar -czf menus.tar.gz ../release/menus/*
+tar -czf menus.tar.gz ./release/menus/*
 mv menus.tar.gz release/githubout/.

@@ -10,14 +10,18 @@ HARD_RELEASE=$1
 
 echo -e "\n### Releasing menu version ${HARD_RELEASE} ###\n"
 
-mkdir -p ../release/githubout
+
+pwd 
+ls 
+ls ./release/menus
+mkdir -p ./release/githubout
+
+# Set Version
+sed -i -e "s/set menu_version .*$/set menu_version ${HARD_RELEASE}/" ./release/menus/version.ipxe
 
 # ipxe Artefacts
-mv ../menus/ipxe/* ../release/githubout/ 2> /dev/null || true
+mv ./release/menus/ipxe/* ./release/githubout/ 2> /dev/null || true
 
-# Menu Artefacts
-sed -i -e "s/set menu_version .*$/set menu_version ${HARD_RELEASE}/" ../release/githubout/version.ipxe
+# tar all Menus Artefacts
 tar -czf menus.tar.gz ../release/menus/*
 mv menus.tar.gz release/githubout/.
-
-# Assets Artefacts

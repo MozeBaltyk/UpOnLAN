@@ -43,10 +43,6 @@ jobs:
 
     - name: Build release
       run: |
-        pwd 
-        ls release/githubout/
-        ls scripts/.
-        ls release/.
         echo "Building release for version ${{ steps.get_version.outputs.TAG_VERSION }}"
         ./scripts/release_menu.sh ${{ steps.get_version.outputs.TAG_VERSION }}
 

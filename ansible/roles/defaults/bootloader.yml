@@ -1,0 +1,98 @@
+boot_domain: boot.netboot.xyz
+boot_timeout: 300000
+boot_version: 2.x
+bootloader_disks:
+- netboot.xyz
+bootloader_http_enabled: true
+bootloader_https_enabled: true
+bootloaders:
+  arm:
+  - desc: Used for CD/DVD, Virtual CDs, DRAC/iLO, VMware, Virtual Box
+    ipxe_bin: ipxe.iso
+    output_bin: -arm64.iso
+    type: ISO
+  - desc: Used for creation of USB Keys
+    ipxe_bin: ipxe.img
+    output_bin: -arm64.img
+    type: IMG
+  - desc: DHCP EFI boot image file, uses built-in iPXE NIC drivers
+    ipxe_bin: ipxe.efi
+    output_bin: -arm64.efi
+    type: DHCP
+  - desc: EFI w/ Simple Network Protocol, attempts to boot all net devices
+    ipxe_bin: snp.efi
+    output_bin: -arm64-snp.efi
+    type: DHCP-snp
+  - desc: EFI w/ Simple Network Protocol, only boots from device chained from
+    ipxe_bin: snponly.efi
+    output_bin: -arm64-snponly.efi
+    type: DHCP-snponly
+  hybrid:
+  - desc: Used for CD/DVD, Virtual CDs, DRAC/iLO, VMware, Virtual Box
+    ipxe_bin: ipxe.iso
+    output_bin: .iso
+    type: ISO
+  - desc: Used for creation of USB Keys
+    ipxe_bin: ipxe.img
+    output_bin: .img
+    type: IMG
+  legacy:
+  - desc: Used for booting from GRUB/EXTLINUX
+    ipxe_bin: ipxe.lkrn
+    output_bin: .lkrn
+    type: Kernel
+  - desc: Virtual floppy disk for DRAC/iLO, VMware, Virtual Box, etc
+    ipxe_bin: ipxe.dsk
+    output_bin: .dsk
+    type: Floppy
+  - desc: Padded Virtual floppy disk for DRAC/iLO, VMware, Virtual Box, etc
+    ipxe_bin: ipxe.pdsk
+    output_bin: .pdsk
+    type: Floppy
+  - desc: DHCP boot image file, uses built-in iPXE NIC drivers
+    ipxe_bin: ipxe.kpxe
+    output_bin: .kpxe
+    type: DHCP
+  - desc: DHCP boot image file, use if you have NIC issues
+    ipxe_bin: undionly.kpxe
+    output_bin: -undionly.kpxe
+    type: DHCP-undionly
+  multiarch:
+  - desc: Used for CD/DVD, Virtual CDs, DRAC/iLO, VMware, Virtual Box
+    ipxe_bin: ipxe.iso
+    output_bin: -multiarch.iso
+    type: ISO
+  - desc: Used for creation of USB Keys
+    ipxe_bin: ipxe.img
+    output_bin: -multiarch.img
+    type: IMG
+  rpi:
+  - desc: Raspberry Pi 4 - USB/SD Card Image
+    ipxe_bin: rpi4-sdcard.img
+    output_bin: -rpi4-sdcard.img
+    type: USB/SD Card
+  - desc: Raspberry Pi 4 - EFI Image
+    ipxe_bin: snp.efi
+    output_bin: -rpi4-snp.efi
+    type: DHCP-snp
+  uefi:
+  - desc: DHCP EFI boot image file, uses built-in iPXE NIC drivers
+    ipxe_bin: ipxe.efi
+    output_bin: .efi
+    type: DHCP
+  - desc: EFI w/ Simple Network Protocol, attempts to boot all net devices
+    ipxe_bin: snp.efi
+    output_bin: -snp.efi
+    type: DHCP-snp
+  - desc: EFI w/ Simple Network Protocol, only boots from device chained from
+    ipxe_bin: snponly.efi
+    output_bin: -snponly.efi
+    type: DHCP-snponly
+  - desc: DHCP EFI Floppy boot image file, uses built-in iPXE NIC drivers
+    ipxe_bin: ipxe.efi.dsk
+    output_bin: .efi.dsk
+    type: Floppy
+  - desc: EFI Floppy image w/ Simple Network Protocol, attempts to boot all net devices
+    ipxe_bin: snp.efi.dsk
+    output_bin: -snp.efi.dsk
+    type: Floppy-snp

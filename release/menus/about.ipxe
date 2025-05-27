@@ -1,0 +1,39 @@
+#!ipxe
+set esc:hex 1b
+set bold ${esc:string}[1m
+set ital ${esc:string}[3m
+set under ${esc:string}[4m
+set boldoff ${esc:string}[22m
+set italoff ${esc:string}[23m
+set underoff ${esc:string}[24m
+set fs_bla ${esc:string}[30m
+set fg_red ${esc:string}[31m
+set fg_gre ${esc:string}[32m
+set fg_yel ${esc:string}[33m
+set fg_blu ${esc:string}[34m
+set fg_mag ${esc:string}[35m
+set fg_cya ${esc:string}[36m
+set fg_whi ${esc:string}[37m
+
+:netabout
+menu ${fg_cya}${bold}About uponlan.xyz (Version: ${version})
+item exit ${bold}Exit back to main menu...${boldoff}
+item --gap --  ${fg_whi}${bold}--Thanks------------------------------------------------------------------
+item about ${fg_gre}${bold}Thanks for your support and let us know how we can improve on !
+item about ${fg_gre}${bold}Github discussions: ${fg_whi}${bold}https://github.com/MozeBaltyk/UpOnLAN/discussions
+item --gap --  ${fg_whi}${bold}-----------------------------------------------------------------
+isset ${upstream_version} && goto display_version || goto skip_version
+:display_version
+iseq ${version} ${upstream_version} || item --gap --  ${fg_gre}${bold}Latest uponlan.xyz version available: ${fg_whi}${bold}${upstream_version}
+item --gap --  ${fg_whi}${bold}-----------------------------------------------------------------
+:skip_version
+choose selected || goto exit
+goto ${selected}
+
+:about
+clear menu
+goto netabout
+
+:exit
+clear menu
+exit

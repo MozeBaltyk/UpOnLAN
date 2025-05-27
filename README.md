@@ -2,8 +2,7 @@
 
 **[Features](#features) • [Get Started](#get-started)**
 
-This project is a cold fork of Netboot.xyz with a goal unify and simplify the upstream project. It also aims to get new functionalities as Wake-on-LAN, test of the pxe menu and install, a webapp which allow to develop custom pxe menus, etc.
-PXEboot is relevant to automate bare-metal installation in view to experiment new setup.
+This project is a cold fork of Netboot.xyz with the goal of unifying and simplifying the upstream into an all-in-one solution. Its main purpose is to provide an editor for iPXE menus and serve them on the fly. Additional features include Wake-on-LAN, PXE menu testing and installation, and a webapp for developing custom PXE menus. PXE booting is especially relevant for automating bare-metal installations and experimenting with new setups.
 
 ## Features
 
@@ -13,10 +12,11 @@ For now, this is more a roadmap or a wishing list than a list of features:
 [x] New Actions on Menus choices
 [x] Custom Endpoint URL
 [x] Webapp displaying logs
-[] *Cloud-init* listed in the Assets (column category)
 [x] Test *PXE boot* with a VM
 [x] Reachability tests
 [] Build pxefile operated from the webapp
+[] Release Menus, Assets, Docker Image.
+[] *Cloud-init* listed in the Assets (column category)
 [] Proposition of systems: Rocky8/9, Ubuntu, OL8/9, Harvester, Proxmox   
 [x] Provide a *Wake-On-LAN* service with web GUI:
     [x] Add/delete entries
@@ -45,7 +45,7 @@ Allowed Actions
 4. redeploy - redeploy uponlan container
 5. logs - display logs from uponlan container
 6. connect - connect to uponlan container
-7. test - test pxe boot with a kvm domain
+7. test - test if pxe server is reachable and boot with a kvm domain
 8. network - check kvm/podman networks info
 ```
 
@@ -76,7 +76,7 @@ uponlan/src
 ```bash
 ├── release
 │   ├── assets             # Defaults assets if no endpoint url given
-│   ├── menus              # Default menus if no endpoint url given
+│   ├── menus              # Default menus use during release to produce artifcate menus.tar.gz
 ```
 
 Manifests/Containerfile map by default `./config` and `./assests`. During the init process, it provisions them.
@@ -112,14 +112,19 @@ Manifests/Containerfile map by default `./config` and `./assests`. During the in
 ## References
 
 * Similar project but with Vagrant:
+
 [dhcp-netboot.xyz](https://github.com/samdbmg/dhcp-netboot.xyz)
 
 * UEFI-HTTP:
+
 [UEFI-HTTP Blog](https://mrguitar.net/blog/?p=2300)
+
 [PXE RHEL](https://developers.redhat.com/articles/2024/08/20/bare-metal-deployments-image-mode-rhel#prepare_a_pxe_environment)
+
 [UEFI-HTTP RHEL](https://developers.redhat.com/articles/2024/08/20/bare-metal-deployments-image-mode-rhel#bonus__forget_tftp_uefi_http_boot_is_better)
 
 * Considerations:
+
 [bare-metal](https://www.jimangel.io/posts/automate-ubuntu-22-04-lts-bare-metal/)
 
 [iPxe DO](https://www.digitalocean.com/community/tutorials/bare-metal-provisioning-with-pxe-and-ipxe)

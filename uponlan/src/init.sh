@@ -36,7 +36,7 @@ if [[ -z ${ENDPOINT_URL} ]]; then
   echo -n "${MENU_VERSION}" > /config/menuversion.txt
   echo -n "https://github.com/mozebaltyk/uponlan" > /config/menuorigin.txt
   curl -L https://github.com/mozebaltyk/uponlan/releases/download/${MENU_VERSION}/menus.tar.gz -o /config/menus/menus.tar.gz
-  tar -xzf /config/menus/menus.tar.gz -C /config/menus
+  tar -xzf /config/menus/menus.tar.gz -C /config/menus/remote
   rm -f /config/menus/menus.tar.gz
 # Import menus if ENDPOINT_URL is set
 else
@@ -46,10 +46,13 @@ else
   echo "[uponlanxyz-init] Import menu from ${ENDPOINT_URL}"
   echo -n "${MENU_VERSION}" > /config/menuversion.txt
   echo -n "${ENDPOINT_URL}" > /config/menuorigin.txt
-  curl -L ${ENDPOINT_URL} -o /config/menus/menus.tar.gz
-  tar -xzf /config/menus/menus.tar.gz -C /config/menus
+  curl -L ${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz -o /config/menus/menus.tar.gz
+  tar -xzf /config/menus/menus.tar.gz -C /config/menus/remote
   rm -f /config/menus/menus.tar.gz
 fi
+
+# Finish Menus settings
+cp /config/menus/remote/* /config/menus/
 
 # init wol.yml
 if [[ ! -f /config/wol.yml ]]; then
@@ -62,9 +65,6 @@ if [[ ! -f /config/endpoints.yml ]]; then
   echo "[uponlanxyz-init] Import endpoints.yml"
   cp /defaults/endpoints.yml /config/endpoints.yml
 fi
-
-# Avoid errrors with supervisord 
-touch /var/logs/messages
 
 # Ownership
 chown -R nbxyz:nbxyz /config

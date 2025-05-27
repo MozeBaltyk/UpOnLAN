@@ -50,3 +50,7 @@ echo Type "exit" to return to menu.
 set menu main_menu
 shell
 goto main_menu
+
+:about
+chain https://github.com/MozeBaltyk/UpOnLAN/release/menus/about.ipxe || chain about.ipxe
+goto main_menu

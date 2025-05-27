@@ -1,0 +1,43 @@
+releases:
+  harvester:
+    enabled: true
+    menu: linux
+    name: Harvester
+  oracle:
+    enabled: true
+    menu: linux
+    mirror: https://yum.oracle.com
+    name: Oracle Linux
+    paths:
+      8: /repo/OracleLinux/OL8/baseos/latest
+      9: /repo/OracleLinux/OL9/baseos/latest
+  proxmox:
+    enabled: true
+    menu: linux
+    name: Proxmox
+  rockylinux:
+    base_dir: pub/rocky
+    enabled: true
+    menu: linux
+    mirror: http://download.rockylinux.org
+    name: Rocky Linux
+    versions:
+    - code_name: 9
+      name: 9 (Latest)
+    - code_name: 8
+      name: 8 (Latest)
+  ubuntu:
+    archive_mirror: http://old-releases.ubuntu.com
+    base_dir: ubuntu
+    enabled: true
+    menu: linux
+    mirror: http://archive.ubuntu.com
+    name: Ubuntu
+    versions:
+    - code_name: plucky
+      name: 25.04 Plucky Puffin
+    - code_name: oracular
+      name: 24.10 Oracular Oriole
+    - code_name: noble
+      name: 24.04 LTS Noble Numbat
+    - code_name: jammy

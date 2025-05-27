@@ -38,11 +38,12 @@ network () {
 
 test () {
     read -p "Which pxe_config do you want to test? [uponlan]: " pxe_config
+    network_name="uponlan"
     pxe_config=${pxe_config:-"uponlan"}
     sudo chmod +x ./scripts/create_kvm_test_network.sh
-    sudo ./scripts/create_kvm_test_network.sh ${pxe_config} ${pxe_config}
+    sudo ./scripts/create_kvm_test_network.sh ${network_name} ${pxe_config}
     sudo chmod +x ./scripts/create_kvm_test_vm.sh
-    sudo ./scripts/create_kvm_test_vm.sh ${pxe_config}
+    sudo ./scripts/create_kvm_test_vm.sh ${network_name}
 }
 
 exec_cmd () {
@@ -61,7 +62,7 @@ print_help () {
     echo "4. redeploy - redeploy uponlan container"
     echo "5. logs - display logs from uponlan container"
     echo "6. connect - connect to uponlan container"
-    echo "7. test - test pxe boot with a kvm domain"
+    echo "7. test - test if pxe server is reachable and boot with a kvm domain"
     echo "8. network - check kvm/podman networks info"
     echo ""
 }

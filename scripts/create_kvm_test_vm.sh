@@ -4,16 +4,16 @@ set -e
 vmname="testpxe"
 
 if [ -z "$1" ]; then
-    read -p "Which network do you want to use? [uponlan]: " network
-    network=${network:-"uponlan"}
-    echo "Using network: $network"
+    read -p "Which network do you want to use? [uponlan]: " network_name
+    network_name=${network_name:-"uponlan"}
+    echo "Using network: $network_name"
 else
-    network=$1
-    echo "Using network: $network"
+    network_name=$1
+    echo "Using network: $network_name"
 fi
 
-if ! sudo virsh net-info "$network" &>/dev/null; then
-    echo "Network '$network' does not exist. Please create it first."
+if ! sudo virsh net-info "$network_name" &>/dev/null; then
+    echo "Network '$network_name' does not exist. Please create it first."
     exit 1
 fi
 
@@ -23,7 +23,7 @@ else
     echo -e "\n\n##### Creating a test VM #####\n"
     sudo virt-install --connect qemu:///system \
     --name ${vmname} \
-    --network=network=${network} --pxe \
+    --network=network=${network_name} --pxe \
     --ram=2048 \
     --vcpus=2 \
     --os-variant=rhl8.0 \

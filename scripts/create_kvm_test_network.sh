@@ -1,16 +1,6 @@
 #!/bin/bash
 set -e
 
-# Test if TFTP is reachable
-tftp_server_ip=${tftp_server_ip:-$(hostname -I | awk '{print $1}')}
-
-if ! nc -u -w 2 ${tftp_server_ip} 69  &> /dev/null; then
-  echo -e "\nTFTP server (${tftp_server_ip}) is not reachable. Please check your network configuration or if pod is running.\n"
-  exit 1
-else
-  echo -e "\nTFTP server (${tftp_server_ip}) is reachable on port 69.\n"
-fi
-
 # KVM network name
 if [ -z "$1" ]; then
     read -p "Which network do you want to create? [uponlan]: " network_name
@@ -35,14 +25,16 @@ fi
 interface=${network_name}-br0        # The bridge interface to use for the network
 network_ip=${network:-"192.168.7.0"} # Default network frame
 gateway_ip="${network_ip%.*}.1"
+tftp_server_ip=${tftp_server_ip:-$(hostname -I | awk '{print $1}')}
 
 # List all VMs attached to the 'uponlan' network and remove them
-for vm in $(virsh list --all --name); do
-  if virsh domiflist "$vm" | grep -qw ${network_name}; then
+for vm in $(sudo virsh list --all --name); do
+  if sudo virsh domiflist "$vm" | grep -qw ${network_name}; then
     echo -e "\nUndefining and destroy VM: $vm\n"
-    virsh destroy "$vm" 2>/dev/null || true
-    virsh undefine "$vm" --remove-all-storage
+    sudo virsh destroy "$vm" 2>/dev/null || true
+    sudo virsh undefine "$vm" --remove-all-storage
   fi
+  sleep 2
 done
 
 # cleanup network before to reapply
@@ -52,17 +44,20 @@ sudo virsh net-undefine ${network_name} 2> /dev/null || true
 if [ "$pxe_type" == "local" ]; then
 ##### TFTP own by kvm (located on the kvm host) ####
 cat <<EOF > /etc/libvirt/qemu/networks/${network_name}.xml
-<network>
+<network xmlns:dnsmasq="http://libvirt.org/schemas/network/dnsmasq/1.0">
   <name>${network_name}</name>
   <forward mode='nat'/>
-  <bridge name='${interface}' stp='on' delay='0'/>
-  <ip family="ipv4" address='${gateway_ip}' prefix='24'>
-    <tftp root='/var/lib/tftpboot' />
+  <bridge name="${interface}" stp="on" delay="5"/>
+  <ip address="${gateway_ip}" netmask="255.255.255.0">
     <dhcp>
-       <range start="${network_ip%.*}.128" end="${network_ip%.*}.254"/>
-       <bootp file='undionly.0' />
+      <range start="${network_ip%.*}.128" end="${network_ip%.*}.254"/>
     </dhcp>
   </ip>
+  <dnsmasq:options>
+    <dnsmasq:option value="enable-tftp"/>
+    <dnsmasq:option value="tftp-root=/var/lib/tftpboot"/>
+    <dnsmasq:option value="dhcp-boot=undionly.0"/>
+  </dnsmasq:options>
 </network>
 EOF
 elif [ "$pxe_type" == "uponlan" ]; then

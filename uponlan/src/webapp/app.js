@@ -65,6 +65,7 @@ const isValidUrl = urlString=> {
    return !!urlPattern.test(urlString);
  }
 
+// Default endpoint URL if not set or invalid
 const defaultEndpointUrl = "https://github.com/mozebaltyk/uponlan";
 let endpoint_url = process.env.ENDPOINT_URL;
 

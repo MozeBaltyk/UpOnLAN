@@ -62,7 +62,7 @@ print_help () {
     echo "4. redeploy - redeploy uponlan container"
     echo "5. logs - display logs from uponlan container"
     echo "6. connect - connect to uponlan container"
-    echo "7. test - test if pxe server is reachable and boot with a kvm domain"
+    echo "7. test - pxeboot a VM on kvm domain"
     echo "8. network - check kvm/podman networks info"
     echo ""
 }

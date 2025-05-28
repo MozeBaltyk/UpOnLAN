@@ -8,21 +8,22 @@ This project is a cold fork of Netboot.xyz with the goal of unifying and simplif
 
 For now, this is more a roadmap or a wishing list than a list of features:
 
-[x] Provide a *TFTP server* for pxeboot and editor of ipxe config.
-[x] New Actions on Menus choices
-[x] Custom Endpoint URL
-[x] Webapp displaying logs
-[x] Test *PXE boot* with a VM
-[x] Reachability tests
-[] Build pxefile operated from the webapp
-[] Release Menus, Assets, Docker Image.
-[] *Cloud-init* listed in the Assets (column category)
-[] Proposition of systems: Rocky8/9, Ubuntu, OL8/9, Harvester, Proxmox   
-[x] Provide a *Wake-On-LAN* service with web GUI:
-    [x] Add/delete entries
-    [x] Send WOL signal
-    [] Get Status/IP of the hosts
-    [] Scheduler
+- [x] Provide a *TFTP server* for pxeboot and editor of ipxe config.
+- [x] New Actions on Menus choices
+- [x] Custom Endpoint URL
+- [x] Webapp displaying logs
+- [x] Test *PXE boot* with a VM
+- [x] Reachability tests
+- [ ] Build pxefile operated from the webapp
+- [ ] Release Menus, Assets, Docker Image.
+- [ ] *Cloud-init* listed in the Assets (column category)
+- [ ] Proposition of systems: Rocky8/9, Ubuntu, OL8/9, Harvester, Proxmox   
+- [ ] Create a help menu
+- [x] Provide a *Wake-On-LAN* service with web GUI:
+    - [x] Add/delete entries
+    - [x] Send WOL signal
+    - [ ] Get Status/IP of the hosts
+    - [ ] Scheduler
 
 ## Get Started
 
@@ -45,7 +46,7 @@ Allowed Actions
 4. redeploy - redeploy uponlan container
 5. logs - display logs from uponlan container
 6. connect - connect to uponlan container
-7. test - test if pxe server is reachable and boot with a kvm domain
+7. test - pxeboot a VM on kvm domain
 8. network - check kvm/podman networks info
 ```
 

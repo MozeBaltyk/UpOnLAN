@@ -4,3 +4,6 @@ node_modules
 .c9
 package-lock.json
 release/githubout/**
+uponlan.xml
+.vscode
+.vscode-test

@@ -125,13 +125,13 @@ socket.on('renderdash', function(response){
         <div class="card-body" style="max-height:2000px; overflow:auto; background:#222; color:#eee; font-family:monospace; font-size:0.9em;">\
           <div class="tab-content" id="logTabsContent">\
             <div class="tab-pane fade show active" id="webapp-log" role="tabpanel" aria-labelledby="webapp-tab">\
-              <div id="weblog-content">Click tab to load logs...</div>\
+              <div id="weblog-content" style="max-height:300px; overflow-y:auto; font-family:monospace; font-size:0.9em;">Click tab to load logs...</div>\
             </div>\
             <div class="tab-pane fade" id="tftp-log" role="tabpanel" aria-labelledby="tftp-tab">\
-              <div id="tftplog-content">Click tab to load logs...</div>\
+              <div id="tftplog-content" style="max-height:300px; overflow-y:auto; font-family:monospace; font-size:0.9em;">Click tab to load logs...</div>\
             </div>\
             <div class="tab-pane fade" id="nginx-log" role="tabpanel" aria-labelledby="nginx-tab">\
-              <div id="nginxlog-content">Click tab to load logs...</div>\
+              <div id="nginxlog-content" style="max-height:300px; overflow-y:auto; font-family:monospace; font-size:0.9em;">Click tab to load logs...</div>\
             </div>\
           </div>\
         </div>\
@@ -141,7 +141,10 @@ socket.on('renderdash', function(response){
         <div class="card-header">Live Metrics</div>\
         <div class="card-body">\
             <!-- Placeholder for metrics, graphs, or other cards here -->\
-            <p>Metrics, graphs, or other cards can be added here.</p>\
+            <div class="text-center">\
+              <canvas id="nginxMetricsChart" width="200" height="120"></canvas>\
+              <p class="text-muted" style="font-size:0.7em;">Live metrics will be displayed here.</p>\
+            </div>\
         </div>\
       </div>\
     </div>\
@@ -510,6 +513,7 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion){
     <div class="card">\
       <div class="card-header">\
         Remote Assets at <a target="_blank" href="https://github.com/mozebaltyk/uponlan/releases/' + remotemenuversion + '">' + remotemenuversion + '</a>\
+        <br>\
         <span style="float:right;">\
           <div class="form-row">\
             <div class="col"><input type="text" class="form-control form-control-sm" id="remotesearch" placeholder="Filter.."></div>\
@@ -523,7 +527,7 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion){
       <table class="table table-sm" id="remoteassets">\
         <thead>\
           <tr>\
-            <th>Asset Name</th>\
+            <th style="width: 35%;">Asset Name</th>\
             <th>Asset path</th>\
             <th></th>\
           </tr>\
@@ -533,7 +537,8 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion){
     </div>\
     <div class="card">\
       <div class="card-header">\
-        Local Assets\
+        Local Assets at <a target="_blank" href="http://localhost:8080">link</a>\
+        <br>\
         <span style="float:right;">\
           <div class="form-row">\
             <div class="col"><input type="text" class="form-control form-control-sm" id="localsearch" placeholder="Filter.."></div>\
@@ -547,7 +552,7 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion){
       <table class="table table-sm" id="localassets" style=".dataTables_filter {display:none;}">\
         <thead>\
           <tr>\
-            <th>Asset Name</th>\
+            <th style="width: 35%;">Asset Name</th>\
             <th>Asset path</th>\
             <th></th>\
           </tr>\
@@ -684,20 +689,16 @@ function deletelocal(){
 //// Download Status Bars ////
 socket.on('dldata', function(url, count, stats){
   $('#statusbar').empty();
-  $('#statusbar').append('\
+$('#statusbar').append('\
   <div class="row">\
-    <div class="col-4">\
-      ' + url.split('download/')[1] + '\
-    </div>\
-    <div class="col-2">\
-      ' + count[0] + ' of ' + count[1] + '\
-    </div>\
-    <div class="col-6">\
-      <div class="progress">\
+    <div class="col-2">' + count[0] + ' of ' + count[1] + '</div>\
+    <div class="col-10">\
+      <div class="progress mb-1">\
         <div class="progress-bar" role="progressbar" style="width: ' + stats.progress + '%;" aria-valuenow="' + stats.progress + '" aria-valuemin="0" aria-valuemax="100"></div>\
       </div>\
+      <div class="text-muted" style="font-size:0.85em; text-align:center;">' + url.split('download/')[1] + '</div>\
     </div>\
-  </dev>');
+  </div>');
 });
 socket.on('purgestatus', function(){
   $('#statusbar').empty();

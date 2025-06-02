@@ -1,0 +1,13 @@
+#weblog-content,
+#tftplog-content,
+#nginx-access-log-content,
+#nginx-error-log-content {
+  height: 200px;      /* fixed max height */
+  overflow-y: auto;       /* vertical scrollbar if content is large */
+  font-family: monospace;
+  font-size: 0.9em;
+  background: #222;
+  color: #eee;
+  padding: 10px;
+  white-space: pre-wrap;  /* keep whitespace and wrap lines */
+}

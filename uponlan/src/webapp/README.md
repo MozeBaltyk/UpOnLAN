@@ -1,47 +1,62 @@
-## Code Architecture
+# UpOnLAN Web App – Code Architecture & Design Insights
+
+## 🧱 Code Structure
 
 ```txt
-├── app.js                  # Minimal bootstrapping
+├── app.js                   # Minimal bootstrapping
 ├── routes/
-│   └── baseRoutes.js       # Contains baseurl + page routes
+│   └── baseRoutes.js        # Contains base URL and page routes
 ├── sockets/
-│   └── socketHandlers.js   # Socket.IO logic
+│   └── socketHandlers.js    # Entry point for all socket modules
+│   └── dashboardHandlers.js # Socket logic for dashboard-related events
+│   └── ...                  # Other socket modules
 ├── services/
-│   ├── menuService.js      # disablesigs, getMenuVersion, etc.
-│   └── dashboardService.js # builds dashboard data
+│   ├── menuService.js       # Exposes getMenuVersion(), disableSigs(), etc.
+│   └── dashboardService.js  # Logic supporting dashboard metrics
+│   └── ...                  # Other service files
 ├── views/
 │   ├── index.ejs
 │   └── uponlanxyz-web.ejs
-├── public/                 # Static assets
+├── public/                  # Static assets (CSS, JS, icons)
 ├── package.json
 ```
 
-### Why split into services/ and sockets/?
+## 🔌 Why `services/` vs `sockets/`?
 
-* `services/`: Pure logic that could be reused (e.g., in REST APIs later).
+| Layer       | Role                                                         |
+|-------------|--------------------------------------------------------------|
+| `services/` | Reusable pure functions with no socket context — logic only |
+| `sockets/`  | Wiring layer: maps Socket.IO events to service logic         |
 
-* `sockets/`: Glue code that maps socket events to those services.
+### Additional Notes:
+- `socketHandlers.js` registers and composes all sub-handlers.
+- Only pass `io` to services that **require broadcasting**, e.g., `io.to(socket.id).emit(...)`.
+- File system I/O is **strictly validated**:
+  - Paths are resolved with `path.resolve(...)`
+  - Only allow access to predefined roots via `.startsWith(...)` checks
 
-* Pass `io` only when needed. Most handlers use just socket, but ones like config/file editing need `io for io.to(socket.id).emit(...)`.
+> 🔐 Keep these security patterns consistent — especially when modifying files or reading logs.
 
-* Security: validating file paths with `path.resolve()` and checking with `.startsWith()`. Keep that strict validation everywhere file I/O happens.
+---
 
-## Others notes 
+## 🧩 Layered Menu System – Why Two Layers?
 
-* When calling an async functions: `const result = await configService.upgrademenu(version); // ✅ result is resolved value`
+| Path                         | Description                           | Behavior / Notes                                              |
+|------------------------------|----------------------------------------|---------------------------------------------------------------|
+| `/config/menus/remote/`      | Remote/base menu definitions           | Pulled from GitHub or Netboot.xyz                             |
+| `/config/menus/local/`       | Local user overrides                   | Created/edited via the web interface                          |
+| `/config/menus/`             | Final merged output                    | Local overrides are layered on top of remote defaults         |
 
-## Layer menu  - Why two layers?
+### Benefits:
+- Keeps **user customizations** safely separated from upstream content
+- Supports **non-destructive updates** to remote menus
+- Final menu reflects **merged content** for consistent PXE boot behavior
 
-| Directory                  | Purpose                                | Behavior / Notes                                            |
-|---------------------------|-----------------------------------------|-------------------------------------------------------------|
-| `/config/menus/remote/`   | Remote/base menu files                  | Fetched from GitHub or Netboot.xyz releases                 |
-| `/config/menus/local/`    | Local/override menu files               | Created or edited by user via the web interface             |
-| `/config/menus/`          | Merged output (remote + local overlay)  | Final menu used by the system; local files overwrite remote |
+---
 
-This layered model allows you to:
+## 🔍 Purpose
 
-* Keep your custom edits separate from upstream files
-
-* Safely update the remote menu without wiping local changes
-
-* Automatically apply your local overrides when generating the final menu
+This web app aims to:
+- Serve a PXE menu via iPXE with real-time edits
+- Allow file, log, and network control via browser
+- Provide live system metrics (TFTP, usage, boot activity, etc.)

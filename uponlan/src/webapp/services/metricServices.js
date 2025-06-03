@@ -1,24 +1,98 @@
-// nginx-metrics.js
+// ../services/metricsServices.js
 const axios = require('axios');
-const StatsD = require('hot-shots');
-const statsd = new StatsD();
-let latestNginxMetrics = {};
+const fs = require('fs');
+const path = require('path');
+
+// Nginx Metrics Collection
+let previous = null;
+let latestNginxMetrics = {
+  accepts: 0,
+  handled: 0,
+  requests: 0,
+  active: 0,
+  timestamp: Date.now(),
+};
 
 async function collectNginxMetrics() {
   try {
     const { data } = await axios.get('http://127.0.0.1/status');
-    const lines = data.split('\n');
-    const [, accepts, handled, requests] = lines[2].trim().split(/\s+/).map(Number);
-    statsd.gauge('nginx.accepts', accepts);
-    statsd.gauge('nginx.handled', handled);
-    statsd.gauge('nginx.requests', requests);
-    // Save for HTTP API
-    latestNginxMetrics = { accepts, handled, requests };
+    const lines = data.trim().split('\n');
+    const active = parseInt(lines[0].split(':')[1].trim(), 10);
+    const [accepts, handled, requests] = lines[2].trim().split(/\s+/).map(Number);
+    const now = Date.now();
+
+    if (previous) {
+      const deltaMetrics = {
+        accepts: Math.max(0, accepts - previous.accepts),
+        handled: Math.max(0, handled - previous.handled),
+        requests: Math.max(0, requests - previous.requests),
+        active,
+        timestamp: now,
+      };
+
+      latestNginxMetrics = deltaMetrics;
+    }
+
+    previous = { accepts, handled, requests, timestamp: now };
   } catch (err) {
-    console.error('Failed to collect NGINX metrics:', err.message);
+    console.error('Error collecting NGINX metrics:', err.message);
   }
 }
-// poll every 30 seconds
-setInterval(collectNginxMetrics, 30000);
-// Initial collection
-module.exports = { getLatestNginxMetrics: () => latestNginxMetrics };
+
+function getNginxMetrics() {
+  return latestNginxMetrics;
+}
+
+// --- TFTP METRICS ---
+const LOG_PATH = '/config/logs/tftp/tftpd.log';
+let lastSize = 0;
+let latestTftpMetrics = { requests: 0, timestamp: Date.now() };
+
+function parseTftpRequestsFromLog(logData) {
+  const lines = logData.split('\n');
+  return lines.filter(line => line.includes('RRQ') || line.includes('WRQ')).length;
+}
+
+function collectTftpMetrics() {
+  try {
+    const stats = fs.statSync(LOG_PATH);
+    const currentSize = stats.size;
+
+    if (currentSize <= lastSize) return; // nothing new or rotated
+
+    const stream = fs.createReadStream(LOG_PATH, {
+      encoding: 'utf8',
+      start: lastSize,
+      end: currentSize - 1,
+    });
+
+    let data = '';
+    stream.on('data', chunk => data += chunk);
+    stream.on('end', () => {
+      const newRequests = parseTftpRequestsFromLog(data);
+      latestTftpMetrics = {
+        requests: newRequests,
+        timestamp: Date.now(),
+      };
+      lastSize = currentSize;
+    });
+  } catch (err) {
+    console.error('Failed to collect TFTP metrics:', err.message);
+  }
+}
+
+function getTftpMetrics() {
+  return latestTftpMetrics;
+}
+
+module.exports = {
+  collectNginxMetrics,
+  getNginxMetrics,
+  collectTftpMetrics,
+  getTftpMetrics,
+};
+
+// Start periodic polling 30s
+const POLL_INTERVAL = 30000;
+setInterval(collectNginxMetrics, POLL_INTERVAL);
+setInterval(collectTftpMetrics, POLL_INTERVAL);

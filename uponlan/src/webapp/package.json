@@ -25,6 +25,8 @@
     "socket.io": "4.8.1",
     "systeminformation": "5.25.11",
     "chart.js": "^4.0.0",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "date-fns": "^4.0.0",
     "axios": "1.9.0",
     "hot-shots": "10.2.1",
     "marked": "15.0.12"

@@ -14,7 +14,6 @@ mkdir -p \
 # copy config files
 [[ ! -f /config/nginx/nginx.conf ]] && \
   cp /defaults/nginx.conf /config/nginx/nginx.conf
-  cp /webapp/public/img/favicon/favicon.ico /assets/favicon.ico
 [[ ! -f /config/nginx/site-confs/default ]] && \
   envsubst '${NGINX_PORT}' < /defaults/default > /config/nginx/site-confs/default
 

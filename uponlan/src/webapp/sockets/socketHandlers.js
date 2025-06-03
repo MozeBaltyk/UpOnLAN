@@ -8,7 +8,8 @@ const registerMetricHandlers = require('./metricHandlers');
 
 module.exports = function(io) {
   io.on('connection', (socket) => {
-    console.log(`${socket.id} connected at ${Date.now()}`);
+    const timestamp = new Date().toISOString(); // e.g., "2025-06-03T18:30:12.123Z"
+    console.log(`[${timestamp}] socket_id: ${socket.id} connected`);
     socket.join(socket.id);
 
     // Register different sets of socket listeners

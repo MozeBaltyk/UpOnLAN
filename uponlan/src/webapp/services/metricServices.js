@@ -92,7 +92,7 @@ module.exports = {
   getTftpMetrics,
 };
 
-// Start periodic polling 30s
-const POLL_INTERVAL = 30000;
+// Start periodic polling 15s
+const POLL_INTERVAL = 15000;
 setInterval(collectNginxMetrics, POLL_INTERVAL);
 setInterval(collectTftpMetrics, POLL_INTERVAL);

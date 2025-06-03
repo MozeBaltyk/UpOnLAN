@@ -13,8 +13,8 @@ module.exports = function registerMetricHandlers(socket, io) {
     });
   };
 
-  // Emit on a 30s interval
-  const interval = setInterval(sendMetrics, 30000);
+  // Emit on a 15s interval
+  const interval = setInterval(sendMetrics, 15000);
 
   // Optionally emit once immediately
   sendMetrics();

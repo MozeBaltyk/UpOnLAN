@@ -1,0 +1,10 @@
+#doc-viewer {
+  overflow-x: hidden;
+}
+
+.nav-link.active {
+  font-weight: bold;
+  color: #010914;
+  background-color: #e7f1ff;
+  border-radius: 0.25rem;
+}

@@ -80,6 +80,7 @@ EXPOSE 69/udp
 EXPOSE 80
 EXPOSE 3000
 
+COPY docs /docs
 COPY src/defaults /defaults
 COPY src/etc /etc
 COPY src/init.sh /init.sh

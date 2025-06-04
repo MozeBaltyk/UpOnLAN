@@ -204,11 +204,11 @@ function initMetricsChart() {
     type: 'line',
     data: {
       datasets: [
-        { label: 'Ngx Req.', borderColor: 'rgba(70,130,180,0.7)', borderWidth: 1, data: [], fill: false, tension: 0.4, },  // SteelBlue
+        { label: 'Ngx Req.', borderColor: 'rgba(70,130,180,0.7)', borderWidth: 1, data: [], fill: false, tension: 0.4, },     // SteelBlue
         { label: 'Ngx Accept.', borderColor: 'rgba(60,179,113,0.7)', borderWidth: 1, data: [], fill: false, tension: 0.4, },  // MediumSeaGreen
         { label: 'Ngx Handl.', borderColor: 'rgba(255,165,0,0.7)', borderWidth: 1, data: [], fill: false, tension: 0.4, },    // Orange
-        { label: 'Ngx Active', borderColor: 'rgba(220,20,60,0.7)', borderWidth: 1, data: [], fill: false, tension: 0.4, },     // Crimson
-        { label: 'TFTP Req.', borderColor: 'rgba(155,89,182,0.5)', borderWidth: 1, data: [], fill: false, tension: 0.4, }, // Soft Amethyst
+        { label: 'Ngx Active', borderColor: 'rgba(220,20,60,0.7)', borderWidth: 1, data: [], fill: false, tension: 0.4, },    // Crimson
+        { label: 'TFTP Req.', borderColor: 'rgba(155,89,182,0.5)', borderWidth: 1, data: [], fill: false, tension: 0.4, },    // Soft Amethyst
       ]
     },
     options: {
@@ -807,6 +807,74 @@ $('#statusbar').append('\
 });
 socket.on('purgestatus', function(){
   $('#statusbar').empty();
+});
+
+//// Render Docs ////
+function renderdoc() {
+  $('#pagecontent').empty();
+  $('#pagecontent').append(`
+    <center>
+      <div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+      <br>
+      <h2>Loading Docs</h2>
+    </center>
+  `);
+  socket.emit('docs:list');
+}
+socket.on('docs:list:response', function(docs) {
+  $('#pagecontent').empty();
+  let sidebar = `
+    <div class="card">
+      <div class="card-header">📚 Documentation</div>
+    </div>
+    <div class="container-fluid">
+      <div class="row flex-xl-nowrap">
+        <div class="col-12 col-md-3 col-xl-2 bd-sidebar">
+          <nav class="collapse bd-links" id="bd-docs-nav">
+            <ul class="nav flex-column">
+              ${docs.map(doc => `
+                <li class="nav-item">
+                  <a href="#" class="nav-link doc-link" data-doc="${doc}">${doc}</a>
+                </li>`).join('')}
+            </ul>
+          </nav>
+        </div>
+          <div class="col-12 col-md-9 col-xl-10">
+            <div id="doc-viewer" class="p-3 text-wrap overflow-auto">
+              <!-- Raw doc content here -->
+              <strong>Welcome to the internal documentation.</strong><br>
+              Here you'll find resources on how to develop, troubleshoot, and maintain your <code>iPXE</code> menus and serve them with the help of <code>UpOnLAN</code>.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  $('#pagecontent').append(sidebar);
+  // Add click handler
+  $('.doc-link').click(function (e) {
+    e.preventDefault();
+    $('.doc-link').removeClass('active');
+    $(this).addClass('active');
+    const doc = $(this).data('doc');
+    loaddoc(doc);
+  });
+});
+function loaddoc(filename) {
+  $('#doc-viewer').html(`
+    <div class="text-center">
+      <div class="spinner-border" role="status"></div>
+      <p>Loading <strong>${filename}</strong>...</p>
+    </div>
+  `);
+  socket.emit('docs:get', filename);
+}
+// Handle document content response
+socket.on('docs:get:response', function({ filename, content }) {
+  const htmlContent = typeof marked !== 'undefined' ? content : `<pre>${content}</pre>`;
+  $('#doc-viewer').html(`${htmlContent}`);
 });
 
 //// Render WOL page ////

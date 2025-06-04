@@ -58,5 +58,7 @@
 
 This web app aims to:
 - Serve a PXE menu via iPXE with real-time edits
+- Serve Assets during PXE install
+- Documentation about iPXE and UpOnLAN 
 - Allow file, log, and network control via browser
 - Provide live system metrics (TFTP, usage, boot activity, etc.)

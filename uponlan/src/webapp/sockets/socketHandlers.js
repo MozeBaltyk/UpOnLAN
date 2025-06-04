@@ -5,6 +5,7 @@ const registerMenuHandlers = require('./menuHandlers');
 const registerAssetHandlers = require('./assetHandlers');
 const registerLogHandlers = require('./logHandlers');
 const registerMetricHandlers = require('./metricHandlers');
+const registerDocHandlers = require('./docHandlers');
 
 module.exports = function(io) {
   io.on('connection', (socket) => {
@@ -19,5 +20,6 @@ module.exports = function(io) {
     registerLogHandlers(socket, io);
     registerMetricHandlers(socket, io);
     registerWolHandlers(socket);
+    registerDocHandlers(socket);
   });
 };

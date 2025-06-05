@@ -4,9 +4,9 @@
 mkdir -p \
   /assets \
   /config/nginx/site-confs \
-  /config/logs/nginx \
-  /config/logs/tftp \
-  /config/logs/webapp \
+  /logs/nginx \
+  /logs/tftp \
+  /logs/webapp \
   /run \
   /var/lib/nginx/tmp/client_body \
   /var/tmp/nginx

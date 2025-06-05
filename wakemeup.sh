@@ -2,17 +2,16 @@
 set -eu
 
 build () {
-    sudo podman build -t localhost/uponlan:latest ./uponlan
+    sudo podman build -t localhost/uponlan:latest .
 }
 
 deploy () {
+    build
     sudo podman play kube ./manifests/uponlan.yaml --publish 8080:80 --publish 3000:3000 --publish 69:69/udp
 }
 
 destroy () { 
     sudo podman play kube --down ./manifests/uponlan.yaml 
-    sudo rm -rf ./assets/*
-    sudo rm -rf ./config/*
     sudo podman rmi localhost/uponlan:latest
 }
 

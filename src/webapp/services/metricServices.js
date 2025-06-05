@@ -1,7 +1,6 @@
 // ../services/metricsServices.js
 const axios = require('axios');
 const fs = require('fs');
-const path = require('path');
 
 // Nginx Metrics Collection
 let previous = null;
@@ -44,7 +43,7 @@ function getNginxMetrics() {
 }
 
 // --- TFTP METRICS ---
-const LOG_PATH = '/config/logs/tftp/tftpd.log';
+const LOG_PATH = '/logs/tftp/tftpd.log';
 let lastSize = 0;
 let latestTftpMetrics = { requests: 0, timestamp: Date.now() };
 
@@ -92,7 +91,7 @@ module.exports = {
   getTftpMetrics,
 };
 
-// Start periodic polling 15s
-const POLL_INTERVAL = 15000;
+// Start periodic polling 10s
+const POLL_INTERVAL = 10000;
 setInterval(collectNginxMetrics, POLL_INTERVAL);
 setInterval(collectTftpMetrics, POLL_INTERVAL);

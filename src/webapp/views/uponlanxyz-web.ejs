@@ -182,7 +182,7 @@ socket.on('renderdash', function(response){
 // Render metrics
 let MetricsChart;
 let storedChartData = [];
-const MAX_POINTS = 40;
+const MAX_POINTS = 45;
 
 // Call this inside renderdash after canvas is injected
 function initMetricsChart() {
@@ -226,7 +226,7 @@ function initMetricsChart() {
         },
         y: {
           beginAtZero: true,
-          title: { display: true, text: 'TFTP / Nginx Req. every 15s' }
+          title: { display: true, text: 'TFTP / Nginx Req. every 10s' }
         }
       },
       elements: {

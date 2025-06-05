@@ -1,4 +1,5 @@
 const fs = require('fs');
+const RootLogPath = "/logs";
 
 function readLogFile(logPath) {
   try {
@@ -10,22 +11,22 @@ function readLogFile(logPath) {
 }
 
 function getWebLog() {
-  const logPath = '/config/logs/webapp/webapp.log';
+  const logPath = RootLogPath + '/webapp/webapp.log';
   return readLogFile(logPath);
 }
 
 function getTftpLog() {
-  const logPath = '/config/logs/tftp/tftpd.log';
+  const logPath = RootLogPath + '/tftp/tftpd.log';
   return readLogFile(logPath);
 }
 
 function getNginxAccessLog() {
-  const accessLogPath = '/config/logs/nginx/access.log';
+  const accessLogPath = RootLogPath + '/nginx/access.log';
   return fs.existsSync(accessLogPath) ? readLogFile(accessLogPath) : 'access.log not found or unreadable.';
 }
 
 function getNginxErrorLog() {
-  const errorLogPath = '/config/logs/nginx/error.log';
+  const errorLogPath = RootLogPath + '/nginx/error.log';
   return fs.existsSync(errorLogPath) ? readLogFile(errorLogPath) : 'error.log not found or unreadable.';
 }
 

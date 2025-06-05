@@ -18,7 +18,7 @@ module.exports = function(io) {
     registerMenuHandlers(socket, io);
     registerAssetHandlers(socket, io);
     registerLogHandlers(socket, io);
-    registerMetricHandlers(socket, io);
+    registerMetricHandlers(socket);
     registerWolHandlers(socket);
     registerDocHandlers(socket);
   });

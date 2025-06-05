@@ -23,6 +23,10 @@ spec:
           mountPath: /config
         - name: uponlan-assets
           mountPath: /assets
+        - name: uponlan-menu
+          mountPath: /menu
+        - name: uponlan-logs
+          mountPath: /logs
       ports:
         - containerPort: 3000
         - containerPort: 69
@@ -30,8 +34,14 @@ spec:
         - containerPort: 80
   volumes:
     - name: uponlan-config
-      hostPath:
+      emptyDir:
         path: ./config
     - name: uponlan-assets
-      hostPath:
+      emptyDir:
         path: ./assets
+    - name: uponlan-menu
+      emptyDir:
+        path: ./menu
+    - name: uponlan-logs
+      emptyDir:
+        path: ./logs

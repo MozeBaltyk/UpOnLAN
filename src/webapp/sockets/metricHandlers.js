@@ -1,7 +1,7 @@
 // ../sockets/metricHandlers.js
 const { getNginxMetrics, getTftpMetrics, } = require('../services/metricServices');
 
-module.exports = function registerMetricHandlers(socket, io) {
+module.exports = function registerMetricHandlers(socket) {
   const sendMetrics = () => {
     const nginx = getNginxMetrics();
     const tftp = getTftpMetrics();
@@ -13,8 +13,8 @@ module.exports = function registerMetricHandlers(socket, io) {
     });
   };
 
-  // Emit on a 15s interval
-  const interval = setInterval(sendMetrics, 15000);
+  // Emit on a 10s interval
+  const interval = setInterval(sendMetrics, 10000);
 
   // Optionally emit once immediately
   sendMetrics();

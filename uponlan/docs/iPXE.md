@@ -38,6 +38,8 @@ fi
 
 Bootable system images (ISO, kernel/initrd, etc.)
 
+---
+
 ## ✍️ iPXE Scripting
 
 You can automate booting via simple iPXE scripts. Common commands include:
@@ -96,6 +98,7 @@ pause
 
 Replace 10.10.10.10 with your actual IP or use DHCP to inject it via next-server.
 
+---
 
 ## 📚 More Resources
 

@@ -1,6 +1,9 @@
-# UpOnLAN Web App – Code Architecture & Design Insights
+## UpOnLAN Web App – Code Architecture & Design Insights
 
-## 🧱 Code Structure
+This part is to help keeping UpOnLAN futures devs.
+
+#### 🧱 Code Structure
+
 
 ```txt
 ├── app.js                   # Minimal bootstrapping
@@ -18,17 +21,21 @@
 │   ├── index.ejs
 │   └── uponlanxyz-web.ejs
 ├── public/                  # Static assets (CSS, JS, icons)
-├── package.json
+├── package.json             # npm dependencies
 ```
 
-## 🔌 Why `services/` vs `sockets/`?
+---
+
+## 🔌 Why `services/` and `sockets/`?
+
 
 | Layer       | Role                                                         |
 |-------------|--------------------------------------------------------------|
 | `services/` | Reusable pure functions with no socket context — logic only |
 | `sockets/`  | Wiring layer: maps Socket.IO events to service logic         |
 
-### Additional Notes:
+#### Additional Notes:
+
 - `socketHandlers.js` registers and composes all sub-handlers.
 - Only pass `io` to services that **require broadcasting**, e.g., `io.to(socket.id).emit(...)`.
 - File system I/O is **strictly validated**:
@@ -41,24 +48,35 @@
 
 ## 🧩 Layered Menu System – Why Two Layers?
 
-| Path                         | Description                           | Behavior / Notes                                              |
+| Path                         | Description                            | Behavior / Notes                                              |
 |------------------------------|----------------------------------------|---------------------------------------------------------------|
 | `/config/menus/remote/`      | Remote/base menu definitions           | Pulled from GitHub or Netboot.xyz                             |
 | `/config/menus/local/`       | Local user overrides                   | Created/edited via the web interface                          |
 | `/config/menus/`             | Final merged output                    | Local overrides are layered on top of remote defaults         |
 
-### Benefits:
+
+#### Benefits:
 - Keeps **user customizations** safely separated from upstream content
 - Supports **non-destructive updates** to remote menus
 - Final menu reflects **merged content** for consistent PXE boot behavior
 
 ---
 
-## 🔍 Purpose
+## Container
 
-This web app aims to:
-- Serve a PXE menu via iPXE with real-time edits
-- Serve Assets during PXE install
-- Documentation about iPXE and UpOnLAN 
-- Allow file, log, and network control via browser
-- Provide live system metrics (TFTP, usage, boot activity, etc.)
+Manifests/Containerfile map by default `./config` and `./assests`. During the init process, it provisions them.
+
+```bash
+tree -L 2 uponlan/src
+
+uponlan/src
+├── docs                 # Documentation in Mardown displayed in the webapp    
+├── defaults             # Default config used by init.sh during deployement
+│   ├── default          # Default nginx site-confs
+│   └── nginx.conf
+├── etc
+│   └── supervisor.conf  # Config services (TFTP,nginx,webapp)
+├── init.sh              # Init script launched by start.sh
+├── start.sh             # Startup script launched by the containerfile 
+└── webapp               # The webapp code source
+```

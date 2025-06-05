@@ -810,6 +810,37 @@ socket.on('purgestatus', function(){
 });
 
 //// Render Docs ////
+function renderTree(tree, parentPath = '', level = 0) {
+  let html = '<ul class="nav flex-column">';
+
+  for (const key in tree) {
+    if (key === '__file') continue;
+
+    const node = tree[key];
+    const fullPath = node.__file || `${parentPath}/${key}`;
+
+    const padding = 15 * level; // 15px indent per level
+
+    html += `<li class="nav-item" style="padding-left: ${padding}px;">`;
+
+    if (node.__file) {
+      html += `<a href="#" class="nav-link doc-link" data-doc="${node.__file}">${key}</a>`;
+    } else {
+      html += `<strong>${key}</strong>`;
+    }
+
+    const hasChildren = Object.keys(node).some(k => k !== '__file');
+    if (hasChildren) {
+      html += renderTree(node, fullPath, level + 1);
+    }
+
+    html += `</li>`;
+  }
+
+  html += '</ul>';
+  return html;
+}
+
 function renderdoc() {
   $('#pagecontent').empty();
   $('#pagecontent').append(`
@@ -833,12 +864,7 @@ socket.on('docs:list:response', function(docs) {
       <div class="row flex-xl-nowrap">
         <div class="col-12 col-md-3 col-xl-2 bd-sidebar">
           <nav class="collapse bd-links" id="bd-docs-nav">
-            <ul class="nav flex-column">
-              ${docs.map(doc => `
-                <li class="nav-item">
-                  <a href="#" class="nav-link doc-link" data-doc="${doc}">${doc}</a>
-                </li>`).join('')}
-            </ul>
+            ${renderTree(docs)}
           </nav>
         </div>
           <div class="col-12 col-md-9 col-xl-10">
@@ -853,6 +879,7 @@ socket.on('docs:list:response', function(docs) {
     </div>
   `;
   $('#pagecontent').append(sidebar);
+
   // Add click handler
   $('.doc-link').click(function (e) {
     e.preventDefault();

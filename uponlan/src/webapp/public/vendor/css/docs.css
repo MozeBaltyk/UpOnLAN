@@ -8,3 +8,10 @@
   background-color: #e7f1ff;
   border-radius: 0.25rem;
 }
+
+#doc-viewer code {
+  background-color: #f1f1f1;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-size: 90%;
+}

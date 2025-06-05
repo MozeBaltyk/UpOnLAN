@@ -1,13 +1,12 @@
 // ../sockets/docHandlers.js
-const { listDocs, getDocContent } = require('../services/docService');
+const { listDocs, getDocContent, buildTree } = require('../services/docServices');
 
 module.exports = function(socket) {
   socket.on('docs:list', async () => {
     try {
       const docs = await listDocs();
-      // Strip .md extensions
-      const cleanNames = docs.map(f => f.replace(/\.md$/, ''));
-      socket.emit('docs:list:response', cleanNames);
+      const tree = buildTree(docs);
+      socket.emit('docs:list:response', tree);
     } catch (err) {
       console.error(err);
       socket.emit('error', 'Failed to list docs');

@@ -1,3 +1,4 @@
+// ./services/menuServices.js
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
@@ -8,14 +9,6 @@ const {
   deleteFiles,
   getEndpointUrls,
  } = require('./utilServices');
-
-function getMenuVersion() {
-  return fs.existsSync('/config/menuversion.txt') ? fs.readFileSync('/config/menuversion.txt', 'utf8') : 'none';
-}
-
-function getMenuOrigin() {
-  return fs.existsSync('/config/menuorigin.txt') ? fs.readFileSync('/config/menuorigin.txt', 'utf8') : 'none';
-}
 
 function disablesigs() {
   const bootcfgr = '/config/menus/remote/boot.cfg';
@@ -348,8 +341,6 @@ function editgetfile(filename, islocal, socket) {
 }
 
 module.exports = {
-  getMenuVersion,
-  getMenuOrigin,
   disablesigs,
   layermenu,
   fetchDevReleases,

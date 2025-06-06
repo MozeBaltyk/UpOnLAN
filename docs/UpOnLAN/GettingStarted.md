@@ -2,11 +2,9 @@
 
 As prerequisites:
 
-* A `podman engine` install on linux.
+* A `podman engine` installed.
 
-* `nc` package installed
-
-* A KVM install with `virt-manager`, Not mandatory but good to have for testing purpose 
+* A KVM install with `virt-manager`, Not mandatory but good to have for testing purpose. 
 
 ```bash
 Usage: ./wakemeup.sh -a <action>

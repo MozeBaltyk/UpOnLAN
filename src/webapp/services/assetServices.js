@@ -1,17 +1,26 @@
+// ./services/assetServices.js - This module handles downloading remote assets and managing local assets.
 const fs = require('fs');
 const path = require('path');
-const { downloader } = require('./utilServices');
+const { getAssetOrigin, downloader } = require('./utilServices');
 
 async function dlremote(dlfiles, callback, io, socket) {
-  var dlarray = [];
-  for (var i in dlfiles){
-    var dlfile = dlfiles[i];
-    var dlpath = '/assets' + path.dirname(dlfile);
-    // Make destination directory
+  let asset_url;
+  try {
+    asset_url = getAssetOrigin();
+  } catch (err) {
+    console.error(err.message);
+    callback(err, null);
+    return;
+  }
+  const dlarray = [];
+  for (let dlfile of dlfiles) {
+    const safePath = dlfile.replace(/^\/+/, '/'); // prevent double slashes
+    const dlpath = path.join('/assets', path.dirname(safePath));
+
     fs.mkdirSync(dlpath, { recursive: true });
-    // Construct array for use in download function
-    var url = 'https://github.com/netbootxyz' + dlfile;
-    dlarray.push({'url':url,'path':dlpath});
+
+    const full_url = asset_url + safePath;
+    dlarray.push({ 'url': full_url, 'path': dlpath });
   }
   await downloader(dlarray, io, socket);
   callback(null, 'done');

@@ -522,8 +522,6 @@ socket.on('devrenderbrowser', function(releases){
   releasestable.draw();
 });
 
-
-
 // Render edit window DEV Menus From Netboot.xyz github
 // This function fetches and displays remote development versions of menus from the Netboot.xyz GitHub repository.
 function nbbrowser(){
@@ -611,69 +609,69 @@ function renderlocal(){
   $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Remote file list</h2></center>');
   socket.emit('getlocal');
 }
-socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion){
+socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotemenuorigin,remoteassetorigin,localnginxurl){
   $('#pagecontent').empty();
-  $('#pagecontent').append('\
-  <div class="card-group">\
-    <div class="card">\
-      <div class="card-header">\
-        Remote Assets at <a target="_blank" href="https://github.com/mozebaltyk/uponlan/releases/' + remotemenuversion + '">' + remotemenuversion + '</a>\
-        <br>\
-        <span style="float:right;">\
-          <div class="form-row">\
-            <div class="col"><input type="text" class="form-control form-control-sm" id="remotesearch" placeholder="Filter.."></div>\
-            <div class="col"><button onclick="remoteselect()" class="btn btn-primary btn-sm form-control form-control-sm">Select All</button></div>\
-            <div class="col"><button onclick="remoteclear()" class="btn btn-secondary btn-sm form-control form-control-sm">Clear Selection</button></div>\
-            <div class="col"><button onclick="dlremote()" class="btn btn-success btn-sm form-control form-control-sm">Pull Selected</button></div>\
-          </div>\
-        </span>\
-      </div>\
-      <div class="card-body">\
-      <table class="table table-sm" id="remoteassets">\
-        <thead>\
-          <tr>\
-            <th style="width: 35%;">Asset Name</th>\
-            <th>Asset path</th>\
-            <th></th>\
-          </tr>\
-        </thead>\
-      </table>\
-      </div>\
-    </div>\
-    <div class="card">\
-      <div class="card-header">\
-        Local Assets at <a target="_blank" href="http://localhost:8080">link</a>\
-        <br>\
-        <span style="float:right;">\
-          <div class="form-row">\
-            <div class="col"><input type="text" class="form-control form-control-sm" id="localsearch" placeholder="Filter.."></div>\
-            <div class="col"><button onclick="localselect()" class="btn btn-primary btn-sm form-control form-control-sm">Select All</button></div>\
-            <div class="col"><button onclick="localclear()" class="btn btn-secondary btn-sm form-control form-control-sm">Clear Selection</button></div>\
-            <div class="col"><button onclick="deletelocal()" class="btn btn-danger btn-sm form-control form-control-sm">Delete Selected</button></div>\
-          </div>\
-        </span>\
-      </div>\
-      <div class="card-body">\
-      <table class="table table-sm" id="localassets" style=".dataTables_filter {display:none;}">\
-        <thead>\
-          <tr>\
-            <th style="width: 35%;">Asset Name</th>\
-            <th>Asset path</th>\
-            <th></th>\
-          </tr>\
-        </thead>\
-      </table>\
-      <table class="table table-sm" id="untrackedassets" style=".dataTables_filter {display:none;}">\
-        <thead>\
-          <tr>\
-            <th>Untracked Assets</th>\
-            <th></th>\
-          </tr>\
-        </thead>\
-      </table>\
-      </div>\
-    </div>\
-  </div>');
+  $('#pagecontent').append(`
+  <div class="card-group">
+    <div class="card">
+      <div class="card-header">
+        Remote Assets at <a target="_blank" href="${remotemenuorigin}/releases/${remotemenuversion}">${remotemenuversion}</a>
+        <br>
+        <span style="float:right;">
+          <div class="form-row">
+            <div class="col"><input type="text" class="form-control form-control-sm" id="remotesearch" placeholder="Filter.."></div>
+            <div class="col"><button onclick="remoteselect()" class="btn btn-primary btn-sm form-control form-control-sm">Select All</button></div>
+            <div class="col"><button onclick="remoteclear()" class="btn btn-secondary btn-sm form-control form-control-sm">Clear Selection</button></div>
+            <div class="col"><button onclick="dlremote()" class="btn btn-success btn-sm form-control form-control-sm">Pull Selected</button></div>
+          </div>
+        </span>
+      </div>
+      <div class="card-body">
+        <table class="table table-sm" id="remoteassets">
+          <thead>
+            <tr>
+              <th style="width: 35%;">Asset Name</th>
+              <th>Asset path</th>
+              <th></th>
+            </tr>
+          </thead>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        Local Assets at <a target="_blank" href="${localnginxurl}">link</a>
+        <br>
+        <span style="float:right;">
+          <div class="form-row">
+            <div class="col"><input type="text" class="form-control form-control-sm" id="localsearch" placeholder="Filter.."></div>
+            <div class="col"><button onclick="localselect()" class="btn btn-primary btn-sm form-control form-control-sm">Select All</button></div>
+            <div class="col"><button onclick="localclear()" class="btn btn-secondary btn-sm form-control form-control-sm">Clear Selection</button></div>
+            <div class="col"><button onclick="deletelocal()" class="btn btn-danger btn-sm form-control form-control-sm">Delete Selected</button></div>
+          </div>
+        </span>
+      </div>
+      <div class="card-body">
+        <table class="table table-sm" id="localassets" style=".dataTables_filter {display:none;}">
+          <thead>
+            <tr>
+              <th style="width: 35%;">Asset Name</th>
+              <th>Asset path</th>
+              <th></th>
+            </tr>
+          </thead>
+        </table>
+        <table class="table table-sm" id="untrackedassets" style=".dataTables_filter {display:none;}">
+          <thead>
+            <tr>
+              <th>Untracked Assets</th>
+              <th></th>
+            </tr>
+          </thead>
+        </table>
+      </div>
+    </div>
+  </div>`);
   var tableoptions = {
     "paging": false,
     "bInfo" : false,
@@ -703,7 +701,7 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion){
         remotetable.row.add( 
           [
             index,
-            '<a href="https://github.com/netbootxyz' + value.path + file + '" target="_blank">' + value.path.split('download/')[1] + file + '</a>',
+            '<a href="' + remoteassetorigin + value.path + file + '" target="_blank">' + value.path.split('download/')[1] + file + '</a>',
             '<span style="float:right;"><input type="checkbox" class="form-check-input remotecheck" value="' + value.path + file + '"></span>'
           ]
         );

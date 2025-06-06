@@ -1,17 +1,8 @@
-const fs = require('fs');
-const exec = require('child_process').exec;
+// ./services/dashboardServices.js
 const fetch = require('node-fetch');
 const si = require('systeminformation');
 const { version } = require('../package.json');
-const { getMenuVersion, getMenuOrigin } = require('./menuServices');
-
-function execCommand(cmd) {
-  return new Promise(resolve => {
-    exec(cmd, (err, stdout, stderr) => {
-      resolve((stdout || stderr || '').trim());
-    });
-  });
-}
+const { getMenuVersion, getMenuOrigin, getEndpointUrls, execCommand } = require('./utilServices');
 
 async function getDashboardInfo() {
   const dashinfo = {
@@ -21,11 +12,13 @@ async function getDashboardInfo() {
   };
 
   try {
-    const res = await fetch('https://api.github.com/repos/mozebaltyk/uponlan/releases/latest', {
+    const { latest_url } = getEndpointUrls();
+    const res = await fetch(latest_url, {
       headers: { 'user-agent': 'node.js' }
     });
     const body = await res.json();
     dashinfo.remotemenuversion = body.tag_name;
+    console.log("Fetching latest release:", latest_url);
   } catch (e) {
     console.warn("Failed to fetch remote version", e);
   }

@@ -7,7 +7,7 @@ build () {
 
 deploy () {
     build
-    sudo podman play kube ./manifests/uponlan.yaml --publish 8080:80 --publish 3000:3000 --publish 69:69/udp
+    sudo podman play kube ./manifests/uponlan.yaml
 }
 
 destroy () { 

@@ -1,9 +1,19 @@
+// ./services/utilServices.js
 const { DownloaderHelper } = require('node-downloader-helper');
 const urlLib = require('url');
 const fetch = require('node-fetch');
 const allowedHosts = ['github.com', 's3.amazonaws.com'];
 const fs = require('fs');
 const path = require('path');
+const exec = require('child_process').exec;
+
+function execCommand(cmd) {
+  return new Promise(resolve => {
+    exec(cmd, (err, stdout, stderr) => {
+      resolve((stdout || stderr || '').trim());
+    });
+  });
+}
 
 function isValidUrl(urlString) {
   try {
@@ -14,13 +24,80 @@ function isValidUrl(urlString) {
   }
 }
 
+function getMenuVersion() {
+  return fs.existsSync('/config/menuversion.txt') ? fs.readFileSync('/config/menuversion.txt', 'utf8') : 'none';
+}
+
+function getMenuOrigin() {
+  const menuOriginPath = '/config/menuorigin.txt';
+  if (!fs.existsSync(menuOriginPath)) return 'none';
+
+  const rawUrl = fs.readFileSync(menuOriginPath, 'utf8').trim();
+  return rawUrl.replace(/\/+$/, '');
+}
+
+function getAssetOrigin() {
+  const filePath = '/config/menuorigin.txt';
+  if (!fs.existsSync(filePath)) return 'none';
+
+  const rawUrl = fs.readFileSync(filePath, 'utf8').trim();
+  try {
+    const parsedUrl = new URL(rawUrl);
+    if (parsedUrl.hostname === 'github.com' && parsedUrl.pathname.startsWith('/netbootxyz')) {
+      // Return only the base GitHub organization URL
+      return 'https://github.com/netbootxyz';
+    }
+    return parsedUrl.toString();
+  } catch (err) {
+    console.error('Invalid URL in menuorigin.txt:', err.message);
+    return rawUrl;
+  }
+}
+
+function getLocalNginx() {
+  const configPath = '/config/nginx/site-confs/default';
+  try {
+    const configContent = fs.readFileSync(configPath, 'utf8');
+    // Regular expression to match the 'listen' directive and capture the port number
+    const listenMatch = configContent.match(/^\s*listen\s+(\d+);/m);
+    if (listenMatch && listenMatch[1]) {
+      const port = listenMatch[1];
+      return `http://localhost:${port}`;
+    } else {
+      console.warn('No listen directive found in NGINX config.');
+      return 'http://localhost';
+    }
+  } catch (err) {
+    console.error('Error reading NGINX config:', err.message);
+    return 'http://localhost';
+  }
+}
+
 function getEndpointUrls() {
-  let endpoint_url = process.env.ENDPOINT_URL;
+  // let endpoint_url = process.env.ENDPOINT_URL;
   const defaultEndpointUrl = "https://github.com/mozebaltyk/uponlan";
-  // Check if env endpoint_url is a valid URL
-  if (!endpoint_url || !isValidUrl(endpoint_url)) {
-    console.warn(`Invalid URL "${endpoint_url}" in environment variable ENDPOINT_URL. Using default URL ${defaultEndpointUrl} instead.`);
-    endpoint_url = defaultEndpointUrl;
+  const menuOriginPath = '/config/menuorigin.txt';
+  let endpoint_url;
+
+  if (fs.existsSync(menuOriginPath)) {
+    try {
+      const rawUrl = fs.readFileSync(menuOriginPath, 'utf8').trim();
+      if (isValidUrl(rawUrl)) {
+        endpoint_url = rawUrl;
+      } else {
+        console.warn(`Invalid URL in menuorigin.txt: "${rawUrl}". Falling back to environment variable.`);
+      }
+    } catch (err) {
+      console.error(`Error reading menuorigin.txt: ${err.message}`);
+    }
+  }
+
+  if (!endpoint_url) {
+    endpoint_url = process.env.ENDPOINT_URL;
+    if (!endpoint_url || !isValidUrl(endpoint_url)) {
+      console.warn(`Invalid or missing ENDPOINT_URL environment variable. Using default URL ${defaultEndpointUrl}.`);
+      endpoint_url = defaultEndpointUrl;
+    }
   }
 
   // Define API and raw URLs based on endpoint_url
@@ -44,10 +121,13 @@ function getEndpointUrls() {
     raw_url = endpoint_url;
   }
 
-  console.log("API URL:", api_url);
-  console.log("RAW URL:", raw_url);
+  // Latest release URL
+  latest_url = `${api_url}releases/latest`;
+
+  //console.log("API URL:", api_url);
+  //console.log("RAW URL:", raw_url);
   console.log("Endpoint URL:", endpoint_url);
-  return { endpoint_url, api_url, raw_url };
+  return { endpoint_url, api_url, raw_url, latest_url };
 }
 
 
@@ -71,62 +151,82 @@ function deleteFiles(file) {
 }
 
 async function downloader(downloads, io, socket) {
-  var startTime = new Date();
-  var total = downloads.length;
-  for (var i in downloads){
-    var value = downloads[i];
-    var url = value.url;
-    var path = value.path;
-    var dloptions = {override:true,retry:{maxRetries:2,delay:5000}};
-    var dl = new DownloaderHelper(url, path, dloptions);
+  let startTime = new Date();
+  const total = downloads.length;
 
-    dl.on('end', function(){ 
-      console.log('Downloaded ' + url + ' to ' + path);
+  for (let i = 0; i < downloads.length; i++) {
+    const { url, path } = downloads[i];
+    const dloptions = {
+      override: true,
+      retry: { maxRetries: 2, delay: 5000 }
+    };
+
+    const dl = new DownloaderHelper(url, path, dloptions);
+
+    dl.on('end', () => {
+      console.log(`Downloaded ${url} to ${path}`);
     });
 
-    dl.on('error', function(error) {
-      console.error('Download failed:', error);
+    dl.on('error', (error) => {
+      console.error(`Download failed: ${url}`, error.message);
     });
 
-    dl.on('progress', function(stats){
-      var currentTime = new Date();
-      var elaspsedTime = currentTime - startTime;
-      if (elaspsedTime > 500) {
+    dl.on('progress', (stats) => {
+      const currentTime = new Date();
+      const elapsedTime = currentTime - startTime;
+      if (elapsedTime > 500) {
         startTime = currentTime;
-        io.emit('dldata', url, [+i + 1,total], stats);
+        io.emit('dldata', url, [i + 1, total], stats);
       }
     });
 
-    await dl.start().catch(error => {
-      console.error(`Download failed: ${item.url} -> ${err.message}`);
-    });
+    try {
+      await dl.start();
+    } catch (err) {
+      console.error(`Download failed: ${url} -> ${err.message}`);
+      continue; // move to next even on error
+    }
 
+    // Optional .part2 support (for non-GitHub/S3 hosts)
     const parsedUrl = urlLib.parse(url);
-    if (!allowedHosts.includes(parsedUrl.host)){
-      // Part 2 if exists repeat
-      var response = await fetch(url + '.part2', {method: 'HEAD'});
-      var urltest = response.headers.get('server');
-      if (urltest == 'AmazonS3' || urltest == 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0') {
-        var dl2 = new DownloaderHelper(url + '.part2', path, dloptions);
-        dl2.on('end', function(){ 
-          console.log('Downloaded ' + url + '.part2' + ' to ' + path);
-        });
-        dl2.on('progress', function(stats){
-          var currentTime = new Date();
-          var elaspsedTime = currentTime - startTime;
-          if (elaspsedTime > 500) {
-            startTime = currentTime;
-            io.emit('dldata', url, [+i + 1,total], stats);
-          }
-        });
-        await dl2.start();
+    if (!allowedHosts.includes(parsedUrl.host)) {
+      try {
+        const response = await fetch(url + '.part2', { method: 'HEAD' });
+        const serverHeader = response.headers.get('server');
+        if (['AmazonS3', 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'].includes(serverHeader)) {
+          const dl2 = new DownloaderHelper(url + '.part2', path, dloptions);
+
+          dl2.on('end', () => {
+            console.log(`Downloaded ${url}.part2 to ${path}`);
+          });
+
+          dl2.on('progress', (stats) => {
+            const currentTime = new Date();
+            const elapsedTime = currentTime - startTime;
+            if (elapsedTime > 500) {
+              startTime = currentTime;
+              io.emit('dldata', url + '.part2', [i + 1, total], stats);
+            }
+          });
+
+          await dl2.start();
+        }
+      } catch (err) {
+        // silently skip .part2 if not found or failed
       }
     }
   }
+
   io.emit('purgestatus');
 }
 
+
 module.exports = {
+  execCommand,
+  getMenuVersion,
+  getMenuOrigin,
+  getAssetOrigin,
+  getLocalNginx,
   isValidUrl,
   getEndpointUrls,
   deleteAllFilesInDir,

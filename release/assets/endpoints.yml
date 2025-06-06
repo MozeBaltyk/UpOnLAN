@@ -1,12 +1,4 @@
 endpoints:
-  oracle-8-cloud-init:
-    path: /asset-mirror/user-data/ol8/
-    files:
-    - cloud-init.cfg
-    - network.cfg
-    os: oracle
-    version: '8'
-    arch: x86_64
   oracle-8-x86_64:
     path: /asset-mirror/releases/download/6-1525fd25/
     files:

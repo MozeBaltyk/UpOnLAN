@@ -1,8 +1,8 @@
+// ./sockets/assetHandlers.js
 const fs = require('fs');
 const yaml = require('js-yaml');
 const readdirp = require('readdirp');
-const fetch = require('node-fetch'); // if not globally available
-const { getMenuVersion, fetchDevReleases, fetchNetbootReleases, } = require('../services/menuServices');
+const { getMenuOrigin, getLocalNginx, getMenuVersion, getAssetOrigin } = require('../services/utilServices');
 const { dlremote } = require('../services/assetServices');
 
 module.exports = function registerAssetHandlers(socket, io) {
@@ -22,7 +22,10 @@ module.exports = function registerAssetHandlers(socket, io) {
       const localfiles = await readdirp.promise('/assets/.');
       const assets = localfiles.map(f => '/' + f.path);
       const menuversion = getMenuVersion();
-      io.sockets.in(socket.id).emit('renderlocal', endpoints, assets, menuversion);
+      const menuorigin = getMenuOrigin();
+      const assetorigin = getAssetOrigin();
+      const localNginx = getLocalNginx();
+      io.sockets.in(socket.id).emit('renderlocal', endpoints, assets, menuversion, menuorigin, assetorigin, localNginx);
     } catch (error) {
       console.error('getlocal error:', error.stack || error);
       socket.emit('error', 'Failed to load local assets: ' + error.message);
@@ -51,25 +54,4 @@ module.exports = function registerAssetHandlers(socket, io) {
     }
   });
 
-  // Fetch latest releases and commits from netboot.xyz
-  socket.on('nbgetbrowser', async function () {
-    try {
-      const { releases, commits } = await fetchNetbootReleases();
-      io.to(socket.id).emit('nbrenderbrowser', releases, commits);
-    } catch (error) {
-      console.error('nbgetbrowser error:', error.stack || error);
-      socket.emit('error', 'Failed to fetch Netboot.xyz browser data: ' + error.message);
-    }
-  });
-
-  // Fetch latest releases from Endpoint URL
-  socket.on('devgetbrowser', async function () {
-    try {
-      const releases = await fetchDevReleases();
-      io.sockets.in(socket.id).emit('devrenderbrowser', releases);
-    } catch (error) {
-      console.error('devgetbrowser error:', error.stack || error);
-      socket.emit('error', 'Failed to fetch UpOnLAN.xyz browser data: ' + error.message);
-    }
-  });
 };

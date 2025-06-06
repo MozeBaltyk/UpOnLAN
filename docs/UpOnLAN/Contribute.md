@@ -4,7 +4,7 @@ Pull requests, discussions, or any other help are welcome!
 
 There are several areas where you can contribute to this project:
 
-- 🛠️ Maintain or add new features to the **UpOnLAN.xyz web app**
+- 🛠️ Maintain or add new features to the **UpOnLAN.xyz webapp**
 - 📚 Improve documentation to help iPXE gain popularity
 - 🧪 Experiment with and provide feedback about **UpOnLAN.xyz**
 - 🐳 Enhance the delivery: containers, CI/CD pipelines, Docker Hub releases, etc.

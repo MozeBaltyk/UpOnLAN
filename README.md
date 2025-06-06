@@ -17,9 +17,7 @@ This webapp aims to:
 
 As prerequisites:
 
-* A `podman engine` install on linux.
-
-* `nc` package installed
+* A `podman engine` installed.
 
 * A KVM install with `virt-manager`, Not mandatory but good to have for testing purpose 
 

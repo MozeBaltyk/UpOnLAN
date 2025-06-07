@@ -856,7 +856,7 @@ socket.on('docs:list:response', function(docs) {
   $('#pagecontent').empty();
   let sidebar = `
     <div class="card">
-      <div class="card-header">📚 Documentation</div>
+      <div class="card-header">Documentation</div>
     </div>
     <div class="container-fluid">
       <div class="row flex-xl-nowrap">
@@ -865,13 +865,34 @@ socket.on('docs:list:response', function(docs) {
             ${renderTree(docs)}
           </nav>
         </div>
-          <div class="col-12 col-md-9 col-xl-10">
-            <div id="doc-viewer" class="p-3 text-wrap overflow-auto">
-              <!-- Raw doc content here -->
-              <strong>Welcome to the internal documentation.</strong><br>
-              Here you'll find resources on how to develop, troubleshoot, and maintain your <code>iPXE</code> menus and serve them with the help of <code>UpOnLAN</code>.
-            </div>
-          </div>
+        <div class="col-12 col-md-9 col-xl-10">
+          <div id="doc-viewer" class="p-3 text-wrap overflow-auto">
+                <!-- Raw doc content here -->
+                <h2 class="mb-3">📡 Welcome to the UpOnLAN Internal Documentation</h2>
+                <p>
+                  This internal documentation is your go-to resource for understanding, developing, and maintaining
+                  <code>iPXE</code> menus integrated with <strong>UpOnLAN.xyz</strong>.
+                </p>
+                <p>
+                  You'll find guidance on:
+                  <ul>
+                    <li>How to structure and build <code>iPXE</code> menus</li>
+                    <li>Serving <code>iPXE</code> menus through a TFTP server</li>
+                    <li>Serving assets through a HTTP server</li>
+                    <li>Troubleshooting tips and integration strategies</li>
+                    <li>Leveraging <strong>UpOnLAN.xyz</strong> features to help you develop <code>iPXE</code> menus.</li>
+                  </ul>
+                </p>
+                <p>Whether you're beginner or advance user, I hope this documentation will help you all the way.</p>
+                <div class="mt-4">
+                  <strong>💡 Note:</strong> This documentation is a work in progress. Contributions and suggestions are highly encouraged!
+                  <br>
+                  Submit improvements on GitHub: 
+                  <a href="https://github.com/MozeBaltyk/UpOnLAN/tree/main/docs" target="_blank">docs repo</a> • 
+                  Join the discussion: 
+                  <a href="https://github.com/MozeBaltyk/UpOnLAN/discussions" target="_blank">community forum</a>
+                </div>
+              </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 // ../services/metricsServices.js
 const axios = require('axios');
 const fs = require('fs');
+const { getLocalNginx } = require('./utilServices');
 
 // Nginx Metrics Collection
 let previous = null;
@@ -14,7 +15,8 @@ let latestNginxMetrics = {
 
 async function collectNginxMetrics() {
   try {
-    const { data } = await axios.get('http://127.0.0.1/status');
+    const nginxurl = getLocalNginx();
+    const { data } = await axios.get(nginxurl + '/status');
     const lines = data.trim().split('\n');
     const active = parseInt(lines[0].split(':')[1].trim(), 10);
     const [accepts, handled, requests] = lines[2].trim().split(/\s+/).map(Number);

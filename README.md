@@ -2,7 +2,9 @@
 
 **[Features](#features) • [Get Started](#get-started)**
 
-This project is a cold fork of Netboot.xyz with the goal of unifying and simplifying the upstream into an all-in-one solution. Its main purpose is to provide an editor for iPXE menus and serve them on the fly. Additional features include Wake-on-LAN, PXE menu testing and installation, and a webapp for developing custom PXE menus. PXE booting is especially relevant for automating bare-metal installations and experimenting with new setups.
+This project is a cold fork of Netboot.xyz with the goal of unifying and simplifying the upstream into an all-in-one solution. Its main purpose is to provide an editor for iPXE menus, build the boot mediums and serve them on the fly. Additional features include Wake-on-LAN, PXE menu testing and installation, and documentation in the webapp for developing custom PXE menus. 
+    
+PXE booting is especially relevant for automating bare-metal installations and experimenting with new setups.
 
 ## Features
 

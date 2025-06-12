@@ -74,7 +74,7 @@ function getLocalNginx() {
 }
 
 function getEndpointUrls() {
-  // let endpoint_url = process.env.ENDPOINT_URL;
+  // if not defined in /config/menuorigin.txt, let endpoint_url = process.env.ENDPOINT_URL;
   const defaultEndpointUrl = "https://github.com/mozebaltyk/uponlan";
   const menuOriginPath = '/config/menuorigin.txt';
   let endpoint_url;

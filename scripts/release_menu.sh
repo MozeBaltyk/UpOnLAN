@@ -9,11 +9,6 @@ fi
 HARD_RELEASE=$1
 
 echo -e "\n### Releasing menu version ${HARD_RELEASE} ###\n"
-
-
-pwd 
-ls 
-ls ./release/menus
 mkdir -p ./release/githubout
 
 # Set Version

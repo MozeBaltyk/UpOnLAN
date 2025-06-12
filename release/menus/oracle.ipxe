@@ -33,7 +33,6 @@ set url ${live_endpoint}/asset-mirror/releases/download/U5-5d86c3df/
 set repo https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/${os_arch}
 goto boot
 
-
 :boot
 imgfree
 kernel ${url}vmlinuz ${ipparam} inst.repo=${repo} root=live:${url}squashfs.img ro rd.live.image rd.lvm=0 rd.luks=0 rd.md=0 rd.dm=0 initrd=initrd.magic ${cmdline}

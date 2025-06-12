@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  release:
-    name: Build Release
+  release_menu:
+    name: Release Menu
     runs-on: ubuntu-latest
     if: github.repository == 'mozebaltyk/uponlan'
     permissions:
@@ -41,7 +41,7 @@ jobs:
     - name: Set release tag
       run: echo "release_tag=${{ steps.get_version.outputs.TAG_VERSION }}" >> $GITHUB_ENV
 
-    - name: Build release
+    - name: Build Menu release
       run: |
         echo "Building release for version ${{ steps.get_version.outputs.TAG_VERSION }}"
         ./scripts/release_menu.sh ${{ steps.get_version.outputs.TAG_VERSION }}
@@ -50,7 +50,7 @@ jobs:
       id: extract-release-notes
       uses: ffurrer2/extract-release-notes@v2
 
-    - name: Create Release and Upload Assets
+    - name: Create Release/Assets for Menu
       uses: svenstaro/upload-release-action@v2
       with:
         file: release/githubout/*
@@ -61,3 +61,23 @@ jobs:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         tag: ${{ env.release_tag }}
         body: ${{ steps.extract-release-notes.outputs.release_notes }}
+
+#  release_assets:
+#    name: Release Assets
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#    - uses: actions/checkout@v4
+#      with:
+#        ref: main
+#
+#    - name: Create release and upload assets
+#      uses: softprops/action-gh-release@v2
+#      with:
+#        tag_name: ${{ env.GITHUB_TAG }}
+#        name: ${{ env.GITHUB_TAG }}
+#        draft: false
+#        prerelease: false
+#        files: buildout/*
+#        token: ${{ secrets.GITHUB_TOKEN }}
+#        body_path: ${{ github.workspace }}-CHANGELOG.txt

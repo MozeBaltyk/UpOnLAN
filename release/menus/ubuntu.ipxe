@@ -20,12 +20,6 @@ menu ${os} - ${os_arch}
 item --gap Latest Releases
 item plucky ${space} ${os} 25.04 Plucky Puffin
 item oracular ${space} ${os} 24.10 Oracular Oriole
-item noble ${space} ${os} 24.04 LTS Noble Numbat
-item jammy ${space} ${os} 22.04 LTS Jammy Jellyfish
-item focal ${space} ${os} 20.04 LTS Focal Fossa (Subiquity)
-item focal-legacy ${space} ${os} 20.04 LTS Focal Fossa (Legacy)
-item bionic ${space} ${os} 18.04 LTS Bionic Beaver
-item xenial ${space} ${os} 16.04 LTS Xenial Xerus
 item --gap Older Releases
 item older_release ${space} Set release codename...
 choose ubuntu_version || goto ubuntu_exit
@@ -94,36 +88,6 @@ echo MD5sums:
 md5sum linux initrd.gz
 boot
 
-:focal_amd64
-set kernel_url ${live_endpoint}/ubuntu-squash/releases/download/20.04.6-6cac7910/
-set codename focal
-set version_number 20.04.6
-goto sub_boot
-:focal_arm64
-set kernel_url ${live_endpoint}/ubuntu-squash/releases/download/20.04.5-3362c70d/
-set codename focal
-set version_number 20.04.5
-goto sub_boot
-:jammy_amd64
-set kernel_url ${live_endpoint}/ubuntu-squash/releases/download/22.04.5-295657f3/
-set codename jammy
-set version_number 22.04.5
-goto sub_boot
-:jammy_arm64
-set kernel_url ${live_endpoint}/ubuntu-squash/releases/download/22.04.5-32a0e326/
-set codename jammy
-set version_number 22.04.5
-goto sub_boot
-:noble_amd64
-set kernel_url ${live_endpoint}/ubuntu-squash/releases/download/24.04.2-dac09526/
-set codename noble
-set version_number 24.04.2
-goto sub_boot
-:noble_arm64
-set kernel_url ${live_endpoint}/ubuntu-squash/releases/download/24.04.2-7b71a472/
-set codename noble
-set version_number 24.04.2
-goto sub_boot
 :oracular_amd64
 set kernel_url ${live_endpoint}/ubuntu-squash/releases/download/24.10-fcf8807c/
 set codename oracular

@@ -1,4 +1,4 @@
-## UpOnLAN Web App – Code Architecture & Design Insights
+## Code Architecture & Design Insights
 
 This part is to help keeping UpOnLAN futures devs. 
 
@@ -13,6 +13,8 @@ This projects includes several components.
 * Documentation for all components. (The one you are currently reading)
 
 * Scripts and workflows
+
+---
 
 #### General Structure of the Project
 
@@ -40,7 +42,7 @@ tree -L 2
 
 #### 🧱 Code Structure
 
-A webapp using Node.js was developed following MVC structure. 
+The webapp is a cold fork from Netboot.xyz, using Node.js, it was refactored following a MVC structure. 
 
 - **Model**: Services in `/services/`
 - **View**: EJS templates in `/views/`

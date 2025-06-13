@@ -59,6 +59,7 @@ RUN apk add --no-cache \
     envsubst \
     git \
     jq \
+    yq \
     nghttp2-dev \
     nginx \
     nodejs \

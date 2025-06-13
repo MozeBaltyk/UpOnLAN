@@ -9,7 +9,10 @@ mkdir -p \
   /logs/webapp \
   /run \
   /var/lib/nginx/tmp/client_body \
-  /var/tmp/nginx
+  /var/tmp/nginx \
+  /config/menus/remote \
+  /config/menus/local \
+  /config/menus/rom
 
 # copy config files
 [[ ! -f /config/nginx/nginx.conf ]] && \
@@ -17,42 +20,49 @@ mkdir -p \
 [[ ! -f /config/nginx/site-confs/default ]] && \
   envsubst '${NGINX_PORT}' < /defaults/default > /config/nginx/site-confs/default
 
-# Ownership
-chown -R nbxyz:nbxyz /assets
-chown -R nbxyz:nbxyz /var/lib/nginx
-chown -R nbxyz:nbxyz /var/log/nginx
-
-# create local logs dir
-mkdir -p \
-  /config/menus/remote \
-  /config/menus/local
-
 # Import UpOnLAN menus if ENDPOINT_URL is not set
 if [[ -z ${ENDPOINT_URL} ]]; then
+  export ENDPOINT_URL="https://github.com/mozebaltyk/uponlan/"
   if [[ -z ${MENU_VERSION+x} ]]; then
     MENU_VERSION=$(curl -sL "https://api.github.com/repos/mozebaltyk/uponlan/releases/latest" | jq -r '.tag_name')
   fi
-  echo "[uponlanxyz-init] Import default menu from uponlan.xyz:${MENU_VERSION}"
-  echo -n "${MENU_VERSION}" > /config/menuversion.txt
-  echo -n "https://github.com/mozebaltyk/uponlan" > /config/menuorigin.txt
-  curl -L https://github.com/mozebaltyk/uponlan/releases/download/${MENU_VERSION}/menus.tar.gz -o /config/menus/menus.tar.gz
-  tar -xzf /config/menus/menus.tar.gz -C /config/menus/remote
-  rm -f /config/menus/menus.tar.gz
 # Import menus if ENDPOINT_URL is set
 else
   if [[ -z ${MENU_VERSION+x} ]]; then
     MENU_VERSION="latest"
   fi
-  echo "[uponlanxyz-init] Import menu from ${ENDPOINT_URL}"
-  echo -n "${MENU_VERSION}" > /config/menuversion.txt
-  echo -n "${ENDPOINT_URL}" > /config/menuorigin.txt
-  curl -L ${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz -o /config/menus/menus.tar.gz
-  tar -xzf /config/menus/menus.tar.gz -C /config/menus/remote
-  rm -f /config/menus/menus.tar.gz
 fi
 
-# Finish Menus settings
-cp /config/menus/remote/* /config/menus/
+# Import menus
+echo "[uponlanxyz-init] Import menu from ${ENDPOINT_URL} version ${MENU_VERSION}"
+curl -L ${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz -o /config/menus/menus.tar.gz
+
+# Extract menus if exists
+if [[ ! -f /config/menus/menus.tar.gz ]]; then
+  echo "[uponlanxyz-init] No menus.tar.gz found, skipping extraction"
+else
+  echo "[uponlanxyz-init] Extracting menus.tar.gz"
+  tar -xzf /config/menus/menus.tar.gz -C /config/menus/remote
+  rm -f /config/menus/menus.tar.gz
+  if [[ -f /config/menus/remote/endpoints.yml ]]; then
+    mv /config/menus/remote/endpoints.yml /config/endpoints.yml
+    echo "[uponlanxyz-init] Extracted endpoints.yml"
+  else
+    echo "[uponlanxyz-init] No endpoints.yml found in extracted menus"
+  fi
+  cp /config/menus/remote/* /config/menus/
+fi
+
+# Ensure endpoints.yml exists
+if [[ ! -f /config/endpoints.yml ]]; then
+  echo "[uponlanxyz-init] No endpoints.yml found, creating a default one"
+  echo "menu: {}" > /config/endpoints.yml
+fi
+
+# Apply patches using yq
+yq -i ".menu.title = \"${TITLE:-UpOnLAN.xyz}\"" /config/endpoints.yml
+yq -i ".menu.version = \"${MENU_VERSION}\"" /config/endpoints.yml
+yq -i ".menu.origin = \"${ENDPOINT_URL:-https://github.com/mozebaltyk/uponlan}\"" /config/endpoints.yml
 
 # init wol.yml
 if [[ ! -f /config/wol.yml ]]; then
@@ -60,11 +70,8 @@ if [[ ! -f /config/wol.yml ]]; then
   cp /defaults/wol.yml /config/wol.yml
 fi
 
-# init endpoints.yml
-if [[ ! -f /config/endpoints.yml ]]; then
-  echo "[uponlanxyz-init] Import endpoints.yml"
-  cp /defaults/endpoints.yml /config/endpoints.yml
-fi
-
 # Ownership
 chown -R nbxyz:nbxyz /config
+chown -R nbxyz:nbxyz /assets
+chown -R nbxyz:nbxyz /var/lib/nginx
+chown -R nbxyz:nbxyz /var/log/nginx

@@ -4,6 +4,8 @@ const {
   upgrademenu,
   upgrademenunetboot,
   emptymenu,
+  getipxefiles,
+  getromfiles,
   createipxe,
   saveconfig,
   revertconfig,
@@ -27,24 +29,33 @@ module.exports = function registerMenuHandlers(socket, io) {
 
   socket.on('upgrademenu', (version) => {
     upgrademenu(version, (err, result) => {
-      if (err) { return socket.emit('error', err.message); }
+      if (err) { 
+        return socket.emit('error', err.message); 
+      }
       console.log('Menu upgrade complete:', result);
+      socket.emit('upgrademenu_complete');
     }, io, socket);
   });
 
   socket.on('upgrademenunetboot', (version) => {
     upgrademenunetboot(version, (err, result) => {
-      if (err) { return socket.emit('error', err.message); }
-      console.log('Netboot menu upgrade complete:', result);
+      if (err) { 
+        return socket.emit('error', err.message); 
+      }
+      console.log('Menu Netboot upgrade complete:', result);
+      socket.emit('upgrademenu_complete');
     }, io, socket);
   });
 
-  socket.on('getconfig', () => {
-    const local_files = fs.readdirSync('/config/menus/local', { withFileTypes: true })
-      .filter(d => !d.isDirectory()).map(d => d.name);
-    const remote_files = fs.readdirSync('/config/menus/remote', { withFileTypes: true })
-      .filter(d => !d.isDirectory()).map(d => d.name);
-    socket.emit('renderconfig', remote_files, local_files);
+  socket.on('getconfig', async () => {
+    try {
+      const { local_files, remote_files } = await getipxefiles();
+      const { list_rom_files} = await getromfiles();
+      socket.emit('renderconfig', remote_files, local_files, list_rom_files);
+    } catch (err) {
+      console.error('getconfig failed:', err);
+      socket.emit('error', 'Failed to get config: ' + err.message);
+    }
   });
 
   // Fetch latest releases and commits from netboot.xyz

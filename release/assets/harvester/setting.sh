@@ -4,7 +4,6 @@ VERSION=$(curl --silent "https://api.github.com/repos/harvester/harvester/releas
 OS=harvester
 RELEASE=${VERSION#v}
 ARCHS="amd64"
-TYPE=file
 BUILD_TYPE="direct_file"
 EXTRACTS="\
 https://releases.rancher.com/harvester/${VERSION}/harvester-${VERSION}-vmlinuz-REPLACE_ARCH|vmlinuz

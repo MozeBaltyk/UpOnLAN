@@ -5,6 +5,7 @@ const fetch = require('node-fetch');
 const allowedHosts = ['github.com', 's3.amazonaws.com'];
 const fs = require('fs');
 const path = require('path');
+const yaml = require('js-yaml');
 const exec = require('child_process').exec;
 
 function execCommand(cmd) {
@@ -24,33 +25,47 @@ function isValidUrl(urlString) {
   }
 }
 
+function getMenuData() {
+  const configPath = '/config/endpoints.yml';
+  if (!fs.existsSync(configPath)) {
+    return { version: 'none', origin: 'none' };
+  }
+
+  try {
+    const fileContent = fs.readFileSync(configPath, 'utf8');
+    const yamlData = yaml.load(fileContent);
+    const menu = yamlData?.menu || {};
+    return {
+      version: menu.version || 'none',
+      origin: menu.origin || 'none'
+    };
+  } catch (err) {
+    console.error('Error reading endpoints.yml:', err.message);
+    return { version: 'none', origin: 'none' };
+  }
+}
+
 function getMenuVersion() {
-  return fs.existsSync('/config/menuversion.txt') ? fs.readFileSync('/config/menuversion.txt', 'utf8') : 'none';
+  return getMenuData().version;
 }
 
 function getMenuOrigin() {
-  const menuOriginPath = '/config/menuorigin.txt';
-  if (!fs.existsSync(menuOriginPath)) return 'none';
-
-  const rawUrl = fs.readFileSync(menuOriginPath, 'utf8').trim();
-  return rawUrl.replace(/\/+$/, '');
+  return getMenuData().origin.replace(/\/+$/, '');
 }
 
 function getAssetOrigin() {
-  const filePath = '/config/menuorigin.txt';
-  if (!fs.existsSync(filePath)) return 'none';
+  const origin = getMenuData().origin;
+  if (origin === 'none') return 'none';
 
-  const rawUrl = fs.readFileSync(filePath, 'utf8').trim();
   try {
-    const parsedUrl = new URL(rawUrl);
+    const parsedUrl = new URL(origin);
     if (parsedUrl.hostname === 'github.com' && parsedUrl.pathname.startsWith('/netbootxyz')) {
-      // Return only the base GitHub organization URL
       return 'https://github.com/netbootxyz';
     }
     return parsedUrl.toString();
   } catch (err) {
-    console.error('Invalid URL in menuorigin.txt:', err.message);
-    return rawUrl;
+    console.error('Invalid URL in endpoints.yml:', err.message);
+    return origin;
   }
 }
 
@@ -76,29 +91,14 @@ function getLocalNginx() {
 function getEndpointUrls() {
   // if not defined in /config/menuorigin.txt, let endpoint_url = process.env.ENDPOINT_URL;
   const defaultEndpointUrl = "https://github.com/mozebaltyk/uponlan";
-  const menuOriginPath = '/config/menuorigin.txt';
-  let endpoint_url;
-
-  if (fs.existsSync(menuOriginPath)) {
-    try {
-      const rawUrl = fs.readFileSync(menuOriginPath, 'utf8').trim();
-      if (isValidUrl(rawUrl)) {
-        endpoint_url = rawUrl;
-      } else {
-        console.warn(`Invalid URL in menuorigin.txt: "${rawUrl}". Falling back to environment variable.`);
-      }
-    } catch (err) {
-      console.error(`Error reading menuorigin.txt: ${err.message}`);
-    }
+  let endpoint_url = getMenuOrigin();
+  if (endpoint_url === 'none' || !isValidUrl(endpoint_url)) {
+    console.warn(`Invalid or missing origin in endpoints.yml. Using default URL ${defaultEndpointUrl}.`);
+    endpoint_url = defaultEndpointUrl;
   }
 
-  if (!endpoint_url) {
-    endpoint_url = process.env.ENDPOINT_URL;
-    if (!endpoint_url || !isValidUrl(endpoint_url)) {
-      console.warn(`Invalid or missing ENDPOINT_URL environment variable. Using default URL ${defaultEndpointUrl}.`);
-      endpoint_url = defaultEndpointUrl;
-    }
-  }
+  // Normalize: remove trailing slashes
+  endpoint_url = endpoint_url.replace(/\/+$/, '');
 
   // Define API and raw URLs based on endpoint_url
   let api_url, raw_url;
@@ -174,9 +174,9 @@ async function downloader(downloads, io, socket) {
     dl.on('progress', (stats) => {
       const currentTime = new Date();
       const elapsedTime = currentTime - startTime;
-      if (elapsedTime > 500) {
+      if (elapsedTime > 300) {
         startTime = currentTime;
-        io.emit('dldata', url, [i + 1, total], stats);
+        socket.emit('dldata', url, [i + 1, total], stats);
       }
     });
 
@@ -203,9 +203,9 @@ async function downloader(downloads, io, socket) {
           dl2.on('progress', (stats) => {
             const currentTime = new Date();
             const elapsedTime = currentTime - startTime;
-            if (elapsedTime > 500) {
+            if (elapsedTime > 300) {
               startTime = currentTime;
-              io.emit('dldata', url + '.part2', [i + 1, total], stats);
+              socket.emit('dldata', url + '.part2', [i + 1, total], stats);
             }
           });
 
@@ -217,9 +217,8 @@ async function downloader(downloads, io, socket) {
     }
   }
 
-  io.emit('purgestatus');
+  socket.emit('purgestatus');
 }
-
 
 module.exports = {
   execCommand,

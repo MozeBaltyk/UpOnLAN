@@ -333,7 +333,7 @@ socket.on('renderconfig', function(remote_files, local_files, list_rom_files){
   </div>\
   <div class="container-fluid">\
     <div class="row flex-xl-nowrap">\
-      <div class="col-12 col-md-3 col-xl-2 bd-sidebar">\
+      <div class="col-12 col-md-4 col-xl-3 bd-sidebar">\
         <button class="btn btn-link bd-search-docs-toggle d-md-none p-0 ml-3" type="button" data-toggle="collapse" data-target="#bd-docs-nav" aria-controls="bd-docs-nav" aria-expanded="false" aria-label="Toggle files navigation">\
           <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 30 30" width="30" height="30" focusable="false">\
             <title>Files</title>\
@@ -365,7 +365,7 @@ socket.on('renderconfig', function(remote_files, local_files, list_rom_files){
           </div>\
         </nav>\
       </div>\
-      <div id="configcontent" class="col-12 col-md-9 col-xl-10">\
+      <div id="configcontent" class="col-12 col-md-8 col-xl-9">\
         <center>\
           <h3>Edit file on the left panel<br><br></h3>\
           <h3>Create a new file:</h3>\
@@ -501,7 +501,6 @@ function createipxe(){
   }
 }
 // Render edit window DEV Menus From var ENDPOINT_URL
-// This function fetches and displays remote development versions of menus from an endpoint URL.
 function devbrowser(){
   $('#configcontent').empty();
   $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Remote Development Versions</h2></center>');
@@ -509,41 +508,35 @@ function devbrowser(){
 }
 socket.on('devrenderbrowser', function(releases){
   $('#configcontent').empty();
-  $('#configcontent').append('\
-  <div class="card-group">\
-    <div class="card">\
-      <div class="card-header">\
-        Releases\
-      </div>\
-      <div class="card-body">\
-      <table class="table table-sm" id="releases" style=".dataTables_filter {display:none;}">\
-        <thead>\
-          <tr>\
-            <th>Releases</th>\
-            <th></th>\
-          </tr>\
-        </thead>\
-      </table>\
-      </div>\
-    </div>\
-  </div>');
-  var tableoptions = {
-    "paging": false,
-    "bInfo" : false,
-    'sDom': 't',
-    "order": []
+  $('#configcontent').append(`
+    <div class="card-group">
+      <div class="card">
+        <div class="card-header p-2">Releases</div>
+        <div class="card-body">
+          <table class="table table-sm" id="releases">
+            <thead>
+              <tr><th>Releases</th><th></th></tr>
+            </thead>
+          </table>
+        </div>
+      </div>
+    </div>
+  `);
+  const tableoptions = {
+    paging: false,
+    bInfo: false,
+    sDom: 't',
+    order: []
   };
   $("#releases").dataTable().fnDestroy();
-  var releasestable = $('#releases').DataTable(tableoptions);
+  const releasestable = $('#releases').DataTable(tableoptions);
   releasestable.clear();
   if (Array.isArray(releases)) {
-    $.each(releases, function(index,value){
-      releasestable.row.add( 
-        [
-          '<a target="_blank" href="' + value.html_url + '">' + value.tag_name + '</a>',
-          '<span style="float:right;"><button onclick="downloadmenus(\'' + value.tag_name + '\')" class="btn btn-outline-success btn-sm">Download</button></span>'
-        ]
-      );
+    $.each(releases, function(index, value){
+      releasestable.row.add([
+        `<a target="_blank" href="${value.html_url}" class="d-inline-block text-truncate" style="max-width: 150px;">${value.tag_name}</a>`,
+        `<span class="float-end"><button onclick="downloadmenus('${value.tag_name}')" class="btn btn-outline-success btn-sm">Download</button></span>`
+      ]);
     });
   } else {
     console.error('Invalid data received for releases:', releases);
@@ -552,7 +545,6 @@ socket.on('devrenderbrowser', function(releases){
 });
 
 // Render edit window DEV Menus From Netboot.xyz github
-// This function fetches and displays remote development versions of menus from the Netboot.xyz GitHub repository.
 function nbbrowser(){
   $('#configcontent').empty();
   $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Remote Netboot.xyz Versions</h2></center>');
@@ -560,66 +552,57 @@ function nbbrowser(){
 }
 socket.on('nbrenderbrowser', function(releases,commits){
   $('#configcontent').empty();
-  $('#configcontent').append('\
-  <div class="card-group">\
-    <div class="card">\
-      <div class="card-header">\
-        Development Commits\
-      </div>\
-      <div class="card-body">\
-      <table class="table table-sm" id="commits">\
-        <thead>\
-          <tr>\
-            <th>Commit</th>\
-            <th></th>\
-          </tr>\
-        </thead>\
-      </table>\
-      </div>\
-    </div>\
-    <div class="card">\
-      <div class="card-header">\
-        Releases\
-      </div>\
-      <div class="card-body">\
-      <table class="table table-sm" id="releases" style=".dataTables_filter {display:none;}">\
-        <thead>\
-          <tr>\
-            <th>Release</th>\
-            <th></th>\
-          </tr>\
-        </thead>\
-      </table>\
-      </div>\
-    </div>\
-  </div>');
-  var tableoptions = {
-    "paging": false,
-    "bInfo" : false,
-    'sDom': 't',
-    "order": []
+  $('#configcontent').append(`
+    <div class="row">
+      <div class="col-sm-12 col-md-6 mb-3">
+        <div class="card h-100">
+          <div class="card-header p-2">Development Commits</div>
+          <div class="card-body">
+            <table class="table table-sm" id="commits">
+              <thead>
+                <tr><th>Commit</th><th></th></tr>
+              </thead>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-12 col-md-6 mb-3">
+        <div class="card h-100">
+          <div class="card-header p-2">Releases</div>
+          <div class="card-body">
+            <table class="table table-sm" id="releases">
+              <thead>
+                <tr><th>Release</th><th></th></tr>
+              </thead>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+  const tableoptions = {
+    paging: false,
+    bInfo: false,
+    sDom: 't',
+    order: []
   };
   $("#commits").dataTable().fnDestroy();
   $("#releases").dataTable().fnDestroy();
-  var commitstable = $('#commits').DataTable(tableoptions);
-  var releasestable = $('#releases').DataTable(tableoptions);
+  const commitstable = $('#commits').DataTable(tableoptions);
+  const releasestable = $('#releases').DataTable(tableoptions);
   commitstable.clear();
   releasestable.clear();
-  $.each(releases, function(index,value){
-    releasestable.row.add( 
-      [
-        '<a target="_blank" href="' + value.html_url + '">' + value.tag_name + '</a>',
-        '<span style="float:right;"><button onclick="downloadmenusnetboot(\'' + value.tag_name + '\')" class="btn btn-outline-success btn-sm">Download</button></span>'
-      ]
-    );
+  $.each(releases, function(index, value){
+    releasestable.row.add([
+      `<a target="_blank" href="${value.html_url}" class="d-inline-block text-truncate" style="max-width: 150px;">${value.tag_name}</a>`,
+      `<span class="float-end"><button onclick="downloadmenusnetboot('${value.tag_name}')" class="btn btn-outline-success btn-sm">Download</button></span>`
+    ]);
   });
-  $.each(commits, function(index,value){
-    commitstable.row.add( 
-      [
-        '<a target="_blank" href="' + value.html_url + '">' + value.sha + '</a>',
-        '<span style="float:right;"><button onclick="downloadmenusnetboot(\'' + value.sha + '\')" class="btn btn-outline-success btn-sm">Download</button></span>'
-      ]
-    );
+  $.each(commits, function(index, value){
+    commitstable.row.add([
+      `<a target="_blank" href="${value.html_url}" class="d-inline-block text-truncate" style="max-width: 150px;">${value.sha}</a>`,
+      `<span class="float-end"><button onclick="downloadmenusnetboot('${value.sha}')" class="btn btn-outline-success btn-sm">Download</button></span>`
+    ]);
   });
   commitstable.draw();
   releasestable.draw();

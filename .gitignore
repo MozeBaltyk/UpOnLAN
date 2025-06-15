@@ -8,3 +8,4 @@ release/menus/rom/**
 uponlan.xml
 .vscode
 .vscode-test
+ansible

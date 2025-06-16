@@ -1,6 +1,18 @@
 #!/bin/bash
 set -eu
 
+build-runner() {
+    sudo podman build -t localhost/uponlan-ansible:latest -f ansible/Containerfile .
+}
+
+run-runner() {
+    sudo podman run -dit --name uponlan-ansible --pod uponlan \
+        -v "$(pwd)/ansible:/ansible" \
+        -v uponlan-config:/config \
+        localhost/uponlan-ansible:latest
+    sudo podman exec -it uponlan-ansible /bin/bash
+}
+
 build () {
     sudo podman build -t localhost/uponlan:latest .
 }
@@ -63,6 +75,8 @@ print_help () {
     echo "6. connect - connect to uponlan container"
     echo "7. test - pxeboot a VM on kvm domain"
     echo "8. network - check kvm/podman networks info"
+    echo "9. build-runner - build Ansible container"
+    echo "10. run-runner - run Ansible container"
     echo ""
 }
 
@@ -88,6 +102,8 @@ case $action in
     connect) echo "Action: connect to uponlan container";;
     test) echo "Action: test pxe boot with a kvm domain";;
     network) echo "Action: check kvm/podman networks info";;
+    build-runner) echo "Action: build Ansible container";;
+    run-runner) echo "Action: run Ansible container";;
     *) echo "Invalid action: $action"; print_help; exit 1;;
 esac
 

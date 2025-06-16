@@ -510,7 +510,7 @@ socket.on('devrenderbrowser', function(releases){
   $('#configcontent').empty();
   $('#configcontent').append(`
     <div class="card-group">
-      <div class="card">
+      <div class="card my-0">
         <div class="card-header p-2">Releases</div>
         <div class="card-body">
           <table class="table table-sm" id="releases">
@@ -555,7 +555,7 @@ socket.on('nbrenderbrowser', function(releases,commits){
   $('#configcontent').append(`
     <div class="row">
       <div class="col-sm-12 col-md-6 mb-3">
-        <div class="card h-100">
+        <div class="card my-0">
           <div class="card-header p-2">Development Commits</div>
           <div class="card-body">
             <table class="table table-sm" id="commits">
@@ -567,7 +567,7 @@ socket.on('nbrenderbrowser', function(releases,commits){
         </div>
       </div>
       <div class="col-sm-12 col-md-6 mb-3">
-        <div class="card h-100">
+        <div class="card my-0">
           <div class="card-header p-2">Releases</div>
           <div class="card-body">
             <table class="table table-sm" id="releases">
@@ -600,7 +600,7 @@ socket.on('nbrenderbrowser', function(releases,commits){
   });
   $.each(commits, function(index, value){
     commitstable.row.add([
-      `<a target="_blank" href="${value.html_url}" class="d-inline-block text-truncate" style="max-width: 150px;">${value.sha}</a>`,
+      `<a target="_blank" href="${value.html_url}" class="d-inline-block text-truncate" style="max-width: 200px;">${value.sha}</a>`,
       `<span class="float-end"><button onclick="downloadmenusnetboot('${value.sha}')" class="btn btn-outline-success btn-sm">Download</button></span>`
     ]);
   });

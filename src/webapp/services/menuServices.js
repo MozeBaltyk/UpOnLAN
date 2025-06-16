@@ -232,7 +232,7 @@ async function disablesigs() {
 // Fully promisified layermenu
 async function layermenu(socket = null, filename = null) {
   const targetDir = path.resolve('/config/menus/');
-  const romDir = path.resolve('/config/menus/rom'); // ROM files are here
+  const romDir = path.resolve('/config/menus/'); // ROM files are here
 
   const { local_files, remote_files } = await getipxefiles();
   const { list_rom_files } = await getremoteromfiles();
@@ -299,7 +299,7 @@ async function getipxefiles() {
 
 // Get ROM files (only from /config/menus, presumably remote base)
 async function getromfiles() {
-  const dir = path.resolve('/config/menus/rom');
+  const dir = path.resolve('/config/menus');
   const list_rom_files = await listFiles(dir, ['efi', 'kpxe', 'dsk', 'pdsk', 'iso', 'img']);
   return { list_rom_files };
 }

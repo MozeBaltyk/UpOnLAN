@@ -18,7 +18,7 @@ You can automate booting via simple iPXE scripts. Common commands include:
 
 ---
 
-### Define and Use variables
+## Define and Use variables
 
 ```ipxe
 #!ipxe
@@ -50,7 +50,7 @@ boot
 
 ---
 
-### Boot Process in iPXE
+## Boot Process in iPXE
 
 See Assets chapter to understand boot workflow, Here a simple example `ubuntu.ipxe` script:
 
@@ -67,7 +67,7 @@ initrd http://${SERVER}/boot/ubuntu/initrd.img
 boot
 ```
 
-### 🔗 Chain iPXE scripts
+## 🔗 Chain iPXE scripts
 
 Example of chain usage with  `main.ipxe` Menu:
 
@@ -104,7 +104,7 @@ pause
 
 ---
 
-### ✍️ Failure handlers
+## ✍️ Failure handlers
 
 In iPXE scripting, every command can fail. You can chain commands together with `||` (logical OR) to detect failures and react accordingly. This allows you to implement robust retry or fallback behavior.
 

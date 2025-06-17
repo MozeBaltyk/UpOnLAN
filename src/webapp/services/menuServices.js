@@ -9,6 +9,7 @@ const {
   downloader,
   deleteAllFilesInDir,
   deleteFiles,
+  getLocalNginx,
   getEndpointUrls,
  } = require('./utilServices');
 
@@ -193,8 +194,9 @@ async function emptymenu(socket, io) {
       await deleteAllFilesInDir('/config/menus/local');
       await deleteAllFilesInDir('/config/menus/remote');
       await deleteAllFilesInDir('/config/menus');
-      await deleteFiles('/config/menuversion.txt');
-      await deleteFiles('/config/menuorigin.txt');
+      await deleteAllFilesInDir('/assets/ipxe');
+      await deleteFiles('/assets/index.html');
+      await deleteFiles('/assets/index.htm');
       await deleteFiles(endpoints_config);
 
       // get default
@@ -232,10 +234,13 @@ async function disablesigs() {
 // Fully promisified layermenu
 async function layermenu(socket = null, filename = null) {
   const targetDir = path.resolve('/config/menus/');
-  const romDir = path.resolve('/config/menus/'); // ROM files are here
+  const romDir = path.resolve('/assets/ipxe'); // ROM files are here
+  const indexDir = path.resolve('/assets/'); // Index files 
 
   const { local_files, remote_files } = await getipxefiles();
   const { list_rom_files } = await getremoteromfiles();
+  const { list_index_files } = await getremoteindexfiles();
+  const local_nginx_url = getLocalNginx();
 
   // Copy remote iPXE files to targetDir
   for (const file of remote_files) {
@@ -249,8 +254,13 @@ async function layermenu(socket = null, filename = null) {
   for (const file of list_rom_files) {
     await fs.copyFile(path.join(getLayerRoot(false), file), path.join(romDir, file));
   }
+  // Copy remote index files to indexDir
+  for (const file of list_index_files) {
+    await fs.copyFile(path.join(getLayerRoot(false), file), path.join(indexDir, file));
+  }
+
   if (socket) {
-    socket.emit('renderconfig', remote_files, local_files, list_rom_files);
+    socket.emit('renderconfig', remote_files, local_files, list_rom_files, list_index_files, local_nginx_url);
   }
 }
 
@@ -297,17 +307,37 @@ async function getipxefiles() {
   return { local_files, remote_files };
 }
 
-// Get ROM files (only from /config/menus, presumably remote base)
+// Get ROM files
 async function getromfiles() {
-  const dir = path.resolve('/config/menus');
-  const list_rom_files = await listFiles(dir, ['efi', 'kpxe', 'dsk', 'pdsk', 'iso', 'img']);
+  const romDir = path.resolve('/assets/ipxe');
+  // Make sure all destination directories exist
+  await fs.mkdir(romDir, { recursive: true });
+  const list_rom_files = await listFiles(romDir, ['efi', 'kpxe', 'dsk', 'pdsk', 'iso', 'img']);
   return { list_rom_files };
 }
 
+async function getindexfiles() {
+  const assetsDir = path.resolve('/assets');
+  // Make sure all destination directories exist
+  await fs.mkdir(assetsDir, { recursive: true });
+  const list_index_files = await listFiles(assetsDir, ['html', 'htm']);
+  return { list_index_files };
+}
+
 async function getremoteromfiles() {
-  const dir = path.resolve('/config/menus/remote');
-  const list_rom_files = await listFiles(dir, ['efi', 'kpxe', 'dsk', 'pdsk', 'iso', 'img']);
+  const remoteDir = path.resolve('/config/menus/remote');
+  // Make sure all destination directories exist
+  await fs.mkdir(remoteDir, { recursive: true });
+  const list_rom_files = await listFiles(remoteDir, ['efi', 'kpxe', 'dsk', 'pdsk', 'iso', 'img']);
   return { list_rom_files };
+}
+
+async function getremoteindexfiles() {
+  const remoteDir = path.resolve('/config/menus/remote');
+  // Make sure all destination directories exist
+  await fs.mkdir(remoteDir, { recursive: true });
+  const list_index_files = await listFiles(remoteDir, ['html', 'htm']);
+  return { list_index_files };
 }
 
 // Read file contents for editing, from local or remote layer
@@ -406,6 +436,7 @@ module.exports = {
   emptymenu,
   getipxefiles,
   getromfiles,
+  getindexfiles,
   editgetfile,
   createipxe,
   saveconfig,

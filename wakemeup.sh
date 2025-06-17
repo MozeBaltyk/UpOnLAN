@@ -9,6 +9,7 @@ run-runner() {
     sudo podman run -dit --name uponlan-ansible --pod uponlan \
         -v "$(pwd)/ansible:/ansible" \
         -v uponlan-config:/config \
+        -v uponlan-assets:/assets \
         localhost/uponlan-ansible:latest
     sudo podman exec -it uponlan-ansible /bin/bash
 }

@@ -1,11 +1,13 @@
 // ./sockets/menuHandlers.js
 const fs = require('fs');
+const { getLocalNginx } = require('../services/utilServices');
 const {
   upgrademenu,
   upgrademenunetboot,
   emptymenu,
   getipxefiles,
   getromfiles,
+  getindexfiles,
   createipxe,
   saveconfig,
   revertconfig,
@@ -50,8 +52,11 @@ module.exports = function registerMenuHandlers(socket, io) {
   socket.on('getconfig', async () => {
     try {
       const { local_files, remote_files } = await getipxefiles();
-      const { list_rom_files} = await getromfiles();
-      socket.emit('renderconfig', remote_files, local_files, list_rom_files);
+      const { list_rom_files } = await getromfiles();
+      const { list_index_files } = await getindexfiles();
+      const local_nginx_url = getLocalNginx();
+
+      socket.emit('renderconfig', remote_files, local_files, list_rom_files, list_index_files, local_nginx_url);
     } catch (err) {
       console.error('getconfig failed:', err);
       socket.emit('error', 'Failed to get config: ' + err.message);

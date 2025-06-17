@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const exec = require('child_process').exec;
+let cachedNginxURL = null;
 
 function execCommand(cmd) {
   return new Promise(resolve => {
@@ -70,21 +71,48 @@ function getAssetOrigin() {
 }
 
 function getLocalNginx() {
+  // Return cached result if available
+  if (cachedNginxURL) {
+    return cachedNginxURL;
+  }
+
   const configPath = '/config/nginx/site-confs/default';
+
   try {
     const configContent = fs.readFileSync(configPath, 'utf8');
-    // Regular expression to match the 'listen' directive and capture the port number
-    const listenMatch = configContent.match(/^\s*listen\s+(\d+);/m);
-    if (listenMatch && listenMatch[1]) {
-      const port = listenMatch[1];
-      return `http://localhost:${port}`;
-    } else {
-      console.warn('No listen directive found in NGINX config.');
-      return 'http://localhost';
+
+    // Match all 'listen' directives: port and whether 'ssl' is present
+    const listenRegex = /^\s*listen\s+(?:[^\s:]*:)?(\d+)(?:[^;]*?\bssl\b)?[^;]*;/gm;
+    let match;
+    let selected = null;
+
+    while ((match = listenRegex.exec(configContent)) !== null) {
+      const port = match[1];
+      const line = match[0];
+
+      if (port) {
+        const isSSL = /\bssl\b/.test(line);
+        selected = {
+          port,
+          protocol: isSSL ? 'https' : 'http',
+        };
+        // Prefer non-443 SSL or any HTTP on first match
+        if (!isSSL || port !== '443') break;
+      }
     }
+
+    if (selected) {
+      cachedNginxURL = `${selected.protocol}://localhost:${selected.port}`;
+    } else {
+      console.warn(`No valid 'listen' directive found in ${configPath}.`);
+      cachedNginxURL = 'http://localhost';
+    }
+
+    return cachedNginxURL;
   } catch (err) {
-    console.error('Error reading NGINX config:', err.message);
-    return 'http://localhost';
+    console.error(`Error reading NGINX config at ${configPath}:`, err.message);
+    cachedNginxURL = 'http://localhost';
+    return cachedNginxURL;
   }
 }
 

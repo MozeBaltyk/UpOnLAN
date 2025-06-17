@@ -325,7 +325,7 @@ function renderconfig(){
   $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Config Items</h2></center>');
   socket.emit('getconfig');
 }
-socket.on('renderconfig', function(remote_files, local_files, list_rom_files){
+socket.on('renderconfig', function(remote_files, local_files, list_rom_files, list_index_files, local_nginx_url){
   $('#pagecontent').empty();
   $('#pagecontent').append('\
   <div class="card">\
@@ -367,7 +367,7 @@ socket.on('renderconfig', function(remote_files, local_files, list_rom_files){
       </div>\
       <div id="configcontent" class="col-12 col-md-8 col-xl-9">\
         <center>\
-          <h3>Edit file on the left panel<br><br></h3>\
+          <br><h3>Edit file on the left panel</h3><br><br>\
           <h3>Create a new file:</h3>\
           <div class="form-row">\
             <div class="col-md-4"></div>\
@@ -424,6 +424,14 @@ socket.on('renderconfig', function(remote_files, local_files, list_rom_files){
       <div class="bd-toc-item">\
         <div>' + value + '</div>\
       </div>');
+  });
+  // Fill index.html list
+  $(list_index_files).each(function(index, value) {
+    $('#rom-file-list').append(`
+      <div class="bd-toc-item">
+        <a target="_blank" href="${local_nginx_url}/${value}">${value}</a>
+      </div>
+    `);
   });
 });
 

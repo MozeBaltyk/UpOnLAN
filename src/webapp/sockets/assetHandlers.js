@@ -1,5 +1,6 @@
 // ./sockets/assetHandlers.js
 const fs = require('fs');
+const path = require('path');
 const yaml = require('js-yaml');
 const readdirp = require('readdirp');
 const { getMenuOrigin, getLocalNginx, getMenuVersion, getAssetOrigin } = require('../services/utilServices');
@@ -35,8 +36,15 @@ module.exports = function registerAssetHandlers(socket, io) {
   // Delete specified local assets
   socket.on('deletelocal', function (dlfiles) {
     try {
-      for (const file of dlfiles) {
-        const fullPath = path.join('/assets', file);
+      for (let  file of dlfiles) {
+        const cleanPath = file.replace(/^\/+/, '');
+        const fullPath = path.join('/assets', cleanPath);
+
+        // Prevent directory traversal
+        if (!fullPath.startsWith(path.resolve('/assets'))) {
+          console.warn('Blocked delete outside /assets:', fullPath);
+          continue;
+        }
         if (fs.existsSync(fullPath)) {
           fs.unlinkSync(fullPath);
           console.log('Deleted', fullPath);

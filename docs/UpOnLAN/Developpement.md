@@ -12,21 +12,21 @@ This projects includes several components.
 
 * Documentation for all components. (The one you are currently reading)
 
-* Scripts and workflows
-
+* Scripts and Github workflows
+ 
 ---
 
 #### General Structure of the Project
 
-`wakemeup.sh` help to kickstart the webapp using a *manifest* and *Containerfile*.
+`wakemeup.sh` help to kickstart the webapp using a *manifest* and *Containerfile*. It can also help to centralize in one command other scripts or be used by Github Workflows...
 
 ```bash
 tree -L 2
 .
 ├── Containerfile     # Build UpOnLAN.xyz image
-├── ansible
+├── ansible           # Divers roles to used by webapp in backend and Github Workflows
 ├── docs              # Markdown docs displayed in the webapp
-├── manifests         # K8s manifests to deploy with podman kube play
+├── manifests         # K8s manifests to deploy with podman kube play or on K8s platform.
 ├── release           # Default menus and assets used in UpOnLAN.xyz
 ├── scripts           # Scripts to test iPXE menu through libvirt VM
 ├── src               

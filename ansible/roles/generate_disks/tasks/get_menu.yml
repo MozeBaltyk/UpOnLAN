@@ -1,0 +1,16 @@
+---
+
+- name: Copy source files from webapp to uponlanxyz_root
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ uponlanxyz_root }}/{{ item.path }}"
+  loop: "{{ query('community.general.filetree', '/config/menus/') }}"
+  when:
+    - item.state == "file"
+    - item.path is not search('/')
+
+  ## PCIids part
+- name: Retrieve pciids.ipxe
+  ansible.builtin.get_url:
+    url: "{{ pciids_url }}"
+    dest: "{{ uponlanxyz_root }}/pciids.ipxe"

@@ -1,0 +1,40 @@
+---
+
+
+- name: Print Bootloader Disks to Build
+  ansible.builtin.debug:
+    var: bootloader_disks
+
+- name: Get menus
+  ansible.builtin.include_tasks: get_menu.yml
+
+- name: Generate iPXE bootloaders
+  ansible.builtin.include_tasks: generate_disks.yml
+  with_items:
+    - "{{ bootloader_disks }}"
+  loop_control:
+    loop_var: bootloader_file
+  when:
+    - generate_disks | default(true) | bool
+
+- name: Generate checksums
+  ansible.builtin.include_tasks: generate_checksums.yml
+  when:
+    - generate_checksums | default(true) | bool
+
+- name: Generate index.html
+  ansible.builtin.include_tasks: generate_index.yml
+  when:
+    - generate_index | default(true) | bool
+
+- name: Generate signatures
+  ansible.builtin.include_tasks: generate_signatures.yml
+  when:
+    - generate_signatures | default(false) | bool
+
+- name: Get back permissions to {{ uponlanxyz_root }} recursively
+  ansible.builtin.file:
+    path: "{{ uponlanxyz_root }}"
+    owner: nbxyz
+    group: nbxyz
+    recurse: true

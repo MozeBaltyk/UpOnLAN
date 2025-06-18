@@ -1,0 +1,14 @@
+---
+- name: Generate site name banner for index
+  ansible.builtin.shell: toilet -f standard {{ site_name }} --html | grep span
+  register: index_title
+  when: ansible_os_family == "Debian"
+
+- name: Reset bootloader filename to first in list
+  ansible.builtin.set_fact:
+    bootloader_filename: "{{ bootloader_disks[0].filename }}"
+
+- name: Generate index template
+  ansible.builtin.template:
+    src: index.html.j2
+    dest: "{{ uponlanxyz_root }}/index.html"

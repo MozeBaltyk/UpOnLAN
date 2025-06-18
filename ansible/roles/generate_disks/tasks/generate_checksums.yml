@@ -1,0 +1,21 @@
+---
+- name: Register a listing of all created iPXE bootloaders
+  ansible.builtin.command: ls -I {{ checksums_filename }} {{ uponlanxyz_root }}/ipxe/
+  register: all_generated_disks
+
+- name: Generate date
+  ansible.builtin.command: date
+  register: current_date
+
+- name: Gather stat listing of directory
+  ansible.builtin.command: sha256sum -b {{ item }}
+  with_items:
+    - "{{ all_generated_disks.stdout_lines }}"
+  args:
+    chdir: "{{ uponlanxyz_root }}/ipxe/"
+  register: all_generated_disks_stat
+
+- name: Generate ipxe disk checksums
+  ansible.builtin.template:
+    src: checksums.txt.j2
+    dest: "{{ uponlanxyz_root }}/ipxe/{{ checksums_filename }}"

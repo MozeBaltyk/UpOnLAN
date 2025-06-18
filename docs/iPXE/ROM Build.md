@@ -1,15 +1,16 @@
 ## ROM Build 
 
-Once you developped your iPXE menu, there is a possibility to compile it with iPXE binaries with a bootlaoder wrapper.
-This Bootloaders wrapper will have for purpose to dynamically handles a maximum of situation and eventually redirect at the `menu.ipxe`.
+Once your iPXE menu developped, there is a possibility to embed those iPXE menus into iPXE binaries with `make bin/undionly.kpxe EMBED=script.ipxe`, to compile it including a bootlaoder wrapper. This Bootloaders wrapper will have for purpose to dynamically handles a maximum of situation and eventually redirect at the `menu.ipxe`.
 
-UpOnLAN.xyz provides a build button in the webapp to realize without effort this task using ansible roles and playbooks in backend.
+UpOnLAN.xyz provides a build button in the webapp to realize without effort this task and provides some customizable options, using ansible roles and playbooks in backend.
 
 ---
 
 ## 📖 Bootloader Wrapper
 
-Included in ansible roles, a bootloader template is propose to wrapper your custom menu iPXE. The bootloader wrapper tries to dynamically handle:
+Included in the ansible roles to generate some embed iPXE binariess, a bootloader template is propose to wrapper your custom iPXE menus. 
+
+The bootloader wrapper dynamically handle situation below:
 
 - Multiple boot protocols (TFTP, HTTP, HTTPS)
 

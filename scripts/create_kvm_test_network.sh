@@ -60,8 +60,8 @@ cat <<EOF > /etc/libvirt/qemu/networks/${network_name}.xml
   </dnsmasq:options>
 </network>
 EOF
-elif [ "$pxe_type" == "uponlan" ]; then
-##### UpOnLAN container ####
+elif [ "$pxe_type" == "uponlan" ] || [ "$pxe_type" == "netboot" ]; then
+##### UpOnLAN or Netboot config ####
 cat <<EOF > /etc/libvirt/qemu/networks/${network_name}.xml
 <network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
   <name>${network_name}</name>
@@ -82,43 +82,12 @@ cat <<EOF > /etc/libvirt/qemu/networks/${network_name}.xml
     <dnsmasq:option value='dhcp-match=set:ipxe-bios,175,33'/>
     <dnsmasq:option value='dhcp-match=set:ipxe-efi,175,36'/>
     <!-- PXE services for initial boot (not iPXE) -->
-    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,X86PC,PXE,netboot.xyz-undionly.kpxe'/>
-    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,BC_EFI,PXE,netboot.xyz.efi'/>
-    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,X86-64_EFI,PXE,netboot.xyz.efi'/>
+    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,X86PC,PXE,rom/${pxe_type}.xyz-undionly.kpxe'/>
+    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,BC_EFI,PXE,rom/${pxe_type}.xyz.efi'/>
+    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,X86-64_EFI,PXE,rom/${pxe_type}.xyz.efi'/>
     <!-- iPXE services for initial boot -->
-    <dnsmasq:option value='dhcp-boot=tag:ipxe-bios,netboot.xyz.kpxe,,${tftp_server_ip};'/>
-    <dnsmasq:option value='dhcp-boot=tag:ipxe-efi,netboot.xyz.efi,,${tftp_server_ip};'/>
-  </dnsmasq:options>
-</network>
-EOF
-elif [ "$pxe_type" == "netboot" ]; then
-##### Netboot.xyz menu ####
-cat <<EOF > /etc/libvirt/qemu/networks/${network_name}.xml
-<network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
-  <name>${network_name}</name>
-  <forward mode='nat'/>
-  <bridge name='${interface}' stp='on' delay='0'/>
-  <domain name="test"/>
-  <ip address='${gateway_ip}' netmask="255.255.255.0">
-    <dhcp>
-      <range start="${network_ip%.*}.128" end="${network_ip%.*}.254"/>
-    </dhcp>
-  </ip>
-  <dnsmasq:options>
-    <!-- Disable re-use of the DHCP servername and filename fields -->
-    <dnsmasq:option value='dhcp-no-override'/>
-    <!-- PXE discovery control (vendor option) -->
-    <dnsmasq:option value='dhcp-option=vendor:PXEClient,6,2b'/>
-    <!-- Detect iPXE requests -->
-    <dnsmasq:option value='dhcp-match=set:ipxe-bios,175,33'/>
-    <dnsmasq:option value='dhcp-match=set:ipxe-efi,175,36'/>
-    <!-- PXE services for initial boot (not iPXE) -->
-    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,X86PC,PXE,netboot.xyz-undionly.kpxe'/>
-    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,BC_EFI,PXE,netboot.xyz.efi'/>
-    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,X86-64_EFI,PXE,netboot.xyz.efi'/>
-    <!-- iPXE services for initial boot -->
-    <dnsmasq:option value='dhcp-boot=tag:ipxe-bios,netboot.xyz.kpxe,,${tftp_server_ip};'/>
-    <dnsmasq:option value='dhcp-boot=tag:ipxe-efi,netboot.xyz.efi,,${tftp_server_ip};'/>
+    <dnsmasq:option value='dhcp-boot=tag:ipxe-bios,${pxe_type}.xyz.kpxe,,rom/${tftp_server_ip};'/>
+    <dnsmasq:option value='dhcp-boot=tag:ipxe-efi,${pxe_type}.xyz.efi,,rom/${tftp_server_ip};'/>
   </dnsmasq:options>
 </network>
 EOF

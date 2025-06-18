@@ -234,8 +234,8 @@ async function disablesigs() {
 // Fully promisified layermenu
 async function layermenu(socket = null, filename = null) {
   const targetDir = path.resolve('/config/menus/');
-  const romDir = path.resolve('/assets/ipxe'); // ROM files are here
-  const indexDir = path.resolve('/assets/'); // Index files 
+  const romDir = path.resolve('/config/menus/rom/ipxe'); // ROM files are here
+  const indexDir = path.resolve('/config/menus/rom'); // Index files 
 
   const { local_files, remote_files } = await getipxefiles();
   const { list_rom_files } = await getremoteromfiles();
@@ -309,7 +309,7 @@ async function getipxefiles() {
 
 // Get ROM files
 async function getromfiles() {
-  const romDir = path.resolve('/assets/ipxe');
+  const romDir = path.resolve('/config/menus/rom/ipxe');
   // Make sure all destination directories exist
   await fs.mkdir(romDir, { recursive: true });
   const list_rom_files = await listFiles(romDir, ['efi', 'kpxe', 'dsk', 'pdsk', 'iso', 'img']);
@@ -317,7 +317,7 @@ async function getromfiles() {
 }
 
 async function getindexfiles() {
-  const assetsDir = path.resolve('/assets');
+  const assetsDir = path.resolve('/config/menus/rom');
   // Make sure all destination directories exist
   await fs.mkdir(assetsDir, { recursive: true });
   const list_index_files = await listFiles(assetsDir, ['html', 'htm']);

@@ -1,12 +1,8 @@
 ---
 
-
 - name: Print Bootloader Disks to Build
   ansible.builtin.debug:
     var: bootloader_disks
-
-- name: Get menus
-  ansible.builtin.include_tasks: get_menu.yml
 
 - name: Generate iPXE bootloaders
   ansible.builtin.include_tasks: generate_disks.yml
@@ -26,6 +22,9 @@
   ansible.builtin.include_tasks: generate_index.yml
   when:
     - generate_index | default(true) | bool
+
+- name: Get menus
+  ansible.builtin.include_tasks: get_menu.yml
 
 - name: Generate signatures
   ansible.builtin.include_tasks: generate_signatures.yml

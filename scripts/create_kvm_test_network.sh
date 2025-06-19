@@ -82,12 +82,12 @@ cat <<EOF > /etc/libvirt/qemu/networks/${network_name}.xml
     <dnsmasq:option value='dhcp-match=set:ipxe-bios,175,33'/>
     <dnsmasq:option value='dhcp-match=set:ipxe-efi,175,36'/>
     <!-- PXE services for initial boot (not iPXE) -->
-    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,X86PC,PXE,rom/${pxe_type}.xyz-undionly.kpxe'/>
-    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,BC_EFI,PXE,rom/${pxe_type}.xyz.efi'/>
-    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,X86-64_EFI,PXE,rom/${pxe_type}.xyz.efi'/>
+    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,X86PC,PXE,rom/ipxe/${pxe_type}.xyz-undionly.kpxe'/>
+    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,BC_EFI,PXE,rom/ipxe/${pxe_type}.xyz.efi'/>
+    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,X86-64_EFI,PXE,rom/ipxe/${pxe_type}.xyz.efi'/>
     <!-- iPXE services for initial boot -->
-    <dnsmasq:option value='dhcp-boot=tag:ipxe-bios,${pxe_type}.xyz.kpxe,,rom/${tftp_server_ip};'/>
-    <dnsmasq:option value='dhcp-boot=tag:ipxe-efi,${pxe_type}.xyz.efi,,rom/${tftp_server_ip};'/>
+    <dnsmasq:option value='dhcp-boot=tag:ipxe-bios,rom/ipxe/${pxe_type}.xyz.kpxe,,${tftp_server_ip};'/>
+    <dnsmasq:option value='dhcp-boot=tag:ipxe-efi,rom/ipxe/${pxe_type}.xyz.efi,,${tftp_server_ip};'/>
   </dnsmasq:options>
 </network>
 EOF

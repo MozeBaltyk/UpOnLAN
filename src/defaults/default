@@ -5,6 +5,15 @@ server {
 		autoindex on;
 	}
 
+    # Redirect /rom to /rom/ (with trailing slash)
+    rewrite ^/rom$ /rom/ permanent;
+    
+    location /rom {
+        root /config/menus;
+        index index.html;
+        autoindex on;
+    }
+
     location /status {
         stub_status;
         allow 127.0.0.1;

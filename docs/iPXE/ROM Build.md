@@ -32,18 +32,23 @@ It's a standard flow which can be widely use for your custom iPXE menus.
 
 ## High-Level Flow of the Bootloader template:
 
-Here a small explaination about bootloader wrapper flows: 
+Bootloader wrapper flow: 
 
-> Start →
->  DHCP →
->    If ProxyDHCP detected → Handle next-server/proxydhcp-next-server →
->    Else → Use normal next-server
->  Try TFTP chain to local-vars.ipxe →
->    Load host or MAC-specific config if exists →
->    Else → Load default menu.ipxe from TFTP
->  Try HTTPS (or HTTP) to load menu.ipxe →
->    If fails → Try fallback (HTTP → HTTPS → localboot)
->  Failsafe Menu always available (key press or fallback)
+> Start   
+>   ↓   
+>  DHCP     
+>   ↓   
+>  If ProxyDHCP detected → Handle next-server/proxydhcp-next-server     
+>  Else → Use normal next-server   
+>   ↓   
+>  Try TFTP chain to local-vars.ipxe →  
+>  &nbsp;  If host or MAC-specific config exists → load it 
+>  &nbsp;  Else → Load default menu.ipxe from TFTP    
+>  Try HTTPS (or HTTP) to load menu.ipxe →    
+>  &nbsp;  If fails → Try fallback (HTTP → HTTPS → localboot)    
+>  Failsafe Menu always available (key press or fallback)    
+
+## 🛠️ Bootloader wrapper Features
 
 With this bootloader, Build your own smart iPXE chainloader with:
 

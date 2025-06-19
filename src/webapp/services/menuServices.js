@@ -198,8 +198,8 @@ async function emptymenu(socket, io) {
       await deleteFiles('/assets/index.html');
       await deleteFiles('/assets/index.htm');
       await deleteFiles(endpoints_config);
-      fs.rmdirSync('/config/menus/remote/sigs', { recursive: true });
-      fs.rmdirSync('/config/menus/rom', { recursive: true });
+      await fs.rm('/config/menus/remote/sigs', { recursive: true, force: true });
+      await fs.rm('/config/menus/rom', { recursive: true, force: true });
 
       // get default
       const { endpoint_url } = getEndpointUrls();

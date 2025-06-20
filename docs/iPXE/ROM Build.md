@@ -32,7 +32,7 @@ It's a standard flow which can be widely use for your custom iPXE menus.
 
 ## High-Level Flow of the Bootloader template:
 
-Bootloader wrapper flow: 
+Bootloader flow: 
 
 > Start   
 >   ↓   

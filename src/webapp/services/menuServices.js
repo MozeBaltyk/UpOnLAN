@@ -10,8 +10,27 @@ const {
   deleteAllFilesInDir,
   deleteFiles,
   getLocalNginx,
+  getMenuVersion,
   getEndpointUrls,
  } = require('./utilServices');
+
+// Run playbooks
+async function runBuildPlaybook(options) {
+  const playbookPath = '/ansible/build_rom.yml';
+
+  const extraVars = Object.entries(options)
+    .map(([key, val]) => `${key}='${val}'`)
+    .join(' ');
+
+  const cmd = `ansible-playbook ${playbookPath} --extra-vars "${extraVars}"`;
+
+  try {
+    const { stdout, stderr } = await exec(cmd);
+    return stdout || stderr;
+  } catch (error) {
+    throw new Error(`Ansible build failed: ${error.stderr || error.message}`);
+  }
+}
 
 // Fetch development releases
 async function fetchDevReleases() {
@@ -243,6 +262,7 @@ async function layermenu(socket = null, filename = null) {
   const { list_rom_files } = await getremoteromfiles();
   const { list_index_files } = await getremoteindexfiles();
   const local_nginx_url = getLocalNginx();
+  const menu_version = getMenuVersion();
 
   // Copy remote iPXE files to targetDir
   for (const file of remote_files) {
@@ -262,7 +282,7 @@ async function layermenu(socket = null, filename = null) {
   }
 
   if (socket) {
-    socket.emit('renderconfig', remote_files, local_files, list_rom_files, list_index_files, local_nginx_url);
+    socket.emit('renderconfig', remote_files, local_files, list_rom_files, list_index_files, local_nginx_url, menu_version);
   }
 }
 
@@ -429,6 +449,7 @@ async function revertconfig(filename, socket, io) {
 
 
 module.exports = {
+  runBuildPlaybook,
   disablesigs,
   layermenu,
   fetchDevReleases,

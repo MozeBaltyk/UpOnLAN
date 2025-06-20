@@ -1,7 +1,6 @@
 // uponlan.xyz
 // Client side javascript
 
-
 // Initiate a websocket connection to the server
 var host = window.location.hostname; 
 var port = window.location.port;
@@ -9,7 +8,6 @@ var protocol = window.location.protocol;
 var socket = io.connect(protocol + '//' + host + ':' + port, {path: "<%= baseurl %>socket.io"});
 // If the page is being loaded for the first time render in the homepage
 $(document).ready(function(){renderdash()})
-
 
 //// Dashboard Page rendering ////
 function renderdash(){
@@ -320,12 +318,14 @@ socket.on('renderdashhook', function(){
 });
 
 //// Config Page rendering ////
+let current_menu_version = '0.0.1';
 function renderconfig(){
   $('#pagecontent').empty();
   $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Config Items</h2></center>');
   socket.emit('getconfig');
 }
-socket.on('renderconfig', function(remote_files, local_files, list_rom_files, list_index_files, local_nginx_url){
+socket.on('renderconfig', function(remote_files, local_files, list_rom_files, list_index_files, local_nginx_url, menu_version){
+  current_menu_version = (menu_version && menu_version !== 'none') ? menu_version : '0.0.1';
   $('#pagecontent').empty();
   $('#pagecontent').append('\
   <div class="card">\
@@ -439,76 +439,186 @@ socket.on('renderconfig', function(remote_files, local_files, list_rom_files, li
 });
 
 // Inject the modal HTML once (outside of renderconfig so it’s only created once)
-$('body').append(`
-  <div class="modal fade" id="buildModal" tabindex="-1" role="dialog" aria-labelledby="buildModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-      <form id="buildForm" class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="buildModalLabel">Build Options</h5>
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
-        </div>
-        <div class="modal-body">
-          <div class="form-check">
-            <input type="checkbox" class="form-check-input" id="optionEFI" name="optionEFI" checked>
-            <label class="form-check-label" for="optionEFI">Generate EFI disks</label>
+if ($('#buildModal').length === 0) {
+  $('body').append(`
+    <div class="modal fade" id="buildModal" tabindex="-1" role="dialog" aria-labelledby="buildModalLabel">
+      <div class="modal-dialog modal-lg" role="document">
+        <form id="buildForm" class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="buildModalLabel">Build Options</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span>&times;</span>
+            </button>
           </div>
-          <div class="form-check">
-            <input type="checkbox" class="form-check-input" id="optionHybrid" name="optionHybrid">
-            <label class="form-check-label" for="optionHybrid">Generate Hybrid disks</label>
+          <div class="modal-body">
+            <div id="buildAlertArea"></div>
+            <div id="buildFormBody">
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="optionEFI" name="optionEFI" checked>
+                <label class="form-check-label" for="optionEFI">Generate EFI disks</label>
+              </div>
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="optionHybrid" name="optionHybrid">
+                <label class="form-check-label" for="optionHybrid">Generate Hybrid disks</label>
+              </div>
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="optionLegacy" name="optionLegacy" checked>
+                <label class="form-check-label" for="optionLegacy">Generate Legacy disks</label>
+              </div>
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="optionLinux" name="optionLinux">
+                <label class="form-check-label" for="optionLinux">Generate Linux disks</label>
+              </div>
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="optionRpi" name="optionRpi">
+                <label class="form-check-label" for="optionRpi">Generate Rpi disks</label>
+              </div>
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="optionIndex" name="optionIndex" checked>
+                <label class="form-check-label" for="optionIndex">Generate index.html</label>
+              </div>
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="optionSignatures" name="optionSignatures">
+                <label class="form-check-label" for="optionSignatures">Generate Signatures</label>
+              </div>
+              <hr>
+              <div class="form-group row">
+                <label for="siteNameInput" class="col-md-3 col-form-label text-md-right">Site Name:</label>
+                <div class="col-md-7">
+                  <input id="siteNameInput" type="text" class="form-control" placeholder="uponlan.xyz" autocomplete="off">
+                  <div class="invalid-feedback">This field is required.</div>
+                </div>
+              </div>
+              <div class="form-group row">
+                <label for="bootDomainInput" class="col-md-3 col-form-label text-md-right">Boot Domain:</label>
+                <div class="col-md-7">
+                  <input id="bootDomainInput" type="text" class="form-control" placeholder="boot.uponlan.xyz" autocomplete="off">
+                  <div class="invalid-feedback">This field is required.</div>
+                </div>
+              </div>
+              <div class="form-group row">
+                <label for="bootVersionInput" class="col-md-3 col-form-label text-md-right">Boot Version:</label>
+                <div class="col-md-7">
+                  <input id="bootVersionInput" type="text" class="form-control" placeholder="0.0.x" autocomplete="off">
+                  <div class="invalid-feedback">This field is required.</div>
+                </div>
+              </div>
+            </div>
+            <div id="buildFormSpinner" class="text-center d-none">
+              <div class="spinner-border text-primary" role="status" style="width: 4rem; height: 4rem;">
+                <span class="sr-only">Building...</span>
+              </div>
+              <p class="mt-3">Building, please wait...</p>
+            </div>
           </div>
-          <div class="form-check">
-            <input type="checkbox" class="form-check-input" id="optionLegacy" name="optionLegacy" checked>
-            <label class="form-check-label" for="optionLegacy">Generate Legacy disks</label>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Build</button>
           </div>
-          <div class="form-check">
-            <input type="checkbox" class="form-check-input" id="optionLinux" name="optionLinux">
-            <label class="form-check-label" for="optionLinux">Generate Linux disks</label>
-          </div>
-          <div class="form-check">
-            <input type="checkbox" class="form-check-input" id="optionRpi" name="optionRpi">
-            <label class="form-check-label" for="optionRpi">Generate Rpi disks</label>
-          </div>
-          <div class="form-check">
-            <input type="checkbox" class="form-check-input" id="optionIndex" name="optionIndex" checked>
-            <label class="form-check-label" for="optionIndex">Generate index.html</label>
-          </div>
-          <div class="form-check">
-            <input type="checkbox" class="form-check-input" id="optionSignatures" name="optionSignatures">
-            <label class="form-check-label" for="optionSignatures">Generate Signatures</label>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Build</button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
-  </div>
-`);
+  `);
+}
 
 // Show modal on Build button click
 $(document).on('click', '#btnBuild', function() {
+  $('#bootVersionInput').attr('placeholder', current_menu_version); // Set placeholder to current version
   $('#buildModal').modal('show');
 });
 
-// Handle Build form submission
-$(document).on('submit', '#buildForm', function(e) {
-  e.preventDefault();
-  const selectedOptions = [];
-  $('#buildForm input[type=checkbox]:checked').each(function() {
-    selectedOptions.push(this.name);
-  });
-  // Send options to server via socket
-  socket.emit('buildMenu', selectedOptions);
-  $('#buildModal').modal('hide');
+// Wait until the modal is fully shown, then safely set focus if needed
+$('#buildModal').on('shown.bs.modal', function () {
+  $('#bootVersionInput').trigger('focus');
 });
 
-// Optional: receive build result
-socket.on('buildMenuResult', function(result) {
-  alert(result.message || 'Build completed!');
-  // Optionally refresh the menu or UI here
+// Handle form submission
+$('#buildForm').on('submit', function (e) {
+  e.preventDefault();
+  const buildOptions = {
+    EFI: $('#optionEFI').is(':checked'),
+    Hybrid: $('#optionHybrid').is(':checked'),
+    Legacy: $('#optionLegacy').is(':checked'),
+    Linux: $('#optionLinux').is(':checked'),
+    Rpi: $('#optionRpi').is(':checked'),
+    Index: $('#optionIndex').is(':checked'),
+    Signatures: $('#optionSignatures').is(':checked'),
+    site_name: $('#siteNameInput').val().trim(),
+    boot_domain: $('#bootDomainInput').val().trim(),
+    boot_version: $('#bootVersionInput').val().trim()
+  };
+  // Reset error states
+  $('#siteNameInput, #bootDomainInput, #bootVersionInput').removeClass('is-invalid');
+  // Validate required fields again
+  if (!buildOptions.site_name) {
+  $('#siteNameInput').addClass('is-invalid');
+  }
+  if (!buildOptions.boot_domain) {
+  $('#bootDomainInput').addClass('is-invalid');
+  }
+  if (!buildOptions.boot_version) {
+  $('#bootVersionInput').addClass('is-invalid');
+  }
+  // Focus the first invalid input field (if any)
+  const firstInvalidSelector = ['#siteNameInput', '#bootDomainInput', '#bootVersionInput']
+    .find(selector => $(selector).hasClass('is-invalid'));
+  if (firstInvalidSelector) {
+    $(firstInvalidSelector).focus();
+  }
+  // Validate required fields
+  if (!buildOptions.site_name || !buildOptions.boot_domain || !buildOptions.boot_version) {
+    // Remove any previous warning alert
+    $('#buildAlertArea .alert-warning').remove();
+    // Show custom styled alert
+    $('#buildAlertArea').html(`
+      <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        Please provide at least: <strong>Site Name</strong>, <strong>Boot Domain</strong> and <strong>Boot Version</strong>.
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+    `);
+    setTimeout(() => {
+      $('#buildAlertArea .alert').alert('close');
+    }, 8000);
+    // Optionally scroll to alert
+    document.querySelector('#buildAlertArea .alert-warning').scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+  // Disable submit during processing
+  $('#buildForm button[type="submit"]').prop('disabled', true);
+
+  // Emit event, Hide form controls and show spinner
+  socket.emit('buildsubmit', buildOptions);
+  // $('#buildModal').modal('hide');
+  $('#buildFormBody').hide();
+  $('#buildFormSpinner').removeClass('d-none');
+  $('#buildForm button[type="submit"]').prop('disabled', true);
+
+  // Re-enable button after short delay => ideally after ansible returns output
+  setTimeout(() => {
+    $('#buildForm button[type="submit"]').prop('disabled', false);
+  }, 1000);
+});
+
+// Handle build result
+socket.on('buildMenuResult', function (result) {
+  // Show message outside modal as before
+  $('#configcontent').prepend(`
+    <div class="alert alert-info alert-dismissible fade show" role="alert">${result.message || 'Build completed!'}
+      <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    </div>
+  `);
+
+  // Hide spinner, show form again
+  $('#buildFormSpinner').addClass('d-none');
+  $('#buildFormBody').show();
+
+  // Re-enable submit button
+  $('#buildForm button[type="submit"]').prop('disabled', false);
+
+  // Close modal now that build is done
+  $('#buildModal').modal('hide');
 });
 
 // Empty menu
@@ -964,9 +1074,9 @@ socket.on('docs:list:response', function(docs) {
         <div class="col-12 col-md-9 col-xl-10">
           <div id="doc-viewer" class="p-3 text-wrap overflow-auto">
                 <!-- Raw doc content here -->
-                <h2 class="mb-3">📡 Welcome to the UpOnLAN Internal Documentation</h2>
+                <h2 class="mb-3">📡 Welcome to the Internal Documentation</h2>
                 <p>
-                  This documentation is your go-to resource for understanding, developing, and maintaining
+                   Resources for understanding, developing, and maintaining
                   <code>iPXE</code> menus integrated with <strong>UpOnLAN.xyz</strong>.
                 </p>
                 <p>
@@ -1130,5 +1240,4 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
       $('#new-wol-mac').val('');
     }
   });
-
 });

@@ -202,7 +202,7 @@ async function downloader(downloads, io, socket) {
     dl.on('progress', (stats) => {
       const currentTime = new Date();
       const elapsedTime = currentTime - startTime;
-      if (elapsedTime > 300) {
+      if (elapsedTime > 100) {
         startTime = currentTime;
         socket.emit('dldata', url, [i + 1, total], stats);
       }
@@ -231,7 +231,7 @@ async function downloader(downloads, io, socket) {
           dl2.on('progress', (stats) => {
             const currentTime = new Date();
             const elapsedTime = currentTime - startTime;
-            if (elapsedTime > 300) {
+            if (elapsedTime > 100) {
               startTime = currentTime;
               socket.emit('dldata', url + '.part2', [i + 1, total], stats);
             }

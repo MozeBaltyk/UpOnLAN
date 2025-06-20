@@ -1,6 +1,6 @@
 // ./sockets/menuHandlers.js
 const fs = require('fs');
-const { getLocalNginx } = require('../services/utilServices');
+const { getLocalNginx, getMenuVersion } = require('../services/utilServices');
 const {
   upgrademenu,
   upgrademenunetboot,
@@ -14,6 +14,7 @@ const {
   editgetfile,
   fetchDevReleases, 
   fetchNetbootReleases,
+  runBuildPlaybook,
 } = require('../services/menuServices');
 
 // This module handles menu-related socket events for the UponLAN web application.
@@ -29,8 +30,19 @@ module.exports = function registerMenuHandlers(socket, io) {
 
   socket.on('editgetfile', (filename, islocal) => editgetfile(filename, islocal, socket));
 
-  socket.on('upgrademenu', (version) => {
-    upgrademenu(version, (err, result) => {
+  socket.on('buildsubmit', async (options) => {
+    try {
+      const output = await runBuildPlaybook(options);
+      socket.emit('buildMenuResult', { success: true, message: output });
+    } catch (err) {
+      socket.emit('buildMenuResult', {
+        success: false,
+        message: 'Build failed: ' + err.message
+      });
+    }
+  });
+
+  socket.on('upgrademenu', (version) => { upgrademenu(version, (err, result) => {
       if (err) { 
         return socket.emit('error', err.message); 
       }
@@ -39,8 +51,7 @@ module.exports = function registerMenuHandlers(socket, io) {
     }, io, socket);
   });
 
-  socket.on('upgrademenunetboot', (version) => {
-    upgrademenunetboot(version, (err, result) => {
+  socket.on('upgrademenunetboot', (version) => { upgrademenunetboot(version, (err, result) => {
       if (err) { 
         return socket.emit('error', err.message); 
       }
@@ -55,8 +66,9 @@ module.exports = function registerMenuHandlers(socket, io) {
       const { list_rom_files } = await getromfiles();
       const { list_index_files } = await getindexfiles();
       const local_nginx_url = getLocalNginx();
+      const menu_version = getMenuVersion();
 
-      socket.emit('renderconfig', remote_files, local_files, list_rom_files, list_index_files, local_nginx_url);
+      socket.emit('renderconfig', remote_files, local_files, list_rom_files, list_index_files, local_nginx_url, menu_version);
     } catch (err) {
       console.error('getconfig failed:', err);
       socket.emit('error', 'Failed to get config: ' + err.message);

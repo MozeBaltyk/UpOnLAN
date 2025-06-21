@@ -1,0 +1,63 @@
+FROM ubuntu:22.04
+
+# Install basic utilities
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    software-properties-common \
+    curl \
+    wget \
+    git \
+    sudo \
+    python3 \
+    python3-pip \
+    ansible-core
+
+# Install Build images packages
+RUN apt-get install -y \
+    apache2 \
+    binutils-dev \
+    binutils-aarch64-linux-gnu \
+    dosfstools \
+    gcc-aarch64-linux-gnu \
+    build-essential \
+    genisoimage \
+    isolinux \
+    liblzma-dev \
+    libslirp-dev \
+    syslinux \
+    syslinux-common \
+    toilet \
+    mtools
+
+# Install Pipxe packages
+RUN apt-get install -y \
+    acpica-tools \
+    binutils \
+    binutils-dev \
+    gcc \
+    libuuid1 \
+    make \
+    mtools \
+    perl \
+    uuid \
+    uuid-dev \
+    xz-utils
+
+# Clean up to reduce image size
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Common user with webapp
+RUN groupmod -g 1000 users && \
+    useradd -u 911 -U -d /ansible -s /bin/bash nbxyz && \
+    usermod -G users nbxyz
+
+# Default workdir
+WORKDIR /ansible
+
+# Copy Ansible playbooks and configuration
+# COPY ansible/ /ansible/
+RUN mkdir -p /ansible/.ansible/tmp && \
+    chown -R nbxyz:nbxyz /ansible/.ansible
+
+# Default command
+CMD ["sleep", "infinity"]

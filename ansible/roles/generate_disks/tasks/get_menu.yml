@@ -1,13 +1,16 @@
 ---
 
+- name: Find files under /config/menus/
+  ansible.builtin.find:
+    paths: /config/menus/
+    file_type: file
+  register: found_files
+
 - name: Copy source files from webapp to uponlanxyz_root
   ansible.builtin.copy:
-    src: "{{ item.src }}"
-    dest: "{{ uponlanxyz_root }}/{{ item.path }}"
-  loop: "{{ query('community.general.filetree', '/config/menus/') }}"
-  when:
-    - item.state == "file"
-    - item.path is not search('/')
+    src: "{{ item.path }}"
+    dest: "{{ uponlanxyz_root }}/{{ item.path | regex_replace('^/config/menus/', '') }}"
+  loop: "{{ found_files.files }}"
 
   ## PCIids part
 - name: Retrieve pciids.ipxe

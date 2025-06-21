@@ -1,6 +1,6 @@
 ---
 - name: Register a listing of all created iPXE bootloaders
-  ansible.builtin.command: ls -I {{ checksums_filename }} {{ uponlanxyz_root }}/ipxe/
+  ansible.builtin.command: find {{ uponlanxyz_root }}/ipxe/ -maxdepth 1 -type f ! -name '{{ checksums_filename }}' -exec basename {} \;
   register: all_generated_disks
 
 - name: Generate date

@@ -11,7 +11,7 @@ run-runner() {
         -v uponlan-config:/config \
         -v uponlan-assets:/assets \
         localhost/uponlan-ansible:latest
-    sudo podman exec -it uponlan-ansible /bin/bash
+    sudo podman exec -it uponlan-ansible /bin/sh
 }
 
 build () {

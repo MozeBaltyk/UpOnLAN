@@ -1,6 +1,3 @@
-FROM ubuntu:22.04 as builder
-RUN apt update && apt install -y isolinux
-
 FROM alpine:3.21.3 AS build
 ARG SOURCE_WEBAPP="webapp"
 
@@ -53,31 +50,6 @@ LABEL org.opencontainers.image.description="uponlan.xyz official docker containe
 # install awake - Python lib so would need a python:3-alpine
 RUN apk --no-cache add awake
 
-#### Add-on stage 
-# Install development tools
-RUN apk add --no-cache \
-  alpine-sdk \
-  python3 \
-  py3-pip \
-  ansible-core \
-  curl wget git \
-  binutils \
-  dosfstools \
-  gcc \
-  build-base \
-  syslinux \
-  mtools \
-  xorriso \
-  xz \
-  util-linux \
-  libuuid \
-  perl \
-  xz-dev
-
-# Copy isolinux to later stage
-COPY --from=builder /usr/lib/ISOLINUX /usr/lib/ISOLINUX
-####################
-
 RUN apk add --no-cache \
     bash \
     busybox \
@@ -108,7 +80,6 @@ EXPOSE 69/udp
 EXPOSE 80
 EXPOSE 3000
 
-COPY ansible /ansible
 COPY docs /docs
 COPY src/defaults /defaults
 COPY src/etc /etc

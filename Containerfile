@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 as builder
+FROM ubuntu:22.04 as deps
 RUN apt update && apt install -y isolinux
 
 FROM alpine:3.21.3 AS build
@@ -75,7 +75,7 @@ RUN apk add --no-cache \
   xz-dev
 
 # Copy isolinux to later stage
-COPY --from=builder /usr/lib/ISOLINUX /usr/lib/ISOLINUX
+COPY --from=deps /usr/lib/ISOLINUX /usr/lib/ISOLINUX
 ####################
 
 RUN apk add --no-cache \
@@ -108,13 +108,18 @@ EXPOSE 69/udp
 EXPOSE 80
 EXPOSE 3000
 
-COPY ansible /ansible
 COPY docs /docs
 COPY src/defaults /defaults
 COPY src/etc /etc
 COPY src/init.sh /init.sh
 COPY src/start.sh /start.sh
 COPY --from=build /webapp /webapp
+
+# Ansible 
+COPY ansible /ansible
+# Set sudoers rule
+RUN echo "nbxyz ALL=(root) NOPASSWD:/usr/bin/ansible-playbook /ansible/build_rom.yml *" > /etc/sudoers.d/ansible
+RUN chmod 440 /etc/sudoers.d/ansible
 
 # default command
 CMD ["sh","/start.sh"]

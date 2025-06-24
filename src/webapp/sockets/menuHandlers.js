@@ -1,6 +1,11 @@
 // ./sockets/menuHandlers.js
 const fs = require('fs');
-const { getLocalNginx, getMenuVersion } = require('../services/utilServices');
+const { 
+  getLocalNginx, 
+  getMenuVersion, 
+  logWithTimestamp, 
+  errorWithTimestamp, 
+} = require('../services/utilServices');
 const {
   upgrademenu,
   upgrademenunetboot,
@@ -20,25 +25,22 @@ const {
 // This module handles menu-related socket events for the UponLAN web application.
 module.exports = function registerMenuHandlers(socket, io) {
 
-  socket.on('emptymenu', () => emptymenu(socket, io));
+  socket.on('emptymenu', () => emptymenu(socket));
 
-  socket.on('createipxe', (filename) => createipxe(filename, socket, io));
+  socket.on('createipxe', (filename) => createipxe(filename, socket));
 
-  socket.on('saveconfig', (filename, text) => saveconfig(filename, text, socket, io));
+  socket.on('saveconfig', (filename, text) => saveconfig(filename, text, socket));
   
-  socket.on('revertconfig', (filename) => revertconfig(filename, socket, io));
+  socket.on('revertconfig', (filename) => revertconfig(filename, socket));
 
   socket.on('editgetfile', (filename, islocal) => editgetfile(filename, islocal, socket));
 
   socket.on('buildsubmit', async (options) => {
     try {
-      const output = await runBuildPlaybook(options);
+      const output = await runBuildPlaybook(options, socket);
       socket.emit('buildMenuResult', { success: true, message: output });
     } catch (err) {
-      socket.emit('buildMenuResult', {
-        success: false,
-        message: 'Build failed: ' + err.message
-      });
+      socket.emit('buildMenuResult', { success: false, message: 'Build failed: ' + err.message });
     }
   });
 
@@ -46,7 +48,7 @@ module.exports = function registerMenuHandlers(socket, io) {
       if (err) { 
         return socket.emit('error', err.message); 
       }
-      console.log('Menu upgrade complete:', result);
+      logWithTimestamp('Menu upgrade complete:', result);
       socket.emit('upgrademenu_complete');
     }, io, socket);
   });
@@ -55,7 +57,7 @@ module.exports = function registerMenuHandlers(socket, io) {
       if (err) { 
         return socket.emit('error', err.message); 
       }
-      console.log('Menu Netboot upgrade complete:', result);
+      logWithTimestamp('Menu Netboot upgrade complete:', result);
       socket.emit('upgrademenu_complete');
     }, io, socket);
   });
@@ -70,7 +72,7 @@ module.exports = function registerMenuHandlers(socket, io) {
 
       socket.emit('renderconfig', remote_files, local_files, list_rom_files, list_index_files, local_nginx_url, menu_version);
     } catch (err) {
-      console.error('getconfig failed:', err);
+      errorWithTimestamp('getconfig failed:', err);
       socket.emit('error', 'Failed to get config: ' + err.message);
     }
   });
@@ -81,7 +83,7 @@ module.exports = function registerMenuHandlers(socket, io) {
       const { releases, commits } = await fetchNetbootReleases();
       io.to(socket.id).emit('nbrenderbrowser', releases, commits);
     } catch (error) {
-      console.error('nbgetbrowser error:', error.stack || error);
+      errorWithTimestamp('nbgetbrowser error:', error);
       socket.emit('error', 'Failed to fetch Netboot.xyz browser data: ' + error.message);
     }
   });
@@ -92,7 +94,7 @@ module.exports = function registerMenuHandlers(socket, io) {
       const releases = await fetchDevReleases();
       io.sockets.in(socket.id).emit('devrenderbrowser', releases);
     } catch (error) {
-      console.error('devgetbrowser error:', error.stack || error);
+      errorWithTimestamp('devgetbrowser error:', error);
       socket.emit('error', 'Failed to fetch Endpoint browser data: ' + error.message);
     }
   });

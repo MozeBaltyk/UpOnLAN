@@ -9,6 +9,16 @@ const yaml = require('js-yaml');
 const exec = require('child_process').exec;
 let cachedNginxURL = null;
 
+function logWithTimestamp(...args) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}]`, ...args);
+}
+
+function errorWithTimestamp(...args) {
+  const timestamp = new Date().toISOString();
+  console.error(`[${timestamp}]`, ...args);
+}
+
 function execCommand(cmd) {
   return new Promise(resolve => {
     exec(cmd, (err, stdout, stderr) => {
@@ -152,9 +162,9 @@ function getEndpointUrls() {
   // Latest release URL
   latest_url = `${api_url}releases/latest`;
 
-  //console.log("API URL:", api_url);
-  //console.log("RAW URL:", raw_url);
-  console.log("Endpoint URL:", endpoint_url);
+  // console.log("API URL:", api_url);
+  // console.log("RAW URL:", raw_url);
+  // console.log("Endpoint URL:", endpoint_url);
   return { endpoint_url, api_url, raw_url, latest_url };
 }
 
@@ -249,6 +259,8 @@ async function downloader(downloads, io, socket) {
 }
 
 module.exports = {
+  logWithTimestamp,
+  errorWithTimestamp,
   execCommand,
   getMenuVersion,
   getMenuOrigin,

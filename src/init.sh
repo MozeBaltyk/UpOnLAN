@@ -7,6 +7,7 @@ mkdir -p \
   /logs/nginx \
   /logs/tftp \
   /logs/webapp \
+  /logs/ansible \
   /run \
   /var/lib/nginx/tmp/client_body \
   /var/tmp/nginx \
@@ -75,3 +76,4 @@ chown -R nbxyz:nbxyz /config
 chown -R nbxyz:nbxyz /assets
 chown -R nbxyz:nbxyz /var/lib/nginx
 chown -R nbxyz:nbxyz /var/log/nginx
+chown -R nbxyz:nbxyz /logs

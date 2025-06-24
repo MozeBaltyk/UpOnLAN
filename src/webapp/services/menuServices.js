@@ -1,9 +1,11 @@
 // ./services/menuServices.js
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsp = fs.promises;
 const path = require('path');
 const yaml = require('js-yaml');
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
+const { spawn } = require('child_process');
 const { isBinaryFile } = require('isbinaryfile');
 const { 
   downloader,
@@ -12,24 +14,81 @@ const {
   getLocalNginx,
   getMenuVersion,
   getEndpointUrls,
+  logWithTimestamp,
+  errorWithTimestamp,
  } = require('./utilServices');
 
-// Run playbooks
-async function runBuildPlaybook(options) {
+// Run playbook with logging, streaming way
+async function runBuildPlaybook(options, socket) {
   const playbookPath = '/ansible/build_rom.yml';
+  const logDir = '/logs/ansible';
 
   const extraVars = Object.entries(options)
     .map(([key, val]) => `${key}='${val}'`)
     .join(' ');
 
-  const cmd = `ansible-playbook ${playbookPath} --extra-vars "${extraVars}"`;
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const logFilePath = path.join(logDir, `build_${timestamp}.log`);
 
-  try {
-    const { stdout, stderr } = await exec(cmd);
-    return stdout || stderr;
-  } catch (error) {
-    throw new Error(`Ansible build failed: ${error.stderr || error.message}`);
-  }
+  await fsp.mkdir(logDir, { recursive: true });
+
+  const args = [playbookPath, '--extra-vars', extraVars];
+  const cmd = `sudo ansible-playbook ${playbookPath} --extra-vars "${extraVars}"`;
+  logWithTimestamp(`ansible trigger: ${cmd}`);
+
+  const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+
+  return new Promise((resolve, reject) => {
+    const ansible = spawn('sudo', ['ansible-playbook', ...args]);
+    let taskCount = 50; // approximate number of tasks, can be adjusted
+    let tasksCompleted = 0;
+
+    ansible.stdout.on('data', (data) => {
+      const lines = data.toString().split('\n');
+      lines.forEach(line => {
+        logStream.write(line + '\n');
+        // Detect task start lines like: "TASK [some task description] ***************"
+        const taskMatch = line.match(/^TASK \[(.+)\]/);
+        if (taskMatch) {
+          taskCount++;
+          socket.emit('buildProgress', {
+            tasksCompleted,
+            taskCount,
+            currentTask: taskMatch[1]
+          });
+        }
+        // Detect "ok", "changed", or "failed" lines to increment completed count
+        if (line.match(/^(ok|changed|failed):/)) {
+          tasksCompleted++;
+          socket.emit('buildProgress', {
+            tasksCompleted,
+            taskCount,
+            currentTask: null
+          });
+        }
+      });
+    });
+
+    ansible.stderr.on('data', (data) => {
+      logStream.write(data);
+    });
+
+    ansible.on('close', (code) => {
+      logStream.end();
+      if (code === 0) {
+        resolve(`Ansible playbook completed successfully: ${logFilePath}`);
+      } else {
+        errorWithTimestamp(`Ansible build failed with code ${code}. See log: ${logFilePath}`);
+        reject(new Error(`Ansible playbook failed with code ${code}. See log: ${logFilePath}`));
+      }
+    });
+
+    ansible.on('error', (error) => {
+      errorWithTimestamp('Failed to start Ansible process:', error.message);
+      logStream.end();
+      reject(new Error(`Failed to start Ansible process: ${error.message}`));
+    });
+  });
 }
 
 // Fetch development releases
@@ -76,10 +135,10 @@ async function upgrademenu(version, callback, io, socket) {
     await deleteFiles(endpoint_config);
 
     // Wipe current remote
-    const remote_files = await fs.readdir(remote_folder, { withFileTypes: true });
+    const remote_files = await fsp.readdir(remote_folder, { withFileTypes: true });
     for (const file of remote_files) {
       if (!file.isDirectory()) {
-        await fs.unlink(path.join(remote_folder, file.name));
+        await fsp.unlink(path.join(remote_folder, file.name));
       }
     }
 
@@ -95,7 +154,7 @@ async function upgrademenu(version, callback, io, socket) {
     const tarFile = path.join(remote_folder, 'menus.tar.gz');
     const untarcmd = `tar xf ${tarFile} -C ${remote_folder}`;
     await exec(untarcmd);
-    await fs.unlink(tarFile);
+    await fsp.unlink(tarFile);
 
     // Write version and origin to config files
     const origin = endpoint_url;
@@ -103,7 +162,7 @@ async function upgrademenu(version, callback, io, socket) {
 
     let yamlData = {};
     try {
-      const fileContent = await fs.readFile(remote_endpoints_config, 'utf8');
+      const fileContent = await fsp.readFile(remote_endpoints_config, 'utf8');
       yamlData = yaml.load(fileContent) || {};
     } catch {
       yamlData = {};
@@ -118,14 +177,14 @@ async function upgrademenu(version, callback, io, socket) {
     yamlData.menu = { origin, version };
 
     // Write full YAML to endpoint config
-    await fs.writeFile(endpoint_config, yaml.dump(yamlData));
+    await fsp.writeFile(endpoint_config, yaml.dump(yamlData));
 
     //  layermenu using Promise wrapper
     await layermenu(socket, null);
     await disablesigs();
-    console.log(`Menu upgraded to version ${version} from ${endpoint_url}`);
+    logWithTimestamp(`Menu upgraded to version ${version} from ${endpoint_url}`);
   } catch (err) {
-    console.error("Error during upgrademenu:", err);
+    errorWithTimestamp("Error during upgrademenu:", err);
     callback(err);
   }
 }
@@ -179,12 +238,12 @@ async function upgrademenunetboot(version, io, socket) {
 
     const tarFile = path.join(remote_folder, 'menus.tar.gz');
     await exec(`tar xf ${tarFile} -C ${remote_folder}`);
-    await fs.unlink(tarFile);
+    await fsp.unlink(tarFile);
     const displayVersion = isCommitSha ? 'Development' : version;
   
     let yamlData = {};
     try {
-      const fileContent = await fs.readFile(endpoint_config, 'utf8');
+      const fileContent = await fsp.readFile(endpoint_config, 'utf8');
       yamlData = yaml.load(fileContent) || {};
     } catch {
       yamlData = {};
@@ -193,20 +252,20 @@ async function upgrademenunetboot(version, io, socket) {
       yamlData.endpoints = [];
     }
     yamlData.menu = { origin, version: displayVersion };
-    await fs.writeFile(endpoint_config, yaml.dump(yamlData));
+    await fsp.writeFile(endpoint_config, yaml.dump(yamlData));
   
     await layermenu(socket, null);
     await disablesigs();
 
-    console.log(`Menu upgraded to version ${version} from ${origin}`);
+    logWithTimestamp(`Menu upgraded to version ${version} from ${origin}`);
   } catch (err) {
-    console.error("Error during upgrademenunetboot:", err);
+    errorWithTimestamp("Error during upgrademenunetboot:", err);
     throw err;
   }
 }
 
 // Empty Menu
-async function emptymenu(socket, io) {
+async function emptymenu(socket) {
     const endpoints_config = '/config/endpoints.yml';
     try {
       // Delete all files in local and remote directories
@@ -217,18 +276,18 @@ async function emptymenu(socket, io) {
       await deleteFiles('/assets/index.html');
       await deleteFiles('/assets/index.htm');
       await deleteFiles(endpoints_config);
-      await fs.rm('/config/menus/remote/sigs', { recursive: true, force: true });
-      await fs.rm('/config/menus/rom', { recursive: true, force: true });
+      await fsp.rm('/config/menus/remote/sigs', { recursive: true, force: true });
+      await fsp.rm('/config/menus/rom', { recursive: true, force: true });
 
       // get default
       const { endpoint_url } = getEndpointUrls();
       const yamlData = { endpoints: [], menu: { origin: endpoint_url } };
-      await fs.writeFile(endpoints_config, yaml.dump(yamlData), 'utf8');
-      console.log(`endpoints.yml reset with origin: ${endpoint_url}`);
+      await fsp.writeFile(endpoints_config, yaml.dump(yamlData), 'utf8');
+      logWithTimestamp(`endpoints.yml reset with origin: ${endpoint_url}`);
       // Render empty menu
       await layermenu(socket, null);
     } catch (err) {
-      console.error('Failed to reset menu:', err);
+      errorWithTimestamp('Failed to reset menu:', err);
       socket.emit('error', 'Failed to reset menu: ' + err.message);
     }
 }
@@ -239,16 +298,16 @@ async function disablesigs() {
   const bootcfgl = '/config/menus/local/boot.cfg';
   const bootcfgm = '/config/menus/boot.cfg';
   try {
-    const fileExists = await fs.stat(bootcfgr).then(() => true).catch(() => false);
-    const localExists = await fs.stat(bootcfgl).then(() => true).catch(() => false);
+    const fileExists = await fsp.stat(bootcfgr).then(() => true).catch(() => false);
+    const localExists = await fsp.stat(bootcfgl).then(() => true).catch(() => false);
     if (fileExists && !localExists) {
-      const data = await fs.readFile(bootcfgr, 'utf8');
+      const data = await fsp.readFile(bootcfgr, 'utf8');
       const disable = data.replace(/set sigs_enabled true/g, 'set sigs_enabled false');
-      await fs.writeFile(bootcfgr, disable, 'utf8');
-      await fs.writeFile(bootcfgm, disable, 'utf8');
+      await fsp.writeFile(bootcfgr, disable, 'utf8');
+      await fsp.writeFile(bootcfgm, disable, 'utf8');
     }
   } catch (err) {
-    console.error('Error disabling sigs:', err);
+    errorWithTimestamp('Error disabling sigs:', err);
   }
 }
 
@@ -266,19 +325,19 @@ async function layermenu(socket = null, filename = null) {
 
   // Copy remote iPXE files to targetDir
   for (const file of remote_files) {
-    await fs.copyFile(path.join(getLayerRoot(false), file), path.join(targetDir, file));
+    await fsp.copyFile(path.join(getLayerRoot(false), file), path.join(targetDir, file));
   }
   // Copy remote iPXE files to targetDir
   for (const file of local_files) {
-    await fs.copyFile(path.join(getLayerRoot(true), file), path.join(targetDir, file));
+    await fsp.copyFile(path.join(getLayerRoot(true), file), path.join(targetDir, file));
   }
   // Copy remote ROM to romDir
   for (const file of list_rom_files) {
-    await fs.copyFile(path.join(getLayerRoot(false), file), path.join(romDir, file));
+    await fsp.copyFile(path.join(getLayerRoot(false), file), path.join(romDir, file));
   }
   // Copy remote index files to indexDir
   for (const file of list_index_files) {
-    await fs.copyFile(path.join(getLayerRoot(false), file), path.join(indexDir, file));
+    await fsp.copyFile(path.join(getLayerRoot(false), file), path.join(indexDir, file));
   }
 
   if (socket) {
@@ -312,12 +371,12 @@ function isPathValid(filepath, islocal) {
 // List files in a directory filtering by extensions
 async function listFiles(dir, exts) {
   try {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const entries = await fsp.readdir(dir, { withFileTypes: true });
     return entries
       .filter(d => !d.isDirectory() && isValidFile(d.name, exts))
       .map(d => d.name);
   } catch (err) {
-    console.error(`Failed to read directory ${dir}:`, err);
+    errorWithTimestamp(`Failed to read directory ${dir}:`, err);
     return [];
   }
 }
@@ -333,7 +392,7 @@ async function getipxefiles() {
 async function getromfiles() {
   const romDir = path.resolve('/config/menus/rom/ipxe');
   // Make sure all destination directories exist
-  await fs.mkdir(romDir, { recursive: true });
+  await fsp.mkdir(romDir, { recursive: true });
   const list_rom_files = await listFiles(romDir, ['efi', 'kpxe', 'dsk', 'pdsk', 'iso', 'img']);
   return { list_rom_files };
 }
@@ -341,7 +400,7 @@ async function getromfiles() {
 async function getindexfiles() {
   const assetsDir = path.resolve('/config/menus/rom');
   // Make sure all destination directories exist
-  await fs.mkdir(assetsDir, { recursive: true });
+  await fsp.mkdir(assetsDir, { recursive: true });
   const list_index_files = await listFiles(assetsDir, ['html', 'htm']);
   return { list_index_files };
 }
@@ -349,7 +408,7 @@ async function getindexfiles() {
 async function getremoteromfiles() {
   const remoteDir = path.resolve('/config/menus/remote');
   // Make sure all destination directories exist
-  await fs.mkdir(remoteDir, { recursive: true });
+  await fsp.mkdir(remoteDir, { recursive: true });
   const list_rom_files = await listFiles(remoteDir, ['efi', 'kpxe', 'dsk', 'pdsk', 'iso', 'img']);
   return { list_rom_files };
 }
@@ -357,7 +416,7 @@ async function getremoteromfiles() {
 async function getremoteindexfiles() {
   const remoteDir = path.resolve('/config/menus/remote');
   // Make sure all destination directories exist
-  await fs.mkdir(remoteDir, { recursive: true });
+  await fsp.mkdir(remoteDir, { recursive: true });
   const list_index_files = await listFiles(remoteDir, ['html', 'htm']);
   return { list_index_files };
 }
@@ -371,8 +430,8 @@ async function editgetfile(filename, islocal, socket) {
   }
 
   try {
-    const data = await fs.readFile(filePath);
-    const stat = await fs.stat(filePath);
+    const data = await fsp.readFile(filePath);
+    const stat = await fsp.stat(filePath);
     const isBinary = await isBinaryFile(data, stat.size);
     if (isBinary) {
       socket.emit('editrenderfile', 'CANNOT EDIT THIS IS A BINARY FILE', filename, 'nomenu');
@@ -380,13 +439,13 @@ async function editgetfile(filename, islocal, socket) {
       socket.emit('editrenderfile', data.toString('utf8'), filename, islocal);
     }
   } catch (err) {
-    console.error('Failed to read file:', err);
+    errorWithTimestamp('Failed to read file:', err);
     socket.emit('error', 'Failed to read file: ' + err.message);
   }
 }
 
 // Create a new empty iPXE file (always local layer)
-async function createipxe(filename, socket, io) {
+async function createipxe(filename, socket) {
   const islocal = true;
   const filePath = getMenuFilePath(filename, islocal);
 
@@ -396,57 +455,54 @@ async function createipxe(filename, socket, io) {
   }
 
   try {
-    await fs.writeFile(filePath, '#!ipxe');
+    await fsp.writeFile(filePath, '#!ipxe');
     await layermenu(socket, filename);
     await disablesigs();
   } catch (err) {
-    console.error('Failed to create iPXE file:', err);
+    errorWithTimestamp('Failed to create iPXE file:', err);
     socket.emit('error', 'Failed to create iPXE file: ' + err.message);
   }
 }
 
 // Save edited content to a local file
-async function saveconfig(filename, text, socket, io) {
+async function saveconfig(filename, text, socket) {
   const islocal = true;
   const filePath = getMenuFilePath(filename, islocal);
-
   if (!isPathValid(filePath, islocal)) {
-    io.sockets.in(socket.id).emit('error', 'Invalid file path');
+    errorWithTimestamp('Invalid file path');
+    socket.emit('error', 'Invalid file path');
     return;
   }
-
   try {
-    await fs.writeFile(filePath, text);
+    await fsp.writeFile(filePath, text);
     await layermenu(socket, filename);
     await disablesigs();
   } catch (err) {
-    console.error('Failed to save iPXE file:', err);
+    errorWithTimestamp('Failed to save iPXE file:', err);
     socket.emit('error', 'Failed to save iPXE file: ' + err.message);
   }
 }
 
 // Revert local override by deleting local file (restoring remote base)
-async function revertconfig(filename, socket, io) {
+async function revertconfig(filename, socket) {
   const islocal = true;
   const filePath = getMenuFilePath(filename, islocal);
 
   if (!isPathValid(filePath, islocal)) {
-    io.sockets.in(socket.id).emit('error', 'Invalid file path');
+    errorWithTimestamp('Invalid file path');
+    socket.emit('error', 'Invalid file path');
     return;
   }
-
   try {
-    await fs.unlink(filePath);
+    await fsp.unlink(filePath);
     await layermenu(socket, null);
     await disablesigs();
-    console.log(`${filename} reverted to remote version`);
+    logWithTimestamp(`${filename} reverted to remote version`);
   } catch (err) {
-    console.error('Failed to revert iPXE file:', err);
+    errorWithTimestamp('Failed to revert iPXE file:', err);
     socket.emit('error', 'Failed to revert iPXE file: ' + err.message);
   }
 }
-
-
 
 module.exports = {
   runBuildPlaybook,

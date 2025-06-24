@@ -2,7 +2,7 @@
 const fetch = require('node-fetch');
 const si = require('systeminformation');
 const { version } = require('../package.json');
-const { getMenuVersion, getMenuOrigin, getEndpointUrls, execCommand } = require('./utilServices');
+const { getMenuVersion, getMenuOrigin, getEndpointUrls, execCommand, logWithTimestamp } = require('./utilServices');
 
 async function getDashboardInfo() {
   const dashinfo = {
@@ -18,7 +18,7 @@ async function getDashboardInfo() {
     });
     const body = await res.json();
     dashinfo.remotemenuversion = body.tag_name;
-    console.log("Fetching latest release:", latest_url);
+    logWithTimestamp("Fetching latest release:", latest_url);
   } catch (e) {
     console.warn("Failed to fetch remote version", e);
   }

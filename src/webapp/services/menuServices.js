@@ -18,7 +18,7 @@ const {
   errorWithTimestamp,
  } = require('./utilServices');
 
-// Run playbook with logging, streaming way
+// Run playbook with logging, streaming, and graceful termination
 async function runBuildPlaybook(options, socket) {
   const playbookPath = '/ansible/build_rom.yml';
   const logDir = '/logs/ansible';
@@ -37,17 +37,22 @@ async function runBuildPlaybook(options, socket) {
   logWithTimestamp(`ansible trigger: ${cmd}`);
 
   const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+  const ansible = spawn('sudo', ['ansible-playbook', ...args]);
 
-  return new Promise((resolve, reject) => {
-    const ansible = spawn('sudo', ['ansible-playbook', ...args]);
-    let taskCount = 50; // approximate number of tasks, can be adjusted
-    let tasksCompleted = 0;
+  let taskCount = 50;
+  let tasksCompleted = 0;
 
+  // Handle graceful termination
+  ansible.on('SIGTERM', () => {
+    logWithTimestamp('Ansible build process received SIGTERM, terminating...');
+    socket.emit('buildMenuResult', { success: false, message: 'Build cancelled by user.' });
+  });
+
+  const promise = new Promise((resolve, reject) => {
     ansible.stdout.on('data', (data) => {
       const lines = data.toString().split('\n');
       lines.forEach(line => {
         logStream.write(line + '\n');
-        // Detect task start lines like: "TASK [some task description] ***************"
         const taskMatch = line.match(/^TASK \[(.+)\]/);
         if (taskMatch) {
           taskCount++;
@@ -57,7 +62,6 @@ async function runBuildPlaybook(options, socket) {
             currentTask: taskMatch[1]
           });
         }
-        // Detect "ok", "changed", or "failed" lines to increment completed count
         if (line.match(/^(ok|changed|failed):/)) {
           tasksCompleted++;
           socket.emit('buildProgress', {
@@ -73,13 +77,24 @@ async function runBuildPlaybook(options, socket) {
       logStream.write(data);
     });
 
-    ansible.on('close', (code) => {
+    ansible.on('close', (code, signal) => {
       logStream.end();
+      // Force progress bar to stop
+      socket.emit('buildProgress', {
+        tasksCompleted: taskCount,
+        taskCount,
+        currentTask: null
+      });
+      if (signal === 'SIGTERM') {
+        logWithTimestamp('Ansible build process terminated by user.');
+        socket.emit('buildMenuResult', { success: false, message: 'Build cancelled by user.' });
+        return;
+      }
       if (code === 0) {
-        resolve(`Ansible playbook completed successfully: ${logFilePath}`);
+        socket.emit('buildMenuResult', { success: true, message: `Ansible playbook completed successfully: ${logFilePath}` });
       } else {
         errorWithTimestamp(`Ansible build failed with code ${code}. See log: ${logFilePath}`);
-        reject(new Error(`Ansible playbook failed with code ${code}. See log: ${logFilePath}`));
+        socket.emit('buildMenuResult', { success: false, message: `Build failed. See log: ${logFilePath}` });
       }
     });
 
@@ -89,6 +104,8 @@ async function runBuildPlaybook(options, socket) {
       reject(new Error(`Failed to start Ansible process: ${error.message}`));
     });
   });
+
+  return { process: ansible, promise };
 }
 
 // Fetch development releases

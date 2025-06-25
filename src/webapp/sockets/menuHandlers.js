@@ -24,23 +24,36 @@ const {
 
 // This module handles menu-related socket events for the UponLAN web application.
 module.exports = function registerMenuHandlers(socket, io) {
-
+  let currentBuildProcess = null;
   socket.on('emptymenu', () => emptymenu(socket));
-
   socket.on('createipxe', (filename) => createipxe(filename, socket));
-
   socket.on('saveconfig', (filename, text) => saveconfig(filename, text, socket));
-  
   socket.on('revertconfig', (filename) => revertconfig(filename, socket));
-
-  socket.on('editgetfile', (filename, islocal) => editgetfile(filename, islocal, socket));
-
+  socket.on('editgetfile', (filename, islocal) => editgetfile(filename, islocal, socket));  
   socket.on('buildsubmit', async (options) => {
+    if (currentBuildProcess) {
+      socket.emit('buildMenuResult', { success: false, message: 'A build is already in progress.' });
+      return;
+    }
     try {
-      const output = await runBuildPlaybook(options, socket);
+      const { process, promise } = await runBuildPlaybook(options, socket);
+      currentBuildProcess = process;
+      const output = await promise;
       socket.emit('buildMenuResult', { success: true, message: output });
     } catch (err) {
       socket.emit('buildMenuResult', { success: false, message: 'Build failed: ' + err.message });
+    } finally {
+      currentBuildProcess = null;
+    }
+  });
+
+  socket.on('buildcancel', () => {
+    if (currentBuildProcess) {
+      logWithTimestamp('Build process cancelled by user.');
+      currentBuildProcess.kill('SIGTERM');
+      currentBuildProcess = null;
+    } else {
+      socket.emit('buildMenuResult', { success: false, message: 'No active build to cancel.' });
     }
   });
 

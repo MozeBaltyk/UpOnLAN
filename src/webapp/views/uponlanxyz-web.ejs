@@ -525,6 +525,10 @@ if ($('#buildModal').length === 0) {
 $(document).on('click', '#btnBuild', function() {
   $('#bootVersionInput').attr('placeholder', current_menu_version); // Set placeholder to current version
   $('#buildModal').modal('show');
+  // Reset Cancel button behavior
+  $('#cancelBuildBtn').off('click').on('click', function () {
+    $('#buildModal').modal('hide');
+  });
 });
 
 // Wait until the modal is fully shown, then safely set focus if needed
@@ -536,29 +540,37 @@ $('#buildModal').on('shown.bs.modal', function () {
 $('#buildForm').on('submit', function (e) {
   e.preventDefault();
   const buildOptions = {
-    EFI: $('#optionEFI').is(':checked'),
-    Hybrid: $('#optionHybrid').is(':checked'),
-    Legacy: $('#optionLegacy').is(':checked'),
-    Linux: $('#optionLinux').is(':checked'),
-    Rpi: $('#optionRpi').is(':checked'),
-    Index: $('#optionIndex').is(':checked'),
-    Signatures: $('#optionSignatures').is(':checked'),
+    generate_disks_efi: $('#optionEFI').is(':checked'),
+    generate_disks_hybrid: $('#optionHybrid').is(':checked'),
+    generate_disks_legacy: $('#optionLegacy').is(':checked'),
+    generate_disks_linux: $('#optionLinux').is(':checked'),
+    generate_disks_rpi: $('#optionRpi').is(':checked'),
+    generate_index: $('#optionIndex').is(':checked'),
+    generate_signatures: $('#optionSignatures').is(':checked'),
     site_name: $('#siteNameInput').val().trim(),
     boot_domain: $('#bootDomainInput').val().trim(),
     boot_version: $('#bootVersionInput').val().trim()
   };
+
+  // If none of the disk options are checked, set generate_disks: false
+  if (
+    !buildOptions.generate_disks_efi &&
+    !buildOptions.generate_disks_hybrid &&
+    !buildOptions.generate_disks_legacy &&
+    !buildOptions.generate_disks_linux &&
+    !buildOptions.generate_disks_rpi
+  ) {
+    buildOptions.generate_disks = false;
+  }
+
   // Reset error states
   $('#siteNameInput, #bootDomainInput, #bootVersionInput').removeClass('is-invalid');
+
   // Validate required fields again
-  if (!buildOptions.site_name) {
-  $('#siteNameInput').addClass('is-invalid');
-  }
-  if (!buildOptions.boot_domain) {
-  $('#bootDomainInput').addClass('is-invalid');
-  }
-  if (!buildOptions.boot_version) {
-  $('#bootVersionInput').addClass('is-invalid');
-  }
+  if (!buildOptions.site_name) $('#siteNameInput').addClass('is-invalid');
+  if (!buildOptions.boot_domain) $('#bootDomainInput').addClass('is-invalid');
+  if (!buildOptions.boot_version) $('#bootVersionInput').addClass('is-invalid');
+
   // Focus the first invalid input field (if any)
   const firstInvalidSelector = ['#siteNameInput', '#bootDomainInput', '#bootVersionInput']
     .find(selector => $(selector).hasClass('is-invalid'));
@@ -578,29 +590,26 @@ $('#buildForm').on('submit', function (e) {
         </button>
       </div>
     `);
-    setTimeout(() => {
-      $('#buildAlertArea .alert').alert('close');
-    }, 8000);
-    // Optionally scroll to alert
+    setTimeout(() => { $('#buildAlertArea .alert').alert('close'); }, 8000);
     document.querySelector('#buildAlertArea .alert-warning').scrollIntoView({ behavior: 'smooth' });
     return;
   }
   // Disable submit during processing
   $('#buildForm button[type="submit"]').prop('disabled', true);
-
-  // Emit event, Hide form controls and show spinner
-  socket.emit('buildsubmit', buildOptions);
-  // $('#buildModal').modal('hide');
   $('#buildFormBody').hide();
   $('#buildProgressContainer').removeClass('d-none');
-  $('#buildProgressBar').css('width', '0%').text('0%');
+  $('#buildProgressBar').removeClass('bg-danger').addClass('bg-success').css('width', '0%').text('0%');
   $('#buildTaskLabel').text('Initializing...');
-  $('#buildForm button[type="submit"]').prop('disabled', true);
 
-  // Re-enable button after short delay => ideally after ansible returns output
-  setTimeout(() => {
+  socket.emit('buildsubmit', buildOptions);
+
+  $('#cancelBuildBtn').off('click').on('click', function () {
+    socket.emit('buildcancel');
+    $('#buildProgressContainer').addClass('d-none');
+    $('#buildFormBody').show();
     $('#buildForm button[type="submit"]').prop('disabled', false);
-  }, 1000);
+    $('#buildModal').modal('hide');
+  });
 });
 
 // Progress bar updates
@@ -614,21 +623,40 @@ socket.on('buildProgress', function (progress) {
     .text(`${percent}%`);
 
   if (progress.currentTask) {
-    $('#buildTaskLabel').text(`Running: ${progress.currentTask}`);
+    $('#buildTaskLabel').text(`${progress.currentTask}`);
   }
 });
 
-// Handle build result
+// Build result handling
 socket.on('buildMenuResult', function (result) {
-  const alertType = result.status === 'success' ? 'success' : 'danger';
-  const message = result.message || (result.status === 'success' ? 'Build completed!' : 'Build failed.');
+  const alertArea = $('#buildAlertArea');
 
-  // Show message outside modal as before
-  $('#configcontent').prepend(`
-    <div class="alert alert-${alertType} alert-dismissible fade show" role="alert">${message}
-      <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+  alertArea.html(`
+    <div class="alert ${result.success ? 'alert-success' : 'alert-danger'} alert-dismissible fade show" role="alert">
+      ${result.message}
+      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+      </button>
     </div>
   `);
+
+  $('#buildProgressBar')
+    .removeClass('bg-success bg-danger')
+    .addClass(result.success ? 'bg-success' : 'bg-danger')
+    .css('width', '100%')
+    .text(result.success ? '100%' : 'Failed');
+  $('#buildTaskLabel').text(result.success ? 'Build completed successfully.' : 'Build failed. See logs for details.');
+
+  setTimeout(() => {
+    $('#buildProgressContainer').addClass('d-none');
+    $('#buildFormBody').show();
+    $('#buildForm button[type="submit"]').prop('disabled', false);
+    $('#buildModal').modal('hide');
+  }, 3000);
+});
+
+$('#cancelBuildBtn').on('click', function () {
+  socket.emit('buildcancel');
   $('#buildProgressContainer').addClass('d-none');
   $('#buildFormBody').show();
   $('#buildForm button[type="submit"]').prop('disabled', false);

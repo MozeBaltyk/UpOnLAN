@@ -66,6 +66,7 @@ RUN apk add --no-cache \
     sudo \
     supervisor \
     syslog-ng \
+    qemu-system-x86_64 \
     tar && \
     groupmod -g 1000 users && \
     useradd -u 911 -U -d /config -s /bin/false nbxyz && \

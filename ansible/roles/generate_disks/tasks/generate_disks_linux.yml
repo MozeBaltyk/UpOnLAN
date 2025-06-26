@@ -17,7 +17,7 @@
 - name: Set trust file to ipxe ca
   ansible.builtin.set_fact:
     trust_files: "{{ cert_dir }}/{{ ipxe_ca_filename }}"
-  when: not generate_signatures
+  when: not generate_signatures | bool
 
 - name: Combine trust args if set
   ansible.builtin.set_fact:

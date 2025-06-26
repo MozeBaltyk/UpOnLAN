@@ -24,7 +24,7 @@ async function runBuildPlaybook(options, socket) {
   const logDir = '/logs/ansible';
 
   const extraVars = Object.entries(options)
-    .map(([key, val]) => `${key}='${val}'`)
+    .map(([key, val]) => `${key}="${val}"`)
     .join(' ');
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -33,20 +33,18 @@ async function runBuildPlaybook(options, socket) {
   await fsp.mkdir(logDir, { recursive: true });
 
   const args = [playbookPath, '--extra-vars', extraVars];
-  const cmd = `sudo ansible-playbook ${playbookPath} --extra-vars "${extraVars}"`;
-  logWithTimestamp(`ansible trigger: ${cmd}`);
+  logWithTimestamp(`ansible trigger: sudo ansible-playbook ${playbookPath} --extra-vars "${extraVars}"`);
 
   const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
-  const ansible = spawn('sudo', ['ansible-playbook', ...args]);
+
+  // setsid to run ansible in a detached session
+  const ansible = spawn('setsid', ['sudo', 'ansible-playbook', ...args]);
+  logWithTimestamp(`Ansible build process started with pid ${ansible.pid} (detached)`);
+
+  ansible.unref();
 
   let taskCount = 50;
   let tasksCompleted = 0;
-
-  // Handle graceful termination
-  ansible.on('SIGTERM', () => {
-    logWithTimestamp('Ansible build process received SIGTERM, terminating...');
-    socket.emit('buildMenuResult', { success: false, message: 'Build cancelled by user.' });
-  });
 
   const promise = new Promise((resolve, reject) => {
     ansible.stdout.on('data', (data) => {
@@ -79,7 +77,6 @@ async function runBuildPlaybook(options, socket) {
 
     ansible.on('close', (code, signal) => {
       logStream.end();
-      // Force progress bar to stop
       socket.emit('buildProgress', {
         tasksCompleted: taskCount,
         taskCount,

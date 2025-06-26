@@ -35,7 +35,7 @@ exit
   Powered by <a href=https://github.com/MozeBaltyk/UpOnLAN>uponlan.xyz</a>
   </p>
 
-{% if generate_disks_hybrid == true %}
+{% if generate_disks_hybrid | bool %}
   <p>x86_64 Legacy and EFI Combined iPXE Bootloaders</p>
   <table style="width:100%">
     <!-- table header -->
@@ -72,7 +72,7 @@ exit
   </table>
 {% endif %}
 
-{% if generate_disks_legacy == true %}
+{% if generate_disks_legacy | bool %}
   <p>x86_64 Legacy (PCBIOS) iPXE Bootloaders</p>
   <table style="width:100%">
     <!-- table header -->
@@ -92,7 +92,7 @@ exit
   </table>
 {% endif %}
 
-{% if generate_disks_efi == true %}
+{% if generate_disks_efi | bool %}
   <p>x86_64 UEFI iPXE Bootloaders</p>
 
   <table style="width:100%">
@@ -113,7 +113,7 @@ exit
   </table>
 {% endif %}
 
-{% if generate_disks_arm == true %}
+{% if generate_disks_arm | bool %}
   <p>ARM64 UEFI iPXE Bootloaders</p>
 
   <table style="width:100%">
@@ -134,7 +134,7 @@ exit
   </table>
 {% endif %}
 
-{% if generate_disks_rpi == true %}
+{% if generate_disks_rpi | bool %}
   <p>Raspberry Pi iPXE Bootloaders</p>
 
   <table style="width:100%">
@@ -155,7 +155,7 @@ exit
   </table>
 {% endif %}
 
-{% if generate_checksums == true %}
+{% if generate_checksums | bool %}
   <p>Checksums<p>
 
   <a href="ipxe/{{ site_name }}-sha256-checksums.txt">SHA256 checksums</a>

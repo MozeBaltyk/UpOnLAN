@@ -22,6 +22,13 @@ const {
   runBuildPlaybook,
 } = require('../services/menuServices');
 
+let globalBuildState = {
+  process: null,
+  startedBy: null,
+  startTime: null,
+  pid: null,
+};
+
 // This module handles menu-related socket events for the UponLAN web application.
 module.exports = function registerMenuHandlers(socket, io) {
   let currentBuildProcess = null;
@@ -31,27 +38,51 @@ module.exports = function registerMenuHandlers(socket, io) {
   socket.on('revertconfig', (filename) => revertconfig(filename, socket));
   socket.on('editgetfile', (filename, islocal) => editgetfile(filename, islocal, socket));  
   socket.on('buildsubmit', async (options) => {
-    if (currentBuildProcess) {
-      socket.emit('buildMenuResult', { success: false, message: 'A build is already in progress.' });
+    if (globalBuildState.process) {
+      const timeStr = globalBuildState.startTime?.toISOString() || 'unknown';
+      const pidStr = globalBuildState.pid || 'unknown';
+      socket.emit('buildMenuResult', { 
+        success: false, 
+        message: `A build is already in progress (started at ${timeStr}, pid ${pidStr}).` 
+      });
       return;
     }
     try {
       const { process, promise } = await runBuildPlaybook(options, socket);
-      currentBuildProcess = process;
+      globalBuildState.process = process;
+      globalBuildState.startedBy = socket.id;
+      globalBuildState.startTime = new Date();
+      globalBuildState.pid = process.pid;
+
       const output = await promise;
       socket.emit('buildMenuResult', { success: true, message: output });
     } catch (err) {
       socket.emit('buildMenuResult', { success: false, message: 'Build failed: ' + err.message });
     } finally {
-      currentBuildProcess = null;
+      globalBuildState = {
+        process: null,
+        startedBy: null,
+        startTime: null,
+        pid: null,
+      };
     }
   });
 
   socket.on('buildcancel', () => {
-    if (currentBuildProcess) {
-      logWithTimestamp('Build process cancelled by user.');
-      currentBuildProcess.kill('SIGTERM');
-      currentBuildProcess = null;
+    if (globalBuildState.process) {
+      logWithTimestamp(`Build process (pid ${globalBuildState.pid}) cancelled by user.`);
+      try {
+        process.kill(-globalBuildState.pid, 'SIGTERM');
+      } catch (err) {
+        errorWithTimestamp(`Failed to terminate build process: ${err.message}`);
+      }
+      socket.emit('buildMenuResult', { success: false, message: 'Build cancelled by user.' });
+      globalBuildState = {
+        process: null,
+        startedBy: null,
+        startTime: null,
+        pid: null,
+      };
     } else {
       socket.emit('buildMenuResult', { success: false, message: 'No active build to cancel.' });
     }

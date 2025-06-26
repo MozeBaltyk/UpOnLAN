@@ -53,8 +53,7 @@ LABEL org.opencontainers.image.description="uponlan.xyz official docker containe
 # install awake - Python lib so would need a python:3-alpine
 RUN apk --no-cache add awake
 
-#### Add-on stage 
-# Install development tools
+#### Add-on for ansible
 RUN apk add --no-cache \
   alpine-sdk \
   python3 \
@@ -73,11 +72,12 @@ RUN apk add --no-cache \
   libuuid \
   perl \
   xz-dev
-
+  
 # Copy isolinux to later stage
 COPY --from=deps /usr/lib/ISOLINUX /usr/lib/ISOLINUX
-####################
 
+
+#### Deps for the webapp
 RUN apk add --no-cache \
     bash \
     busybox \
@@ -94,6 +94,7 @@ RUN apk add --no-cache \
     sudo \
     supervisor \
     syslog-ng \
+    qemu-system-x86_64 \
     tar && \
     groupmod -g 1000 users && \
     useradd -u 911 -U -d /config -s /bin/false nbxyz && \

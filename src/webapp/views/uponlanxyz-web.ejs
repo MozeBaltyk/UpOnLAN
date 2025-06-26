@@ -512,8 +512,8 @@ if ($('#buildModal').length === 0) {
               <p id="buildTaskLabel" class="mt-3 text-center font-weight-bold"></p>
             </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-primary">Build</button>
+            <button type="button" class="btn btn-secondary" id="cancelBuildBtn">Cancel</button>
+            <button type="submit" class="btn btn-primary">Run</button>
           </div>
         </form>
       </div>
@@ -523,21 +523,23 @@ if ($('#buildModal').length === 0) {
 
 // Show modal on Build button click
 $(document).on('click', '#btnBuild', function() {
-  $('#bootVersionInput').attr('placeholder', current_menu_version); // Set placeholder to current version
+  $('#bootVersionInput').attr('placeholder', current_menu_version);
   $('#buildModal').modal('show');
-  // Reset Cancel button behavior
-  $('#cancelBuildBtn').off('click').on('click', function () {
-    $('#buildModal').modal('hide');
-  });
 });
 
-// Wait until the modal is fully shown, then safely set focus if needed
+// Cancel button logic - emit buildcancel, hide modal, NO reset
+$(document).on('click', '#cancelBuildBtn', function () {
+  socket.emit('buildcancel');
+  $('#buildModal').modal('hide');
+});
+
+// Focus input when modal fully shown
 $('#buildModal').on('shown.bs.modal', function () {
   $('#bootVersionInput').trigger('focus');
 });
 
 // Handle form submission
-$('#buildForm').on('submit', function (e) {
+$(document).on('submit', '#buildForm', function (e) {
   e.preventDefault();
   const buildOptions = {
     generate_disks_efi: $('#optionEFI').is(':checked'),
@@ -552,36 +554,17 @@ $('#buildForm').on('submit', function (e) {
     boot_version: $('#bootVersionInput').val().trim()
   };
 
-  // If none of the disk options are checked, set generate_disks: false
-  if (
-    !buildOptions.generate_disks_efi &&
-    !buildOptions.generate_disks_hybrid &&
-    !buildOptions.generate_disks_legacy &&
-    !buildOptions.generate_disks_linux &&
-    !buildOptions.generate_disks_rpi
-  ) {
-    buildOptions.generate_disks = false;
-  }
-
-  // Reset error states
   $('#siteNameInput, #bootDomainInput, #bootVersionInput').removeClass('is-invalid');
 
-  // Validate required fields again
   if (!buildOptions.site_name) $('#siteNameInput').addClass('is-invalid');
   if (!buildOptions.boot_domain) $('#bootDomainInput').addClass('is-invalid');
   if (!buildOptions.boot_version) $('#bootVersionInput').addClass('is-invalid');
 
-  // Focus the first invalid input field (if any)
-  const firstInvalidSelector = ['#siteNameInput', '#bootDomainInput', '#bootVersionInput']
-    .find(selector => $(selector).hasClass('is-invalid'));
-  if (firstInvalidSelector) {
-    $(firstInvalidSelector).focus();
-  }
-  // Validate required fields
-  if (!buildOptions.site_name || !buildOptions.boot_domain || !buildOptions.boot_version) {
-    // Remove any previous warning alert
-    $('#buildAlertArea .alert-warning').remove();
-    // Show custom styled alert
+  const firstInvalid = ['#siteNameInput', '#bootDomainInput', '#bootVersionInput']
+    .find(sel => $(sel).hasClass('is-invalid'));
+
+  if (firstInvalid) {
+    $(firstInvalid).focus();
     $('#buildAlertArea').html(`
       <div class="alert alert-warning alert-dismissible fade show" role="alert">
         Please provide at least: <strong>Site Name</strong>, <strong>Boot Domain</strong> and <strong>Boot Version</strong>.
@@ -590,48 +573,32 @@ $('#buildForm').on('submit', function (e) {
         </button>
       </div>
     `);
-    setTimeout(() => { $('#buildAlertArea .alert').alert('close'); }, 8000);
+    setTimeout(() => $('#buildAlertArea .alert').alert('close'), 8000);
     document.querySelector('#buildAlertArea .alert-warning').scrollIntoView({ behavior: 'smooth' });
     return;
   }
-  // Disable submit during processing
+
   $('#buildForm button[type="submit"]').prop('disabled', true);
   $('#buildFormBody').hide();
   $('#buildProgressContainer').removeClass('d-none');
   $('#buildProgressBar').removeClass('bg-danger').addClass('bg-success').css('width', '0%').text('0%');
   $('#buildTaskLabel').text('Initializing...');
-
   socket.emit('buildsubmit', buildOptions);
-
-  $('#cancelBuildBtn').off('click').on('click', function () {
-    socket.emit('buildcancel');
-    $('#buildProgressContainer').addClass('d-none');
-    $('#buildFormBody').show();
-    $('#buildForm button[type="submit"]').prop('disabled', false);
-    $('#buildModal').modal('hide');
-  });
 });
 
-// Progress bar updates
+// Progress updates
 socket.on('buildProgress', function (progress) {
   const percent = progress.taskCount > 0 
     ? Math.round((progress.tasksCompleted / progress.taskCount) * 100)
     : 0;
 
-  $('#buildProgressBar')
-    .css('width', percent + '%')
-    .text(`${percent}%`);
-
-  if (progress.currentTask) {
-    $('#buildTaskLabel').text(`${progress.currentTask}`);
-  }
+  $('#buildProgressBar').css('width', percent + '%').text(`${percent}%`);
+  if (progress.currentTask) $('#buildTaskLabel').text(progress.currentTask);
 });
 
-// Build result handling
+// Handle build result
 socket.on('buildMenuResult', function (result) {
-  const alertArea = $('#buildAlertArea');
-
-  alertArea.html(`
+  $('#buildAlertArea').html(`
     <div class="alert ${result.success ? 'alert-success' : 'alert-danger'} alert-dismissible fade show" role="alert">
       ${result.message}
       <button type="button" class="close" data-dismiss="alert" aria-label="Close">
@@ -648,20 +615,21 @@ socket.on('buildMenuResult', function (result) {
   $('#buildTaskLabel').text(result.success ? 'Build completed successfully.' : 'Build failed. See logs for details.');
 
   setTimeout(() => {
-    $('#buildProgressContainer').addClass('d-none');
-    $('#buildFormBody').show();
-    $('#buildForm button[type="submit"]').prop('disabled', false);
     $('#buildModal').modal('hide');
-  }, 3000);
+    resetBuildModal();
+  }, 6000);
 });
 
-$('#cancelBuildBtn').on('click', function () {
-  socket.emit('buildcancel');
-  $('#buildProgressContainer').addClass('d-none');
-  $('#buildFormBody').show();
+// Reset modal ONLY after success/fail
+function resetBuildModal() {
   $('#buildForm button[type="submit"]').prop('disabled', false);
-  $('#buildModal').modal('hide');
-});
+  $('#buildFormBody').show();
+  $('#buildProgressContainer').addClass('d-none');
+  $('#buildProgressBar').removeClass('bg-success bg-danger').css('width', '0%').text('0%');
+  $('#buildTaskLabel').text('');
+  $('#buildAlertArea').html('');
+  $('#siteNameInput, #bootDomainInput, #bootVersionInput').removeClass('is-invalid');
+}
 
 // Empty menu
 function resetmenu() {

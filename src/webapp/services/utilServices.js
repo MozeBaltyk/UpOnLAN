@@ -7,7 +7,141 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const exec = require('child_process').exec;
+const { promisify } = require('util');
+const execPromise = promisify(exec);
+const { spawn } = require('child_process');
 let cachedNginxURL = null;
+let ansibleState = {
+  process: null,
+  pid: null,
+  startedBy: null,
+  startTime: null,
+  currentPlaybook: null,
+};
+
+async function startAnsiblePlaybook(playbookPath, options, socket, progressCallback) {
+    if (ansibleState.process) {
+        return { success: false, message: `Ansible already running (PID ${ansibleState.pid})` };
+    }
+    const { process, promise } = await runAnsiblePlaybook(playbookPath, options, socket, progressCallback);
+
+    logWithTimestamp(`Starting playbook: ${playbookPath} with PID ${process.pid}`);
+
+    ansibleState = {
+        process,
+        pid: process.pid,
+        startedBy: socket.id,
+        startTime: new Date(),
+        currentPlaybook: playbookPath,
+    };
+    promise.finally(() => resetAnsibleState());
+
+    return { success: true, message: `Build started (PID ${process.pid})`, pid: process.pid, promise };
+}
+
+function cancelAnsiblePlaybook() {
+  if (!ansibleState.process) return { success: false, message: 'No active playbook running' };
+  try {
+    logWithTimestamp(`Cancelling playbook with PID ${ansibleState.pid}`);
+    process.kill(-ansibleState.pid, 'SIGTERM');
+  } catch (err) {
+    errorWithTimestamp(`Failed to terminate process ${ansibleState.pid}:`, err.message);
+    return { success: false, message: `Failed to terminate process: ${err.message}` };
+  }
+  resetAnsibleState();
+  logWithTimestamp(`Playbook with PID ${ansibleState.pid} cancelled successfully`);
+  return { success: true, message: 'Playbook cancelled' };
+}
+
+function resetAnsibleState() {
+  ansibleState = { process: null, pid: null, startedBy: null, startTime: null, currentPlaybook: null };
+}
+
+async function runAnsiblePlaybook(playbookPath, options, socket, progressCallback) {
+  const logDir = '/logs/ansible';
+  await fs.promises.mkdir(logDir, { recursive: true });
+
+  const extraVars = Object.entries(options)
+    .map(([key, val]) => `${key}="${val}"`)
+    .join(' ');
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const logFilePath = path.join(logDir, `${path.basename(playbookPath)}_${timestamp}.log`);
+
+  // Count tasks
+  let taskCount = 0;
+  try {
+    const { stdout } = await execPromise(`sudo ansible-playbook ${playbookPath} --list-tasks`);
+    const rawTaskCount = (stdout.match(/^\s{6,}.*$/gm) || []).length;
+    taskCount = rawTaskCount * 7;
+  } catch (err) {
+    logWithTimestamp(`Failed to count tasks: ${err.message}`);
+  }
+  if (taskCount === 0) {
+    logWithTimestamp('Warning: No tasks detected in playbook. Progress tracking may be inaccurate.');
+  }
+
+  // launch ansible-playbook with setsid to run it in a new session
+  const args = [ playbookPath, '--extra-vars', extraVars];
+  const ansible = spawn('setsid', ['sudo', 'ansible-playbook', ...args]);
+  ansible.unref();
+
+  const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+
+  const promise = new Promise((resolve, reject) => {
+    let tasksCompleted = 0;
+
+    ansible.stdout.on('data', (data) => {
+      const lines = data.toString().split('\n');
+      lines.forEach(line => {
+        logStream.write(line + '\n');
+        const taskMatch = line.match(/^TASK \[(.+)\]/);
+        if (taskMatch && progressCallback) {
+          taskCount++;
+          progressCallback({ tasksCompleted, taskCount, currentTask: taskMatch[1] });
+        }
+        if (line.match(/^(ok|changed|failed):/)) {
+          tasksCompleted++;
+          if (progressCallback) {
+            progressCallback({ tasksCompleted, taskCount, currentTask: null });
+          }
+        }
+      });
+    });
+
+    ansible.stderr.on('data', (data) => {
+      logStream.write(data);
+    });
+
+    ansible.on('close', (code, signal) => {
+      logStream.end();
+      if (signal === 'SIGTERM') {
+        resolve({ success: false, message: 'Playbook cancelled by user.' });
+      } else if (code === 0) {
+        resolve({ success: true, message: `Playbook completed successfully: ${logFilePath}` });
+      } else {
+        resolve({ success: false, message: `Playbook failed. See log: ${logFilePath}` });
+      }
+    });
+
+    ansible.on('error', (err) => {
+      logStream.end();
+      reject(new Error(`Failed to start Ansible process: ${err.message}`));
+    });
+  });
+
+  return { process: ansible, promise };
+}
+
+async function hasOrphanProcesses() {
+  const cmd = `ps -o pid,ppid,comm | awk '$2 == 1 && $1 != 1 && $3 ~ /ansible-play/'`;
+  try {
+    const { stdout } = await exec(cmd);
+    return stdout.trim() !== '';
+  } catch {
+    return false;
+  }
+}
 
 function logWithTimestamp(...args) {
   const timestamp = new Date().toISOString();
@@ -259,6 +393,9 @@ async function downloader(downloads, io, socket) {
 }
 
 module.exports = {
+  startAnsiblePlaybook,
+  cancelAnsiblePlaybook,
+  hasOrphanProcesses,
   logWithTimestamp,
   errorWithTimestamp,
   execCommand,

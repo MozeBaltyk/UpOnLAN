@@ -5,7 +5,6 @@ const path = require('path');
 const yaml = require('js-yaml');
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
-const { spawn } = require('child_process');
 const { isBinaryFile } = require('isbinaryfile');
 const { 
   downloader,
@@ -16,93 +15,18 @@ const {
   getEndpointUrls,
   logWithTimestamp,
   errorWithTimestamp,
+  startAnsiblePlaybook,
+  cancelAnsiblePlaybook,
  } = require('./utilServices');
 
-// Run playbook with logging, streaming, and graceful termination
 async function runBuildPlaybook(options, socket) {
-  const playbookPath = '/ansible/build_rom.yml';
-  const logDir = '/logs/ansible';
-
-  const extraVars = Object.entries(options)
-    .map(([key, val]) => `${key}="${val}"`)
-    .join(' ');
-
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const logFilePath = path.join(logDir, `build_${timestamp}.log`);
-
-  await fsp.mkdir(logDir, { recursive: true });
-
-  const args = [playbookPath, '--extra-vars', extraVars];
-  logWithTimestamp(`ansible trigger: sudo ansible-playbook ${playbookPath} --extra-vars "${extraVars}"`);
-
-  const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
-
-  // setsid to run ansible in a detached session
-  const ansible = spawn('setsid', ['sudo', 'ansible-playbook', ...args]);
-  logWithTimestamp(`Ansible build process started with pid ${ansible.pid} (detached)`);
-
-  ansible.unref();
-
-  let taskCount = 50;
-  let tasksCompleted = 0;
-
-  const promise = new Promise((resolve, reject) => {
-    ansible.stdout.on('data', (data) => {
-      const lines = data.toString().split('\n');
-      lines.forEach(line => {
-        logStream.write(line + '\n');
-        const taskMatch = line.match(/^TASK \[(.+)\]/);
-        if (taskMatch) {
-          taskCount++;
-          socket.emit('buildProgress', {
-            tasksCompleted,
-            taskCount,
-            currentTask: taskMatch[1]
-          });
-        }
-        if (line.match(/^(ok|changed|failed):/)) {
-          tasksCompleted++;
-          socket.emit('buildProgress', {
-            tasksCompleted,
-            taskCount,
-            currentTask: null
-          });
-        }
-      });
-    });
-
-    ansible.stderr.on('data', (data) => {
-      logStream.write(data);
-    });
-
-    ansible.on('close', (code, signal) => {
-      logStream.end();
-      socket.emit('buildProgress', {
-        tasksCompleted: taskCount,
-        taskCount,
-        currentTask: null
-      });
-      if (signal === 'SIGTERM') {
-        logWithTimestamp('Ansible build process terminated by user.');
-        socket.emit('buildMenuResult', { success: false, message: 'Build cancelled by user.' });
-        return;
-      }
-      if (code === 0) {
-        socket.emit('buildMenuResult', { success: true, message: `Ansible playbook completed successfully: ${logFilePath}` });
-      } else {
-        errorWithTimestamp(`Ansible build failed with code ${code}. See log: ${logFilePath}`);
-        socket.emit('buildMenuResult', { success: false, message: `Build failed. See log: ${logFilePath}` });
-      }
-    });
-
-    ansible.on('error', (error) => {
-      errorWithTimestamp('Failed to start Ansible process:', error.message);
-      logStream.end();
-      reject(new Error(`Failed to start Ansible process: ${error.message}`));
-    });
+  return await startAnsiblePlaybook('/ansible/build_rom.yml', options, socket, (progress) => {
+    socket.emit('buildProgress', progress);
   });
+}
 
-  return { process: ansible, promise };
+function cancelBuildPlaybook() {
+  return cancelAnsiblePlaybook();
 }
 
 // Fetch development releases
@@ -520,6 +444,7 @@ async function revertconfig(filename, socket) {
 
 module.exports = {
   runBuildPlaybook,
+  cancelBuildPlaybook,
   disablesigs,
   layermenu,
   fetchDevReleases,

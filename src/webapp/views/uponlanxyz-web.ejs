@@ -530,7 +530,8 @@ $(document).on('click', '#btnBuild', function() {
 // Cancel button logic - emit buildcancel, hide modal, NO reset
 $(document).on('click', '#cancelBuildBtn', function () {
   socket.emit('buildcancel');
-  $('#buildModal').modal('hide');
+  $('#buildTaskLabel').text('Cancelling build...');
+  setTimeout(() => { $('#buildModal').modal('hide');}, 8000);
 });
 
 // Focus input when modal fully shown
@@ -613,11 +614,7 @@ socket.on('buildMenuResult', function (result) {
     .css('width', '100%')
     .text(result.success ? '100%' : 'Failed');
   $('#buildTaskLabel').text(result.success ? 'Build completed successfully.' : 'Build failed. See logs for details.');
-
-  setTimeout(() => {
-    $('#buildModal').modal('hide');
-    resetBuildModal();
-  }, 6000);
+  setTimeout(() => { $('#buildModal').modal('hide'); resetBuildModal();}, 8000);
 });
 
 // Reset modal ONLY after success/fail

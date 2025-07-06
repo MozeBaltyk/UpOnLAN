@@ -4,7 +4,8 @@ const {
   getLocalNginx, 
   getMenuVersion, 
   logWithTimestamp, 
-  errorWithTimestamp, 
+  errorWithTimestamp,
+  hasOrphanProcesses,
 } = require('../services/utilServices');
 const {
   upgrademenu,
@@ -20,6 +21,7 @@ const {
   fetchDevReleases, 
   fetchNetbootReleases,
   runBuildPlaybook,
+  cancelBuildPlaybook,
 } = require('../services/menuServices');
 
 let globalBuildState = {
@@ -38,54 +40,27 @@ module.exports = function registerMenuHandlers(socket, io) {
   socket.on('revertconfig', (filename) => revertconfig(filename, socket));
   socket.on('editgetfile', (filename, islocal) => editgetfile(filename, islocal, socket));  
   socket.on('buildsubmit', async (options) => {
-    if (globalBuildState.process) {
-      const timeStr = globalBuildState.startTime?.toISOString() || 'unknown';
-      const pidStr = globalBuildState.pid || 'unknown';
-      socket.emit('buildMenuResult', { 
-        success: false, 
-        message: `A build is already in progress (started at ${timeStr}, pid ${pidStr}).` 
-      });
-      return;
-    }
-    try {
-      const { process, promise } = await runBuildPlaybook(options, socket);
-      globalBuildState.process = process;
-      globalBuildState.startedBy = socket.id;
-      globalBuildState.startTime = new Date();
-      globalBuildState.pid = process.pid;
-
-      const output = await promise;
-      socket.emit('buildMenuResult', { success: true, message: output });
-    } catch (err) {
-      socket.emit('buildMenuResult', { success: false, message: 'Build failed: ' + err.message });
-    } finally {
-      globalBuildState = {
-        process: null,
-        startedBy: null,
-        startTime: null,
-        pid: null,
-      };
-    }
+      const result = await runBuildPlaybook(options, socket);
+      if (result.success) {
+          socket.emit('buildStarted', { pid: result.pid });          
+          // Wait for the playbook to finish
+          result.promise.then((finalResult) => {
+              socket.emit('buildMenuResult', finalResult);
+          }).catch(err => {
+              socket.emit('buildMenuResult', { success: false, message: err.message });
+          });
+      } else {
+          socket.emit('buildMenuResult', result);
+      }
   });
 
-  socket.on('buildcancel', () => {
-    if (globalBuildState.process) {
-      logWithTimestamp(`Build process (pid ${globalBuildState.pid}) cancelled by user.`);
-      try {
-        process.kill(-globalBuildState.pid, 'SIGTERM');
-      } catch (err) {
-        errorWithTimestamp(`Failed to terminate build process: ${err.message}`);
-      }
-      socket.emit('buildMenuResult', { success: false, message: 'Build cancelled by user.' });
-      globalBuildState = {
-        process: null,
-        startedBy: null,
-        startTime: null,
-        pid: null,
-      };
-    } else {
-      socket.emit('buildMenuResult', { success: false, message: 'No active build to cancel.' });
+  socket.on('buildcancel', async () => {
+    const orphanExists = await hasOrphanProcesses();
+    const result = cancelBuildPlaybook();
+    if (orphanExists) {
+      result.message += ' Warning: Detected orphan ansible-playbook processes.';
     }
+    socket.emit('buildMenuResult', result);
   });
 
   socket.on('upgrademenu', (version) => { upgrademenu(version, (err, result) => {

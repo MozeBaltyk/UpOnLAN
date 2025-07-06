@@ -1,18 +1,28 @@
-## Code Architecture & Design Insights
+## Code Architecture & Design
 
-This part is to help keeping UpOnLAN futures devs. 
+This documentation act as a PRD (Product Requirements Document) describing the technical design, user-facing behavior, and development guidelines for the **UpOnLAN Web Application**, which provides an interface for managing iPXE boot menus, assets, and system builds via Ansible. 
 
-This projects includes several components.
+#### 🖥️ Functional Overview
 
-* A webapp
+The **UpOnLAN WebApp** allows users to:
 
-* A menu and Assets mirror
+✅ Manage PXE boot menus with layered local/remote configuration
+✅ Download, update, or override assets like ISOs, kernels, and boot files
+✅ Trigger builds via Ansible playbooks to generate ROMs, ISOs, or other boot artifacts
+✅ Monitor build progress and system status in real-time via WebSockets
+✅ Access project documentation directly from the web interface
 
-* Ansible playbooks to produce binaries and iso from iPXE menus.
+#### 🏗️ Technical Components Summary
 
-* Documentation for all components. (The one you are currently reading)
+This projects includes several components :
 
-* Scripts and Github workflows
+| Component               | Description                                                        |
+| ----------------------- | ------------------------------------------------------------------ |
+| WebApp (Node.js)        | User interface + backend server logic                              |
+| Menu & Assets Mirror    | Menus and assets as artifacts in the github project                |
+| Ansible Playbooks       | Infrastructure automation: builds, updates, system provisioning    |
+| Documentation (`/docs`) | Markdown docs rendered within the web interface                    |
+| Scripts & Workflows     | Helper tools for local testing (e.g., libvirt) + GitHub automation |
  
 ---
 
@@ -40,7 +50,7 @@ tree -L 2
 
 ---
 
-#### 🧱 Code Structure
+## 🧱 WebApp Code Architecture
 
 The webapp is a cold fork from Netboot.xyz, using Node.js, it was refactored following a MVC structure. 
 
@@ -51,20 +61,20 @@ The webapp is a cold fork from Netboot.xyz, using Node.js, it was refactored fol
 ```bash
 webapp                       # The webapp code source
 ├── app.js                   # Web server and socket bootstrapping
-├── routes/
+├── routes/                  # HTTP routes (minimal, most logic is socket-based)
 │   └── baseRoutes.js        # Contains base URL and page routes
-├── sockets/
+├── sockets/                 # Socket.IO event handlers (split by domain)
 │   └── socketHandlers.js    # Entry point for all socket modules
 │   └── dashboardHandlers.js # Socket logic for dashboard-related events
 │   └── ...                  # Other socket modules
-├── services/
+├── services/                # Business logic layer (pure functions)
 │   ├── menuService.js       # Exposes getMenuVersion(), disableSigs(), etc.
 │   └── dashboardService.js  # Logic supporting dashboard metrics
 │   └── ...                  # Other service files
-├── views/
+├── views/                   # EJS templates rendered on the client
 │   ├── index.ejs
 │   └── uponlanxyz-web.ejs
-├── public/                  # Static assets (CSS, JS, icons)
+├── public/                  # Static assets (CSS, JS, images)
 ├── package.json             # npm dependencies
 ```
 
@@ -121,3 +131,18 @@ Ensure no user-provided paths are directly passed to `fs` methods — always san
 - Final menu reflects **merged content** for consistent PXE boot behavior
 
 ---
+
+## Ansible integration 
+
+The WebApp container integrates Ansible and all dependencies to run ansible-playbook located in `/ansible`. So the WebApp act as an ansible-runner: 
+
+- Builds run detached using setsid and sudo to prevent blocking the Node.js event loop
+
+- Real-time progress is streamed via Socket.IO (buildProgress events)
+
+- Logs are stored in `/logs/ansible/` with timestamped filenames
+
+- Only one build runs at a time; parallel executions are blocked
+
+- Cancellation is supported via `SIGTERM`
+

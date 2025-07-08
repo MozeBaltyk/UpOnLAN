@@ -2,15 +2,23 @@
 
 This documentation act as a PRD (Product Requirements Document) describing the technical design, user-facing behavior, and development guidelines for the **UpOnLAN Web Application**, which provides an interface for managing iPXE boot menus, assets, and system builds via Ansible. 
 
+---
+
 #### 🖥️ Functional Overview
 
 The **UpOnLAN WebApp** allows users to:
 
-✅ Manage PXE boot menus with layered local/remote configuration
-✅ Download, update, or override assets like ISOs, kernels, and boot files
-✅ Trigger builds via Ansible playbooks to generate ROMs, ISOs, or other boot artifacts
-✅ Monitor build progress and system status in real-time via WebSockets
-✅ Access project documentation directly from the web interface
+✅ Manage PXE boot menus with layered local/remote configuration       
+
+✅ Download, update, or override assets like ISOs, kernels, and boot files       
+
+✅ Trigger builds via Ansible playbooks to generate ROMs, ISOs, or other boot artifacts       
+
+✅ Monitor build progress and system status in real-time via WebSockets        
+
+✅ Access project documentation directly from the web interface      
+
+---
 
 #### 🏗️ Technical Components Summary
 

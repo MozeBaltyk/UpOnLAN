@@ -15,3 +15,12 @@
   border-radius: 3px;
   font-size: 90%;
 }
+
+[data-theme="dark"] .nav-link.active {
+  background-color: var(--bg-tertiary) !important;
+}
+
+[data-theme="dark"] #doc-viewer code {
+  background-color: var(--bg-tertiary) !important;
+  color: var(--code-color) !important;
+}

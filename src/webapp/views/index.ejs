@@ -32,6 +32,7 @@
     <link rel="stylesheet" href="<%= baseurl %>public/vendor/css/logs.css">
     <link rel="stylesheet" href="<%= baseurl %>public/vendor/css/docs.css">
     <link rel="stylesheet" href="<%= baseurl %>public/vendor/css/menus.css">
+    <link rel="stylesheet" href="<%= baseurl %>public/vendor/css/dark-theme.css">
   </head>
   <body>
     <!-- Navigation -->
@@ -60,6 +61,11 @@
         </ul>
         <ul class="navbar-nav ml-auto">
           <div id="statusbar" style="width:500px" ></div>
+          <li class="nav-item">
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light theme">
+              <span id="theme-icon">🌙</span>
+            </button>
+          </li>
         </ul>
       </div>
     </nav>

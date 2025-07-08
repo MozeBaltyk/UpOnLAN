@@ -95,6 +95,7 @@ RUN apk add --no-cache \
     supervisor \
     syslog-ng \
     qemu-system-x86_64 \
+    busybox-extras \
     tar && \
     groupmod -g 1000 users && \
     useradd -u 911 -U -d /config -s /bin/false nbxyz && \

@@ -7,6 +7,15 @@ spec:
   containers:
     - name: webapp
       image: localhost/uponlan:latest
+      # needed for QEMU
+      #securityContext:
+      #  capabilities:
+      #    add:
+      #      - NET_ADMIN
+      #  devices:
+      #    - name: tun
+      #      devicePath: /dev/net/tun
+      #  privileged: true
       env:
         - name: MENU_VERSION
           value: "0.0.2"

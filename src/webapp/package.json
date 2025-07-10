@@ -1,5 +1,5 @@
 {
-  "name": "WebApp",
+  "name": "UpOnLAN",
   "version": "0.0.2",
   "description": "Configuration and mirroring application for uponlan.xyz stack",
   "main": "app.js",
@@ -15,7 +15,7 @@
   "homepage": "https://mozebaltyk.github.io",
   "dependencies": {
     "ejs": "3.1.10",
-    "express": "4.21.2",
+    "express": "5.1.0",
     "http": "0.0.0",
     "isbinaryfile": "5.0.4",
     "js-yaml": "4.1.0",
@@ -23,7 +23,7 @@
     "readdirp": "3.6.0",
     "node-fetch": "2.7.0",
     "socket.io": "4.8.1",
-    "systeminformation": "5.25.11",
+    "systeminformation": "5.27.7",
     "chart.js": "^4.0.0",
     "chartjs-adapter-date-fns": "^3.0.0",
     "date-fns": "^4.0.0",

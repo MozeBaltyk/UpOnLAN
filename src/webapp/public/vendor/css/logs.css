@@ -1,20 +1,28 @@
 /* shared theme */
 .log-content {
-  height:340px; 
-  font-family:monospace; 
-  font-size:0.9em;
+  height: 340px;
+  font-family: monospace;
+  font-size: 0.9em;
+  overflow-y: auto;   /* scroll if content exceeds height */
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-pane {
+  height: 100%;
+  overflow: hidden; /* avoid overflow */
+  display: flex;
+  flex-direction: column;
 }
 
 .log-tab {
-  height: 100%;
-  overflow-y: auto;
-  font-size: 0.9em;
-  padding: 10px;
+  flex-grow: 1;       /* fill vertical space */
+  overflow: hidden;
   white-space: pre-wrap;
+  padding: 10px;
 }
 
 [data-theme="dark"] .log-tab {
   background: var(--bg-secondary) !important;
   color: var(--text-primary) !important;
 }
-

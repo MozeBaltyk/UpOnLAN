@@ -70,7 +70,7 @@ socket.on('renderdash', function(response){
   var cpustats = response.cpu;
   var cpupercent = response.CPUpercent;
   var memstats = response.mem;
-  var usedmem = (memstats.active/memstats.total)*100;
+  var usedmem = ((memstats.active/memstats.total)*100).toFixed(2);;
   var totalmem = parseFloat(memstats.total/1000000000).toFixed(2);
   var diskbuffer = parseFloat(memstats.buffcache/1000000000).toFixed(2);
   if (menuversion != remotemenuversion){
@@ -565,7 +565,7 @@ if ($('#buildModal').length === 0) {
 }
 
 // Show modal on Build button click
-$(document).on('click', '#btnBuild', function() {
+$(document).on('click', '#btnBuild', function () {
   $('#bootVersionInput').attr('placeholder', current_menu_version);
   $('#buildModal').modal('show');
 });
@@ -574,7 +574,7 @@ $(document).on('click', '#btnBuild', function() {
 $(document).on('click', '#cancelBuildBtn', function () {
   socket.emit('buildcancel');
   $('#buildTaskLabel').text('Cancelling build...');
-  setTimeout(() => { $('#buildModal').modal('hide');}, 8000);
+  $('#buildForm button[type="submit"]').prop('disabled', true); // disable until response
 });
 
 // Focus input when modal fully shown
@@ -582,9 +582,65 @@ $('#buildModal').on('shown.bs.modal', function () {
   $('#bootVersionInput').trigger('focus');
 });
 
-// Handle form submission
+// --- Version Helpers ---
+function parseSemver(ver) {
+  const match = ver.match(/^(\d+)\.(\d+)\.(\d+)(?:-([a-z]+)(?:\.(\d+))?)?$/i);
+  if (!match) return null;
+
+  return {
+    major: parseInt(match[1], 10),
+    minor: parseInt(match[2], 10),
+    patch: parseInt(match[3], 10),
+    prerelease: match[4] || '',
+    prereleaseNum: match[5] ? parseInt(match[5], 10) : 0
+  };
+}
+
+function isVersionGreater(newVersion, currentVersion) {
+  const nv = parseSemver(newVersion);
+  const cv = parseSemver(currentVersion);
+  if (!nv || !cv) return false;
+
+  for (const key of ['major', 'minor', 'patch']) {
+    if (nv[key] > cv[key]) return true;
+    if (nv[key] < cv[key]) return false;
+  }
+
+  const order = { alpha: 0, beta: 1, '': 2 }; // '' = stable
+  const nvTag = nv.prerelease;
+  const cvTag = cv.prerelease;
+
+  if (order[nvTag] > order[cvTag]) return true;
+  if (order[nvTag] < order[cvTag]) return false;
+
+  return nv.prereleaseNum > cv.prereleaseNum;
+}
+
+// --- Alert Helper ---
+function showAlert(type, message) {
+  $('#buildAlertArea').html(`
+    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+      ${message}
+      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+  `);
+  setTimeout(() => $('#buildAlertArea .alert').alert('close'), 8000);
+  document.querySelector(`#buildAlertArea .alert-${type}`)?.scrollIntoView({ behavior: 'smooth' });
+}
+
+// --- Invalid Field Helper ---
+function markInvalid(selector, message) {
+  $(selector).addClass('is-invalid');
+  showAlert('danger', message);
+  return true; // so we can return early
+}
+
+// --- Form Handler ---
 $(document).on('submit', '#buildForm', function (e) {
   e.preventDefault();
+
   const buildOptions = {
     generate_disks_efi: $('#optionEFI').is(':checked'),
     generate_disks_hybrid: $('#optionHybrid').is(':checked'),
@@ -598,30 +654,29 @@ $(document).on('submit', '#buildForm', function (e) {
     boot_version: $('#bootVersionInput').val().trim()
   };
 
-  $('#siteNameInput, #bootDomainInput, #bootVersionInput').removeClass('is-invalid');
+  // Reset previous states
+  $('#siteNameInput, #bootDomainInput, #bootVersionInput').removeClass('is-invalid').removeAttr('aria-invalid');
 
-  if (!buildOptions.site_name) $('#siteNameInput').addClass('is-invalid');
-  if (!buildOptions.boot_domain) $('#bootDomainInput').addClass('is-invalid');
-  if (!buildOptions.boot_version) $('#bootVersionInput').addClass('is-invalid');
+  // Validate required fields
+  if (!buildOptions.site_name) return markInvalid('#siteNameInput', 'Site Name is required.');
+  if (!buildOptions.boot_domain) return markInvalid('#bootDomainInput', 'Boot Domain is required.');
 
-  const firstInvalid = ['#siteNameInput', '#bootDomainInput', '#bootVersionInput']
-    .find(sel => $(sel).hasClass('is-invalid'));
-
-  if (firstInvalid) {
-    $(firstInvalid).focus();
-    $('#buildAlertArea').html(`
-      <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        Please provide at least: <strong>Site Name</strong>, <strong>Boot Domain</strong> and <strong>Boot Version</strong>.
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-    `);
-    setTimeout(() => $('#buildAlertArea .alert').alert('close'), 8000);
-    document.querySelector('#buildAlertArea .alert-warning').scrollIntoView({ behavior: 'smooth' });
-    return;
+  const semverRegex = /^\d+\.\d+\.\d+(-(?:alpha|beta)(\.\d+)?)?$/;
+  if (!buildOptions.boot_version) return markInvalid('#bootVersionInput', 'Boot Version is required.');
+  if (!semverRegex.test(buildOptions.boot_version)) {
+    return markInvalid(
+      '#bootVersionInput',
+      'Boot Version must follow format <strong>X.Y.Z</strong> or <strong>X.Y.Z-alpha.N</strong>/<strong>X.Y.Z-beta.N</strong>.'
+    );
+  }
+  if (!isVersionGreater(buildOptions.boot_version, current_menu_version)) {
+    return markInvalid(
+      '#bootVersionInput',
+      `Boot Version must be greater than current version <strong>${current_menu_version}</strong>.`
+    );
   }
 
+  // Submit the build
   $('#buildForm button[type="submit"]').prop('disabled', true);
   $('#buildFormBody').hide();
   $('#buildProgressContainer').removeClass('d-none');
@@ -640,32 +695,64 @@ socket.on('buildProgress', function (progress) {
   if (progress.currentTask) $('#buildTaskLabel').text(progress.currentTask);
 });
 
-// Handle build result
 socket.on('buildMenuResult', function (result) {
-  $('#buildAlertArea').html(`
-    <div class="alert ${result.success ? 'alert-success' : 'alert-danger'} alert-dismissible fade show" role="alert">
-      ${result.message}
-      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-        <span aria-hidden="true">&times;</span>
-      </button>
-    </div>
-  `);
+  $('#buildForm button[type="submit"]').prop('disabled', false);
+  $('#buildProgressBar').css('width', '100%');
 
+  if (result.message === 'No active playbook running') {
+    showAlert('info', 'There is no build in progress to cancel.');
+    $('#buildTaskLabel').text('No build running.');
+    $('#buildProgressBar')
+      .removeClass('bg-success bg-danger bg-warning')
+      .addClass('bg-info')
+      .css('width', '100%')
+      .text('Idle');
+    setTimeout(() => {
+      $('#buildModal').modal('hide');
+      resetBuildModal();
+    }, 5000);
+    return;
+  }
+
+  let alertType, labelText;
+
+  if (result.status === 'cancelled') {
+    alertType = 'warning';
+    labelText = 'Cancelled';
+  } else if (result.status === 'error' || result.success === false) {
+    alertType = 'danger';
+    labelText = 'Build failed. See logs for details.';
+  } else {
+    alertType = 'success';
+    labelText = 'Build completed successfully.';
+  }
+
+  showAlert(alertType, result.message);
   $('#buildProgressBar')
-    .removeClass('bg-success bg-danger')
-    .addClass(result.success ? 'bg-success' : 'bg-danger')
+    .removeClass('bg-success bg-danger bg-warning')
+    .addClass(alertType === 'danger' ? 'bg-danger' :
+              alertType === 'warning' ? 'bg-warning' : 'bg-success')
     .css('width', '100%')
-    .text(result.success ? '100%' : 'Failed');
-  $('#buildTaskLabel').text(result.success ? 'Build completed successfully.' : 'Build failed. See logs for details.');
-  setTimeout(() => { $('#buildModal').modal('hide'); resetBuildModal();}, 8000);
+    .text(labelText === 'Cancelled' ? 'Cancelled' : (alertType === 'danger' ? 'Failed' : '100%'));
+
+  $('#buildTaskLabel').text(labelText);
+
+  // Hide modal after delay
+  setTimeout(() => {
+    $('#buildModal').modal('hide');
+     resetBuildModal();
+  }, 8000);
 });
 
-// Reset modal ONLY after success/fail
+// Reset modal form
 function resetBuildModal() {
   $('#buildForm button[type="submit"]').prop('disabled', false);
   $('#buildFormBody').show();
   $('#buildProgressContainer').addClass('d-none');
-  $('#buildProgressBar').removeClass('bg-success bg-danger').css('width', '0%').text('0%');
+  $('#buildProgressBar')
+    .removeClass('bg-success bg-danger bg-warning')
+    .css('width', '0%')
+    .text('0%');
   $('#buildTaskLabel').text('');
   $('#buildAlertArea').html('');
   $('#siteNameInput, #bootDomainInput, #bootVersionInput').removeClass('is-invalid');

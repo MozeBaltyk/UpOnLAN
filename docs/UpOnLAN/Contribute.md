@@ -22,7 +22,7 @@ This is more of a roadmap or wish list than a finalized feature set — but it s
 - [x] Web app displays logs and live metrics
 - [x] Test **PXE boot** with a Libvirt VM
 - [x] Display iPXE and UpOnLAN documentation in the web app
-- [ ] Build 🔄 PXE boot files directly from the web app (via backend Ansible playbooks)
+- [x] Build 🔄 PXE boot files directly from the web app (via backend Ansible playbooks)
 - [ ] Release menus, assets, and Docker images
 - [ ] List **Cloud-init** assets 📝 (with a "category" column)
 - [ ] Provide a standard UpOnLAN menu with:

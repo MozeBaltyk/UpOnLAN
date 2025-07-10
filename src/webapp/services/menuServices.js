@@ -20,13 +20,23 @@ const {
  } = require('./utilServices');
 
 async function runBuildPlaybook(options, socket) {
-  return await startAnsiblePlaybook('/ansible/build_rom.yml', options, socket, (progress) => {
+  // Start the playbook and get the process object, for example:
+  const result = await startAnsiblePlaybook('/ansible/build_rom.yml', options, socket, (progress) => {
     socket.emit('buildProgress', progress);
   });
+  return result;
 }
 
-function cancelBuildPlaybook() {
-  return cancelAnsiblePlaybook();
+async function cancelBuildPlaybook(socket) {
+  // cancelAnsiblePlaybook() will handle ansibleState internally
+  const result = await cancelAnsiblePlaybook();
+  socket.emit('buildMenuResult', {
+    success: !result.success ? false : true,
+    status: result.status || (result.success ? 'success' : 'error'),
+    message: result.message,
+    pid: result.pid || null,
+  });
+  return result;
 }
 
 // Fetch development releases

@@ -24,16 +24,8 @@ const {
   cancelBuildPlaybook,
 } = require('../services/menuServices');
 
-let globalBuildState = {
-  process: null,
-  startedBy: null,
-  startTime: null,
-  pid: null,
-};
-
 // This module handles menu-related socket events for the UponLAN web application.
 module.exports = function registerMenuHandlers(socket, io) {
-  let currentBuildProcess = null;
   socket.on('emptymenu', () => emptymenu(socket));
   socket.on('createipxe', (filename) => createipxe(filename, socket));
   socket.on('saveconfig', (filename, text) => saveconfig(filename, text, socket));
@@ -56,7 +48,7 @@ module.exports = function registerMenuHandlers(socket, io) {
 
   socket.on('buildcancel', async () => {
     const orphanExists = await hasOrphanProcesses();
-    const result = cancelBuildPlaybook();
+    const result = await cancelBuildPlaybook(socket);
     if (orphanExists) {
       result.message += ' Warning: Detected orphan ansible-playbook processes.';
     }

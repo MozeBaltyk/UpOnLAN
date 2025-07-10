@@ -19,42 +19,47 @@ let ansibleState = {
   currentPlaybook: null,
 };
 
-async function startAnsiblePlaybook(playbookPath, options, socket, progressCallback) {
-    if (ansibleState.process) {
-        return { success: false, message: `Ansible already running (PID ${ansibleState.pid})` };
-    }
-    const { process, promise } = await runAnsiblePlaybook(playbookPath, options, socket, progressCallback);
-
-    logWithTimestamp(`Starting playbook: ${playbookPath} with PID ${process.pid}`);
-
-    ansibleState = {
-        process,
-        pid: process.pid,
-        startedBy: socket.id,
-        startTime: new Date(),
-        currentPlaybook: playbookPath,
-    };
-    promise.finally(() => resetAnsibleState());
-
-    return { success: true, message: `Build started (PID ${process.pid})`, pid: process.pid, promise };
+function resetAnsibleState() {
+  ansibleState = { process: null, pid: null, startedBy: null, startTime: null, currentPlaybook: null, promise: null, };
 }
 
-function cancelAnsiblePlaybook() {
-  if (!ansibleState.process) return { success: false, message: 'No active playbook running' };
+async function startAnsiblePlaybook(playbookPath, options, socket, progressCallback) {
+  if (ansibleState.process) {
+    return { success: false, message: `Ansible already running (PID ${ansibleState.pid})` };
+  }
+  const { process, promise } = await runAnsiblePlaybook(playbookPath, options, socket, progressCallback);
+
+  logWithTimestamp(`Starting playbook: ${playbookPath} with PID ${process.pid}`);
+
+  ansibleState = {
+      process,
+      pid: process.pid,
+      startedBy: socket.id,
+      startTime: new Date(),
+      currentPlaybook: playbookPath,
+      promise,
+  };
+  promise.finally(() => resetAnsibleState());
+
+  return { success: true, message: `Build started (PID ${process.pid})`, pid: process.pid, promise };
+}
+
+async function cancelAnsiblePlaybook() {
+  if (!ansibleState.process || !ansibleState.promise) {
+    return { success: false, message: 'No active playbook running' };
+  }
+
   try {
     logWithTimestamp(`Cancelling playbook with PID ${ansibleState.pid}`);
     process.kill(-ansibleState.pid, 'SIGTERM');
+
+    // Wait for the playbook promise to resolve
+    const result = await ansibleState.promise;
+    return result;
   } catch (err) {
-    errorWithTimestamp(`Failed to terminate process ${ansibleState.pid}:`, err.message);
+    errorWithTimestamp(`Failed to terminate process ${ansibleState.pid}: ${err.message}`);
     return { success: false, message: `Failed to terminate process: ${err.message}` };
   }
-  resetAnsibleState();
-  logWithTimestamp(`Playbook with PID ${ansibleState.pid} cancelled successfully`);
-  return { success: true, message: 'Playbook cancelled' };
-}
-
-function resetAnsibleState() {
-  ansibleState = { process: null, pid: null, startedBy: null, startTime: null, currentPlaybook: null };
 }
 
 async function runAnsiblePlaybook(playbookPath, options, socket, progressCallback) {
@@ -84,10 +89,7 @@ async function runAnsiblePlaybook(playbookPath, options, socket, progressCallbac
   // launch ansible-playbook with setsid to run it in a new session
   const args = [ playbookPath, '--extra-vars', extraVars];
   const ansible = spawn('setsid', ['sudo', 'ansible-playbook', ...args]);
-  ansible.unref();
-
   const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
-
   const promise = new Promise((resolve, reject) => {
     let tasksCompleted = 0;
 
@@ -116,11 +118,24 @@ async function runAnsiblePlaybook(playbookPath, options, socket, progressCallbac
     ansible.on('close', (code, signal) => {
       logStream.end();
       if (signal === 'SIGTERM') {
-        resolve({ success: false, message: 'Playbook cancelled by user.' });
+        // Process was terminated by your cancel
+        resolve({
+          success: false,
+          status: 'cancelled',
+          message: 'Playbook execution was cancelled by the user.',
+        });
       } else if (code === 0) {
-        resolve({ success: true, message: `Playbook completed successfully: ${logFilePath}` });
+        resolve({
+          success: true,
+          status: 'success',
+          message: `Playbook completed successfully: ${logFilePath}`,
+        });
       } else {
-        resolve({ success: false, message: `Playbook failed. See log: ${logFilePath}` });
+        resolve({
+          success: false,
+          status: 'error',
+          message: `Playbook failed with code ${code}. See log: ${logFilePath}`,
+        });
       }
     });
 

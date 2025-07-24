@@ -1,0 +1,42 @@
+qemu-system-x86_64 \
+  -boot n \
+  -nographic
+
+qemu-system-x86_64 -m 512M -boot n \
+  -netdev user,id=net0,tftp=/config/menus,bootfile=menu.ipxe \
+  -device e1000,netdev=net0 \
+  -nographic
+
+qemu-system-x86_64 -m 512M -boot n \
+  -nographic \
+  -netdev user,id=net0 \
+  -device e1000,netdev=net0
+
+tftp -g -r menu.ipxe -l menu.ipxe localhost
+
+echo "allow br0" > /etc/qemu/bridge.conf
+sudo usermod -aG qemu root
+sudo ip link add name br0 type bridge
+sudo ip link set dev br0 up
+sudo ip a add 172.16.0.1/24 dev br0
+
+/etc/dnsmasq.conf
+interface=br0
+bind-interfaces
+dhcp-range=172.16.0.10,172.16.0.100,12h
+dhcp-host=52:54:00:12:34:56,172.16.0.50
+
+qemu-system-x86_64 -m 512M -boot n \
+  -netdev bridge,br=br0,id=net0,helper=/usr/lib/qemu/qemu-bridge-helper \
+  -device e1000,netdev=net0,mac=52:54:00:12:34:56 \
+  -nographic
+
+qemu-system-x86_64 -m 512M -boot n \
+  -netdev bridge,br=br0,id=net0,helper=/usr/lib/qemu/qemu-bridge-helper \
+  -device e1000,netdev=net0 \
+  -nographic
+
+qemu-system-x86_64 -m 512M -boot n \
+  -netdev user,id=net0 \
+  -device e1000,netdev=net0 \
+  -nographic

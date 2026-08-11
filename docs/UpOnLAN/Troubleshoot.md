@@ -35,6 +35,20 @@ Walk the boot steps from [Networks summary](../Networks.md):
 
 The webapp **Monitor** tab tails Nginx, TFTP and webapp activity in real time — it is the first place to look during a failed boot.
 
+### Automated PXE test on KVM
+
+`./wakemeup.sh -a test` creates a throwaway KVM network + VM and PXE-boots it against the running container. It verifies the chain end-to-end (DHCP lease → TFTP bootloader → HTTP menu) and exits 0/1 accordingly.
+
+```bash
+./wakemeup.sh -a test
+# Which pxe_config? [uponlan]  →  local | uponlan | netboot | uefi.http
+```
+
+- `uponlan` (default): dnsmasq points the VM at the container's own TFTP/nginx (`rom/ipxe/uponlan.xyz*` — run the ROM build first if the artifact check warns).
+- `uefi.http`: VM boots UEFI with OVMF and fetches the bootloader over HTTP (requires `ovmf`/`edk2-ovmf` on the host).
+- `local`: boots from the KVM host's own TFTP — useful as a baseline before involving UpOnLAN.
+- Troubleshoot manually with `virsh screenshot testpxe`, `virsh console testpxe`, and `virsh net-dhcp-leases uponlan`.
+
 ---
 
 ## 🧱 Menu build fails in the webapp

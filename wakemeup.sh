@@ -55,7 +55,9 @@ test () {
     sudo chmod +x ./scripts/create_kvm_test_network.sh
     sudo ./scripts/create_kvm_test_network.sh ${network_name} ${pxe_config}
     sudo chmod +x ./scripts/create_kvm_test_vm.sh
-    sudo ./scripts/create_kvm_test_vm.sh ${network_name}
+    sudo ./scripts/create_kvm_test_vm.sh ${network_name} ${pxe_config}
+    sudo chmod +x ./scripts/verify_kvm_boot.sh
+    sudo ./scripts/verify_kvm_boot.sh ${network_name} testpxe
 }
 
 test-webapp () {

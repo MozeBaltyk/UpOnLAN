@@ -91,30 +91,63 @@ cat <<EOF > /etc/libvirt/qemu/networks/${network_name}.xml
   </dnsmasq:options>
 </network>
 EOF
-elif pxe_type == "efi.http"; then
-##### UEFI HTTP Boot (request extra package for kvm: ) ####
+elif [ "$pxe_type" == "uefi.http" ] || [ "$pxe_type" == "efi.http" ]; then
+##### UEFI HTTP Boot (no TFTP needed; firmware fetches the bootloader over HTTP) ####
 cat <<EOF > /etc/libvirt/qemu/networks/${network_name}.xml
 <network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
   <name>${network_name}</name>
   <forward mode='nat'/>
   <bridge name='${interface}' stp='on' delay='0'/>
   <ip address='${gateway_ip}' netmask='255.255.255.0'>
-  <tftp root='/var/lib/tftpboot'/>
     <dhcp>
-      <range start='${network_ip%.*}.128' end='${network_ip%.*}.254' />
-      <bootp file='pxelinux.0'/>
+      <range start='${network_ip%.*}.128' end='${network_ip%.*}.254'/>
     </dhcp>
   </ip>
   <dnsmasq:options>
     <dnsmasq:option value='dhcp-vendorclass=set:efi-http,HTTPClient:Arch:00016'/>
     <dnsmasq:option value='dhcp-option-force=tag:efi-http,60,HTTPClient'/>
-    <dnsmasq:option value='dhcp-boot=tag:efi-http,&quot;http://192.168.122.1/rhel8/EFI/BOOT/BOOTX64.EFI&quot;'/>
+    <!-- UEFI firmware fetches the UpOnLAN bootloader straight from nginx -->
+    <dnsmasq:option value='dhcp-boot=tag:efi-http,&quot;http://${tftp_server_ip}:${NGINX_PORT:-8080}/rom/ipxe/uponlan.xyz.efi&quot;'/>
   </dnsmasq:options>
 </network>
 EOF
 else
-  echo "nothing"
+  echo "Invalid pxe_type: $pxe_type (use local|uponlan|netboot|uefi.http)"
+  exit 1
 fi
+
+# Precondition check: warn when the bootloader the network advertises does not exist
+check_boot_files () {
+    # expected file(s) that the PXE config references, relative to the serving root
+    case "$pxe_type" in
+        local)     local files="/var/lib/tftpboot/undionly.0" root="KVM host";;
+        uponlan|netboot) local files="/config/menus/rom/ipxe/${pxe_type}.xyz-undionly.kpxe /config/menus/rom/ipxe/${pxe_type}.xyz.kpxe /config/menus/rom/ipxe/${pxe_type}.xyz.efi" root="container";;
+        uefi.http|efi.http) local files="/config/menus/rom/ipxe/uponlan.xyz.efi" root="container";;
+    esac
+
+    for f in $files; do
+        if [ "$root" == "container" ]; then
+            cid=$(sudo podman ps --filter ancestor=localhost/uponlan:latest --format "{{.ID}}" | head -n1)
+            if [ -z "$cid" ]; then
+                echo -e "\nWARN: container not running — cannot check $f. Deploy first: ./wakemeup.sh -a deploy"
+                return 0
+            fi
+            if sudo podman exec "$cid" test -f "$f"; then
+                echo -e "\nOK: $f present in container (${root})"
+            else
+                echo -e "\nWARN: $f NOT found in container — run the ROM build (webapp Build tab or ansible) first, otherwise PXE boot will fail."
+            fi
+        else
+            if [ -f "$f" ]; then
+                echo -e "\nOK: $f present on ${root}"
+            else
+                echo -e "\nWARN: $f NOT found on ${root} — see docs/iPXE.md to install the iPXE binary."
+            fi
+        fi
+    done
+}
+
+check_boot_files
 
 sudo virsh net-define /etc/libvirt/qemu/networks/${network_name}.xml
 sudo virsh net-start ${network_name}

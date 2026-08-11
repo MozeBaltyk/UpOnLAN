@@ -3,3 +3,4 @@ config
 assets
 README.md
 LICENCE.txt
+**/coverage

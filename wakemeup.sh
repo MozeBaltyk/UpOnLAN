@@ -58,6 +58,30 @@ test () {
     sudo ./scripts/create_kvm_test_vm.sh ${network_name}
 }
 
+test-webapp () {
+    read -p "Which test layer? [all/unit/integration/e2e/smoke] (default: all): " layer
+    layer=${layer:-all}
+    # npm is purged from the final image (build-only dep), so call vitest directly
+    case $layer in
+        all) cmd="node node_modules/vitest/vitest.mjs run";;
+        unit|integration|e2e|smoke) cmd="node node_modules/vitest/vitest.mjs run test/${layer}";;
+        *) echo "Invalid layer: $layer (use all/unit/integration/e2e/smoke)"; exit 1;;
+    esac
+
+    cid=$(sudo podman ps --filter ancestor=localhost/uponlan:latest --format "{{.ID}}" | head -n1)
+    if [[ -z "$cid" ]]; then
+        echo "No uponlan container running. Start it first: ./wakemeup.sh -a deploy"
+        exit 1
+    fi
+    if ! sudo podman exec "$cid" test -d /webapp/test; then
+        echo "Container image does not contain the tests. Rebuild it first: ./wakemeup.sh -a build"
+        exit 1
+    fi
+
+    echo "Running '$cmd' inside container $cid"
+    sudo podman exec -it "$cid" sh -c "cd /webapp && $cmd"
+}
+
 exec_cmd () {
     eval "${action}"
 }
@@ -78,6 +102,7 @@ print_help () {
     echo "8. network - check kvm/podman networks info"
     echo "9. build-runner - build Ansible container"
     echo "10. run-runner - run Ansible container"
+    echo "11. test-webapp - run webapp tests inside the container"
     echo ""
 }
 
@@ -105,6 +130,7 @@ case $action in
     network) echo "Action: check kvm/podman networks info";;
     build-runner) echo "Action: build Ansible container";;
     run-runner) echo "Action: run Ansible container";;
+    test-webapp) echo "Action: run webapp tests in container";;
     *) echo "Invalid action: $action"; print_help; exit 1;;
 esac
 

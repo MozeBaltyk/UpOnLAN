@@ -5,6 +5,7 @@ Pull requests, discussions, or any other help are welcome!
 There are several areas where you can contribute to this project:
 
 - 🛠️ Maintain or add new features to the **UpOnLAN.xyz webapp**
+- 🧪 Write or improve tests (Vitest pyramid in `src/webapp/test/` — see Developpement → Testing)
 - 📚 Improve documentation to help iPXE gain popularity
 - 🧪 Experiment with and provide feedback about **UpOnLAN.xyz**
 - 🐳 Enhance the delivery: containers, CI/CD pipelines, Docker Hub releases, etc.
@@ -23,6 +24,7 @@ This is more of a roadmap or wish list than a finalized feature set — but it s
 - [x] Test **PXE boot** with a Libvirt VM
 - [x] Display iPXE and UpOnLAN documentation in the web app
 - [x] Build 🔄 PXE boot files directly from the web app (via backend Ansible playbooks)
+- [x] Automated test suite: unit / integration / e2e / smoke layers
 - [ ] Release menus, assets, and Docker images
 - [ ] List **Cloud-init** assets 📝 (with a "category" column)
 - [ ] Provide a standard UpOnLAN menu with:

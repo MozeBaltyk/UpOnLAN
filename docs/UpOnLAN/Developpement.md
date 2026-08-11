@@ -154,3 +154,41 @@ The WebApp container integrates Ansible and all dependencies to run ansible-play
 
 - Cancellation is supported via `SIGTERM`
 
+---
+
+## 🧪 Testing
+
+Tests live in `src/webapp/test/` and run with **Vitest** (devDependency — not installed at runtime).
+
+### Test pyramid
+
+| Layer         | Path                     | What is covered                                                                  |
+|---------------|--------------------------|----------------------------------------------------------------------------------|
+| Unit          | `test/unit/`             | Business rules: WoL MAC validation, endpoints.yml URL derivation, nginx listen parsing, doc tree + traversal guard, TFTP log parsing, log fallbacks |
+| Integration   | `test/integration/`      | Real server, real sockets, real fixture volumes: HTTP/socket auth, routes, WoL CRUD persistence, menu create/save/revert, docs listing |
+| E2E           | `test/e2e/`              | Critical journeys: WoL lifecycle, PXE menu lifecycle (incl. signature disabling), unauthenticated attacker blocked |
+| Smoke         | `test/smoke/`            | Boots `node app.js` like production; probes HTTP auth, socket auth and the WoL injection gate |
+
+### How to run
+
+```bash
+# locally, from src/webapp
+npm install                # once
+npm test                   # all layers
+npm run test:unit          # unit only
+npm run test:integration   # integration only
+npm run test:e2e           # journeys only
+npm run test:smoke         # smoke only
+
+# inside the container
+./wakemeup.sh -a test-webapp    # prompts for a layer, default = all
+```
+
+In CI, `.github/workflows/test.yml` runs the four layers on every push/PR touching `src/webapp`.
+
+### Testability notes
+
+- Container volumes (`/config`, `/assets`, `/docs`, `/logs`) are overridable via the `UPONLAN_CONFIG`, `UPONLAN_ASSETS`, `UPONLAN_DOCS`, `UPONLAN_LOGS` env vars so tests run against fixture files with **zero mocking**.
+- `app.js` exports `{ app, http, io }` and only listens when run directly (`require.main === module`), letting tests boot the server on an ephemeral port.
+- `npm` is a build-only dependency in the container image (purged after install), so in-container runs invoke vitest directly: `node node_modules/vitest/vitest.mjs run`.
+

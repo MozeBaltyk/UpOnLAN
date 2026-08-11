@@ -19,6 +19,9 @@ Allowed Actions
 6. connect - connect to uponlan container
 7. test - pxeboot a VM on kvm domain
 8. network - check kvm/podman networks info
+9. build-runner - build Ansible container
+10. run-runner - run Ansible container
+11. test-webapp - run webapp tests inside the container
 ```
 
 ---

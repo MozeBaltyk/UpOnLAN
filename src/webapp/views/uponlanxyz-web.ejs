@@ -1,6 +1,87 @@
 // uponlan.xyz
 // Client side javascript
 
+//// UI Helpers ////
+
+// Toast notifications (Bootstrap 4 toast, auto-dismissing)
+function showToast(message, type) {
+  type = type || 'info';
+  const icons = { success: '✅', danger: '❌', warning: '⚠️', info: 'ℹ️' };
+  const el = document.createElement('div');
+  el.className = 'toast show';
+  el.setAttribute('role', 'alert');
+  el.setAttribute('aria-live', 'assertive');
+  el.setAttribute('aria-atomic', 'true');
+  el.setAttribute('data-autohide', 'true');
+  el.innerHTML =
+    '<div class="toast-header">' +
+      '<strong class="mr-auto text-uppercase small">' + type + '</strong>' +
+      '<button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close"><span aria-hidden="true">&times;</span></button>' +
+    '</div>' +
+    '<div class="toast-body">' + icons[type] + ' ' + message + '</div>';
+  const container = document.getElementById('toast-container');
+  if (container) {
+    container.appendChild(el);
+    setTimeout(function() { el.classList.remove('show'); setTimeout(function() { el.remove(); }, 350); }, 5000);
+  }
+  // Fallback if container is missing (page not fully rendered yet)
+  else {
+    alert(message);
+  }
+}
+
+// Consistent loading state injected into a container
+function showLoading(selector, message) {
+  $(selector).empty().append(
+    '<center class="py-5"><div class="spinner-border text-primary" style="width:3rem;height:3rem;" role="status">' +
+    '<span class="sr-only">Loading...</span></div><br><h5 class="mt-3 text-muted">' + message + '</h5></center>'
+  );
+}
+
+// Navbar status chips (menu version / origin / asset counts)
+function setStatusChips(chips) {
+  const container = document.getElementById('statuschips');
+  if (!container) return;
+  container.innerHTML = '';
+  (chips || []).forEach(function(chip) {
+    const b = document.createElement('span');
+    b.className = 'badge badge-' + (chip.color || 'secondary') + ' p-2 mr-1';
+    b.title = chip.title || chip.text;
+    b.textContent = chip.text;
+    container.appendChild(b);
+  });
+}
+
+// Highlight active nav item
+function setActiveNav(id) {
+  $('.nav-item').removeClass('active');
+  $('#' + id).addClass('active');
+}
+
+// Delegated click dispatch for data-action buttons (no inline onclick in markup)
+$(document).on('click', '[data-action]', function () {
+  const action = $(this).data('action');
+  const handlers = {
+    'createipxe': createipxe,
+    'devbrowser': devbrowser,
+    'nbbrowser': nbbrowser,
+    'resetmenu': resetmenu,
+    'remoteselect': remoteselect,
+    'remoteclear': remoteclear,
+    'dlremote': dlremote,
+    'localselect': localselect,
+    'localclear': localclear,
+    'deletelocal': deletelocal,
+  };
+  if (handlers[action]) handlers[action]();
+});
+
+// Highlight active nav item and switch pages
+function navTo(page, navId) {
+  setActiveNav(navId);
+  window[page]();
+}
+
 //// Theme Management ////
 function initializeTheme() {
   const savedTheme = localStorage.getItem('saved-theme') || 'light';
@@ -55,7 +136,7 @@ $(document).ready(function(){
 //// Dashboard Page rendering ////
 function renderdash(){
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Dashboard</h2></center>');
+  showLoading('#pagecontent', 'Getting Dashboard');
   socket.emit('getdash');
 }
 socket.on('renderdash', function(response){
@@ -67,6 +148,12 @@ socket.on('renderdash', function(response){
   var menuversion = response.menuversion;
   var menuorigin = response.menuorigin;
   var remotemenuversion = response.remotemenuversion;
+  // Navbar status chips
+  setStatusChips([
+    { text: 'Menus v' + menuversion, color: 'secondary', title: 'Local menu version' },
+    { text: (menuversion != remotemenuversion ? 'v' + remotemenuversion + ' available' : 'Up to date'), color: (menuversion != remotemenuversion ? 'success' : 'secondary'), title: 'Remote menu version' },
+    { text: webversion, color: 'info', title: 'Webapp version' }
+  ]);
   var cpustats = response.cpu;
   var cpupercent = response.CPUpercent;
   var memstats = response.mem;
@@ -345,12 +432,11 @@ function upgrademenus(version){
 }
 function downloadmenus(version){
   $('#configcontent').empty();
-  $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Pulling menus at version requested</h2></center>');
+showLoading('#configcontent', 'Pulling menus at version requested');
   socket.emit('upgrademenu', version);
 }
 function downloadmenusnetboot(version){
-  $('#configcontent').empty();
-  $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Pulling menus at version requested</h2></center>');
+  showLoading('#configcontent', 'Pulling menus at version requested');
   socket.emit('upgrademenunetboot', version);
 }
 // Re-render dash hook
@@ -364,7 +450,7 @@ socket.on('renderdashhook', function(){
 let current_menu_version = '0.0.1';
 function renderconfig(){
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Config Items</h2></center>');
+  showLoading('#pagecontent', 'Getting Config Items');
   socket.emit('getconfig');
 }
 socket.on('renderconfig', function(remote_files, local_files, list_rom_files, list_index_files, local_nginx_url, menu_version){
@@ -418,24 +504,24 @@ socket.on('renderconfig', function(remote_files, local_files, list_rom_files, li
           <div class="form-row">
             <div class="col-md-4"></div>
             <div class="col-md-2"><input type="text" class="form-control ipxefilename" placeholder="myfile.ipxe"></div>
-            <div class="col-md-2"><button onclick="createipxe()" class="btn btn-primary form-control">Create New</button></div>
+            <div class="col-md-2"><button data-action="createipxe" class="btn btn-primary form-control">Create New</button></div>
             <div class="col-md-4"></div>
           </div><br>
           <h3>Import a menu:</h3>
           <div class="form-row">
             <div class="col-md-4"></div>
-            <div class="col-md-4"><button onclick="devbrowser()" class="btn btn-outline-info form-control">Menu From Endpoint URL</button></div>
+            <div class="col-md-4"><button data-action="devbrowser" class="btn btn-outline-info form-control">Menu From Endpoint URL</button></div>
             <div class="col-md-4"></div>
           </div><br>
           <div class="form-row">
             <div class="col-md-4"></div>
-            <div class="col-md-4"><button onclick="nbbrowser()" class="btn btn-outline-info form-control">Menu Netboot.xyz</button></div>
+            <div class="col-md-4"><button data-action="nbbrowser" class="btn btn-outline-info form-control">Menu Netboot.xyz</button></div>
             <div class="col-md-4"></div>
           </div><br>
           <h3>Erase menus:</h3>
           <div class="form-row">
             <div class="col-md-4"></div>
-            <div class="col-md-4"><button onclick="resetmenu()" class="btn btn-outline-danger form-control">Reset Menus</button></div>
+            <div class="col-md-4"><button data-action="resetmenu" class="btn btn-outline-danger form-control">Reset Menus</button></div>
             <div class="col-md-4"></div>
           </div>
         </center>
@@ -762,7 +848,7 @@ function resetBuildModal() {
 function resetmenu() {
   if (confirm('Are you sure you want to reset the menu?')) {
     $('#configcontent').empty();
-    $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Empty Menu</h2></center>');
+    showLoading('#configcontent', 'Empty Menu');
     socket.emit('emptymenu');
     // Refresh the config page after a short delay
     setTimeout(renderconfig, 1000)
@@ -771,7 +857,7 @@ function resetmenu() {
 // Render edit window
 function editgetfile(filename,islocal){
   $('#configcontent').empty();
-  $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting File Contents</h2></center>');
+  showLoading('#configcontent', 'Getting File Contents');
   socket.emit('editgetfile',filename,islocal);
 }
 socket.on('editrenderfile', function(response,filename,metadata){
@@ -816,13 +902,13 @@ function saveconfig(filename){
   var text = editor.getValue();
   socket.emit('saveconfig',filename,text);
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Saving File</h2></center>');
+  showLoading('#pagecontent', 'Saving File');
 }
 // Delete a local file (revert)
 function revertconfig(filename){
   socket.emit('revertconfig',filename);
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Reverting File</h2></center>');
+  showLoading('#pagecontent', 'Reverting File');
 }
 // Create a new file
 function createipxe(){
@@ -830,13 +916,13 @@ function createipxe(){
   if (filename){
   socket.emit('createipxe',filename);
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Creating File</h2></center>');
+  showLoading('#pagecontent', 'Creating File');
   }
 }
 // Render edit window DEV Menus From var ENDPOINT_URL
 function devbrowser(){
   $('#configcontent').empty();
-  $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Remote Development Versions</h2></center>');
+  showLoading('#configcontent', 'Getting Remote Development Versions');
   socket.emit('devgetbrowser');
 }
 socket.on('devrenderbrowser', function(releases){
@@ -880,7 +966,7 @@ socket.on('devrenderbrowser', function(releases){
 // Render edit window DEV Menus From Netboot.xyz github
 function nbbrowser(){
   $('#configcontent').empty();
-  $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Remote Netboot.xyz Versions</h2></center>');
+  showLoading('#configcontent', 'Getting Remote Netboot.xyz Versions');
   socket.emit('nbgetbrowser');
 }
 socket.on('nbrenderbrowser', function(releases,commits){
@@ -951,11 +1037,15 @@ socket.on('renderconfighook', function(){
 //// Local rendering ////
 function renderlocal(){
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Remote file list</h2></center>');
+  showLoading('#pagecontent', 'Getting Remote file list');
   socket.emit('getlocal');
 }
 socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotemenuorigin,remoteassetorigin,localnginxurl){
   $('#pagecontent').empty();
+  setStatusChips([
+    { text: 'Remote ' + remotemenuversion, color: 'info', title: 'Remote menu version' },
+    { text: (endpoints.endpoints ? Object.keys(endpoints.endpoints).length : 0) + ' endpoints', color: 'secondary', title: 'Configured asset endpoints' }
+  ]);
   $('#pagecontent').append(`
   <div class="card-group">
     <div class="card">
@@ -965,9 +1055,9 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
         <span style="float:right;">
           <div class="form-row">
             <div class="col"><input type="text" class="form-control form-control-sm" id="remotesearch" placeholder="Filter.."></div>
-            <div class="col"><button onclick="remoteselect()" class="btn btn-primary btn-sm form-control form-control-sm">Select All</button></div>
-            <div class="col"><button onclick="remoteclear()" class="btn btn-secondary btn-sm form-control form-control-sm">Clear Selection</button></div>
-            <div class="col"><button onclick="dlremote()" class="btn btn-success btn-sm form-control form-control-sm">Pull Selected</button></div>
+            <div class="col"><button data-action="remoteselect" class="btn btn-primary btn-sm form-control form-control-sm">Select All</button></div>
+            <div class="col"><button data-action="remoteclear" class="btn btn-secondary btn-sm form-control form-control-sm">Clear Selection</button></div>
+            <div class="col"><button data-action="dlremote" class="btn btn-success btn-sm form-control form-control-sm">Pull Selected</button></div>
           </div>
         </span>
       </div>
@@ -990,14 +1080,14 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
         <span style="float:right;">
           <div class="form-row">
             <div class="col"><input type="text" class="form-control form-control-sm" id="localsearch" placeholder="Filter.."></div>
-            <div class="col"><button onclick="localselect()" class="btn btn-primary btn-sm form-control form-control-sm">Select All</button></div>
-            <div class="col"><button onclick="localclear()" class="btn btn-secondary btn-sm form-control form-control-sm">Clear Selection</button></div>
-            <div class="col"><button onclick="deletelocal()" class="btn btn-danger btn-sm form-control form-control-sm">Delete Selected</button></div>
+            <div class="col"><button data-action="localselect" class="btn btn-primary btn-sm form-control form-control-sm">Select All</button></div>
+            <div class="col"><button data-action="localclear" class="btn btn-secondary btn-sm form-control form-control-sm">Clear Selection</button></div>
+            <div class="col"><button data-action="deletelocal" class="btn btn-danger btn-sm form-control form-control-sm">Delete Selected</button></div>
           </div>
         </span>
       </div>
       <div class="card-body">
-        <table class="table table-sm" id="localassets" style=".dataTables_filter {display:none;}">
+        <table class="table table-sm" id="localassets">
           <thead>
             <tr>
               <th style="width: 35%;">Asset Name</th>
@@ -1006,7 +1096,7 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
             </tr>
           </thead>
         </table>
-        <table class="table table-sm" id="untrackedassets" style=".dataTables_filter {display:none;}">
+        <table class="table table-sm" id="untrackedassets">
           <thead>
             <tr>
               <th>Untracked Assets</th>
@@ -1069,12 +1159,13 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
   }
   remotetable.draw();
   localtable.draw();
-  $('#localsearch').keyup(function(){
-    localtable.search($(this).val()).draw() ;
-  })
-  $('#remotesearch').keyup(function(){
-    remotetable.search($(this).val()).draw() ;
-  })
+  // Debounced per-table filters
+  const debounceSearch = function(fn, delay) {
+    let t;
+    return function() { clearTimeout(t); t = setTimeout(fn, 150); };
+  };
+  $('#localsearch').keyup(debounceSearch(function(){ localtable.search($(this).val()).draw(); }));
+  $('#remotesearch').keyup(debounceSearch(function(){ remotetable.search($(this).val()).draw(); }));
 });
 function remoteselect(){   
   $('.remotecheck').each(function() {
@@ -1186,15 +1277,7 @@ function renderTree(tree, parentPath = '', level = 0) {
 
 function renderdoc() {
   $('#pagecontent').empty();
-  $('#pagecontent').append(`
-    <center>
-      <div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status">
-        <span class="sr-only">Loading...</span>
-      </div>
-      <br>
-      <h2>Loading Docs</h2>
-    </center>
-  `);
+  showLoading('#pagecontent', 'Loading Docs');
   socket.emit('docs:list');
 }
 socket.on('docs:list:response', function(docs) {
@@ -1262,9 +1345,9 @@ socket.on('docs:list:response', function(docs) {
 });
 function loaddoc(filename) {
   $('#doc-viewer').html(`
-    <div class="text-center">
-      <div class="spinner-border" role="status"></div>
-      <p>Loading <strong>${filename}</strong>...</p>
+    <div class="text-center py-5">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="text-muted mt-2">Loading <strong>${filename}</strong>...</p>
     </div>
   `);
   socket.emit('docs:get', filename);
@@ -1279,12 +1362,11 @@ socket.on('docs:get:response', function({ filename, content }) {
 
 // Display Error message if any
 socket.on('error', function(msg){
-  // Show the error if the WOL form is visible
+  // Show the error in the WOL form if visible, else a toast
   if ($('#wol-error').length) {
     $('#wol-error').text(msg).show();
   } else {
-    // Fallback: alert if not on WOL page
-    alert(msg);
+    showToast(msg, 'danger');
   }
 });
 
@@ -1297,7 +1379,7 @@ socket.on('renderwolhook', function(){
 
 function renderwol(){
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting WOL</h2></center>');
+  showLoading('#pagecontent', 'Getting WOL');
   socket.emit('getwol');
 }
 socket.on('renderwol', function(wolpoints, remotemenuversion){

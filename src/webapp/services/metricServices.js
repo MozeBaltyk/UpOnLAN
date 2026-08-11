@@ -1,4 +1,5 @@
 // ../services/metricsServices.js
+'use strict';
 const axios = require('axios');
 const fs = require('fs');
 const { getLocalNginx } = require('./utilServices');

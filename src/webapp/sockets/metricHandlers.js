@@ -1,4 +1,5 @@
 // ../sockets/metricHandlers.js
+'use strict';
 const { getNginxMetrics, getTftpMetrics, } = require('../services/metricServices');
 
 module.exports = function registerMetricHandlers(socket) {

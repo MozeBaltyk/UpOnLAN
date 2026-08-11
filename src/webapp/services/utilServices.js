@@ -1,4 +1,5 @@
 // ./services/utilServices.js
+'use strict';
 const { DownloaderHelper } = require('node-downloader-helper');
 const urlLib = require('url');
 const fetch = require('node-fetch');
@@ -66,9 +67,30 @@ async function runAnsiblePlaybook(playbookPath, options, socket, progressCallbac
   const logDir = '/logs/ansible';
   await fs.promises.mkdir(logDir, { recursive: true });
 
-  const extraVars = Object.entries(options)
-    .map(([key, val]) => `${key}="${val}"`)
-    .join(' ');
+  // Whitelist option keys (fail closed) and sanitize values so client input
+  // cannot inject YAML/extra-vars into the root-running playbook.
+  const boolKeys = [
+    'generate_disks_efi',
+    'generate_disks_hybrid',
+    'generate_disks_legacy',
+    'generate_disks_linux',
+    'generate_disks_rpi',
+    'generate_index',
+    'generate_signatures',
+  ];
+  const stringKeys = ['site_name', 'boot_domain', 'boot_version'];
+
+  const extraVars = [];
+  for (const key of boolKeys) {
+    if (key in options) extraVars.push(`${key}="${options[key] ? 'true' : 'false'}"`);
+  }
+  for (const key of stringKeys) {
+    if (!(key in options)) continue;
+    const val = String(options[key]).replace(/["$\n\r`\\]/g, ''); // scrub shell/YAML metacharacters
+    if (val === '') continue; // reject empty/invalid
+    extraVars.push(`${key}="${val}"`);
+  }
+  const extraVarsStr = extraVars.join(' ');
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const logFilePath = path.join(logDir, `${path.basename(playbookPath)}_${timestamp}.log`);
@@ -87,7 +109,7 @@ async function runAnsiblePlaybook(playbookPath, options, socket, progressCallbac
   }
 
   // launch ansible-playbook with setsid to run it in a new session
-  const args = [ playbookPath, '--extra-vars', extraVars];
+  const args = extraVarsStr ? [playbookPath, '--extra-vars', extraVarsStr] : [playbookPath];
   const ansible = spawn('setsid', ['sudo', 'ansible-playbook', ...args]);
   const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
   const promise = new Promise((resolve, reject) => {
@@ -309,7 +331,7 @@ function getEndpointUrls() {
   }
 
   // Latest release URL
-  latest_url = `${api_url}releases/latest`;
+  const latest_url = `${api_url}releases/latest`;
 
   // console.log("API URL:", api_url);
   // console.log("RAW URL:", raw_url);
@@ -337,7 +359,7 @@ function deleteFiles(file) {
   }
 }
 
-async function downloader(downloads, io, socket) {
+async function downloader(downloads, socket) {
   let startTime = new Date();
   const total = downloads.length;
 
@@ -370,8 +392,7 @@ async function downloader(downloads, io, socket) {
     try {
       await dl.start();
     } catch (err) {
-      console.error(`Download failed: ${url} -> ${err.message}`);
-      continue; // move to next even on error
+      throw new Error(`Download failed: ${url} -> ${err.message}`);
     }
 
     // Optional .part2 support (for non-GitHub/S3 hosts)

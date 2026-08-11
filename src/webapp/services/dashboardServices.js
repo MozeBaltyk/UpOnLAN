@@ -1,4 +1,5 @@
 // ./services/dashboardServices.js
+'use strict';
 const fetch = require('node-fetch');
 const si = require('systeminformation');
 const { version } = require('../package.json');

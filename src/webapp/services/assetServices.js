@@ -1,9 +1,10 @@
 // ./services/assetServices.js - This module handles downloading remote assets and managing local assets.
+'use strict';
 const fs = require('fs');
 const path = require('path');
 const { getAssetOrigin, downloader } = require('./utilServices');
 
-async function dlremote(dlfiles, callback, io, socket) {
+async function dlremote(dlfiles, callback, socket) {
   let asset_url;
   try {
     asset_url = getAssetOrigin();
@@ -22,7 +23,7 @@ async function dlremote(dlfiles, callback, io, socket) {
     const full_url = asset_url + safePath;
     dlarray.push({ 'url': full_url, 'path': dlpath });
   }
-  await downloader(dlarray, io, socket);
+  await downloader(dlarray, socket);
   callback(null, 'done');
 }
 

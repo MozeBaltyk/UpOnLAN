@@ -1,4 +1,5 @@
 // ../sockets/socketHandlers.js
+'use strict';
 const registerDashboardHandlers = require('./dashboardHandlers');
 const registerWolHandlers = require('./wolHandlers');
 const registerMenuHandlers = require('./menuHandlers');

@@ -1,4 +1,5 @@
 // ./sockets/assetHandlers.js
+'use strict';
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
@@ -12,7 +13,7 @@ module.exports = function registerAssetHandlers(socket, io) {
     dlremote(files, (err, result) => {
       if (err) return socket.emit('error', err.message);
       socket.emit('dlremotedone', result);
-    }, io, socket);
+    }, socket);
   });
 
   // Send local endpoints and asset files to client

@@ -1,3 +1,4 @@
+'use strict';
 const fs = require('fs');
 const yaml = require('js-yaml');
 const { exec } = require('child_process');
@@ -40,7 +41,13 @@ function deleteWolEntry(mac) {
 }
 
 function wakeHost(mac, callback) {
-  exec(`awake ${mac}`, (err, stdout, stderr) => {
+  // Sanitize then validate before ever touching the shell (prevents command injection)
+  const sanitized = String(mac || '').replace(/[^0-9A-Fa-f:-]/g, '');
+  if (!isValidMac(sanitized)) {
+    callback(new Error('Invalid MAC address'));
+    return;
+  }
+  exec(`awake ${sanitized}`, (err, stdout, stderr) => {
     callback(err, stdout, stderr);
   });
 }

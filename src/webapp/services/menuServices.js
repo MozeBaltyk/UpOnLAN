@@ -1,4 +1,5 @@
 // ./services/menuServices.js
+'use strict';
 const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
@@ -31,7 +32,7 @@ async function cancelBuildPlaybook(socket) {
   // cancelAnsiblePlaybook() will handle ansibleState internally
   const result = await cancelAnsiblePlaybook();
   socket.emit('buildMenuResult', {
-    success: !result.success ? false : true,
+    success: result.success,
     status: result.status || (result.success ? 'success' : 'error'),
     message: result.message,
     pid: result.pid || null,
@@ -71,7 +72,7 @@ async function fetchNetbootReleases() {
 }
 
 // Upgrade menu function from given Endpoint
-async function upgrademenu(version, callback, io, socket) {
+async function upgrademenu(version, callback, socket) {
   const { endpoint_url } = getEndpointUrls();
   const remote_folder = '/config/menus/remote/';
   const targetDir = '/config/menus/';
@@ -96,7 +97,7 @@ async function upgrademenu(version, callback, io, socket) {
       path: remote_folder,
     }];
 
-    await downloader(downloads, io, socket);
+    await downloader(downloads, socket);
 
     // Extract tar file and cleanup
     const tarFile = path.join(remote_folder, 'menus.tar.gz');
@@ -131,6 +132,7 @@ async function upgrademenu(version, callback, io, socket) {
     await layermenu(socket, null);
     await disablesigs();
     logWithTimestamp(`Menu upgraded to version ${version} from ${endpoint_url}`);
+    callback(null, 'success');
   } catch (err) {
     errorWithTimestamp("Error during upgrademenu:", err);
     callback(err);
@@ -138,7 +140,7 @@ async function upgrademenu(version, callback, io, socket) {
 }
 
 // Upgrade menu function from Netboot.xyz repository
-async function upgrademenunetboot(version, io, socket) {
+async function upgrademenunetboot(version, callback, socket) {
   const remote_folder = '/config/menus/remote/';
   const targetDir = '/config/menus/';
   const endpoint_config = '/config/endpoints.yml';
@@ -182,7 +184,7 @@ async function upgrademenunetboot(version, io, socket) {
       path: '/config/',
     });
 
-    await downloader(downloads, io, socket)
+    await downloader(downloads, socket)
 
     const tarFile = path.join(remote_folder, 'menus.tar.gz');
     await exec(`tar xf ${tarFile} -C ${remote_folder}`);
@@ -206,9 +208,10 @@ async function upgrademenunetboot(version, io, socket) {
     await disablesigs();
 
     logWithTimestamp(`Menu upgraded to version ${version} from ${origin}`);
+    callback(null, 'success');
   } catch (err) {
     errorWithTimestamp("Error during upgrademenunetboot:", err);
-    throw err;
+    callback(err);
   }
 }
 

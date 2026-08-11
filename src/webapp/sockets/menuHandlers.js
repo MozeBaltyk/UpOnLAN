@@ -1,5 +1,5 @@
 // ./sockets/menuHandlers.js
-const fs = require('fs');
+'use strict';
 const { 
   getLocalNginx, 
   getMenuVersion, 
@@ -48,11 +48,11 @@ module.exports = function registerMenuHandlers(socket, io) {
 
   socket.on('buildcancel', async () => {
     const orphanExists = await hasOrphanProcesses();
-    const result = await cancelBuildPlaybook(socket);
+    // cancelBuildPlaybook emits 'buildMenuResult' itself
+    await cancelBuildPlaybook(socket);
     if (orphanExists) {
-      result.message += ' Warning: Detected orphan ansible-playbook processes.';
+      socket.emit('error', 'Warning: Detected orphan ansible-playbook processes.');
     }
-    socket.emit('buildMenuResult', result);
   });
 
   socket.on('upgrademenu', (version) => { upgrademenu(version, (err, result) => {
@@ -61,7 +61,7 @@ module.exports = function registerMenuHandlers(socket, io) {
       }
       logWithTimestamp('Menu upgrade complete:', result);
       socket.emit('upgrademenu_complete');
-    }, io, socket);
+    }, socket);
   });
 
   socket.on('upgrademenunetboot', (version) => { upgrademenunetboot(version, (err, result) => {
@@ -70,7 +70,7 @@ module.exports = function registerMenuHandlers(socket, io) {
       }
       logWithTimestamp('Menu Netboot upgrade complete:', result);
       socket.emit('upgrademenu_complete');
-    }, io, socket);
+    }, socket);
   });
 
   socket.on('getconfig', async () => {

@@ -1,0 +1,40 @@
+name: tests
+
+on:
+  push:
+    paths:
+      - 'src/webapp/**'
+  pull_request:
+    paths:
+      - 'src/webapp/**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: webapp test layers
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./src/webapp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # No committed package-lock.json in this repo, so `npm install` (not ci).
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: E2E journeys
+        run: npm run test:e2e
+
+      - name: Smoke tests
+        run: npm run test:smoke

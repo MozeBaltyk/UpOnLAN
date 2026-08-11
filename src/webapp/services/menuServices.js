@@ -7,6 +7,11 @@ const yaml = require('js-yaml');
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const { isBinaryFile } = require('isbinaryfile');
+// Containers mount these volumes; overridable so tests run against fixtures.
+const CONFIG_ROOT = process.env.UPONLAN_CONFIG || '/config';
+const ASSETS_ROOT = process.env.UPONLAN_ASSETS || '/assets';
+const MENU_DIR = path.join(CONFIG_ROOT, 'menus');
+const ENDPOINTS_CONFIG = path.join(CONFIG_ROOT, 'endpoints.yml');
 const { 
   downloader,
   deleteAllFilesInDir,
@@ -74,9 +79,9 @@ async function fetchNetbootReleases() {
 // Upgrade menu function from given Endpoint
 async function upgrademenu(version, callback, socket) {
   const { endpoint_url } = getEndpointUrls();
-  const remote_folder = '/config/menus/remote/';
-  const targetDir = '/config/menus/';
-  const endpoint_config = '/config/endpoints.yml';
+  const remote_folder = path.join(MENU_DIR, 'remote') + path.sep;
+  const targetDir = MENU_DIR + path.sep;
+  const endpoint_config = ENDPOINTS_CONFIG;
 
   try {
     // Clean folders
@@ -141,9 +146,9 @@ async function upgrademenu(version, callback, socket) {
 
 // Upgrade menu function from Netboot.xyz repository
 async function upgrademenunetboot(version, callback, socket) {
-  const remote_folder = '/config/menus/remote/';
-  const targetDir = '/config/menus/';
-  const endpoint_config = '/config/endpoints.yml';
+  const remote_folder = path.join(MENU_DIR, 'remote') + path.sep;
+  const targetDir = MENU_DIR + path.sep;
+  const endpoint_config = ENDPOINTS_CONFIG;
 
   try {
     await deleteAllFilesInDir(targetDir);
@@ -181,7 +186,7 @@ async function upgrademenunetboot(version, callback, socket) {
 
     downloads.push({
       url: `https://raw.githubusercontent.com/netbootxyz/netboot.xyz/${version}/endpoints.yml`,
-      path: '/config/',
+      path: CONFIG_ROOT + path.sep,
     });
 
     await downloader(downloads, socket)
@@ -217,18 +222,18 @@ async function upgrademenunetboot(version, callback, socket) {
 
 // Empty Menu
 async function emptymenu(socket) {
-    const endpoints_config = '/config/endpoints.yml';
+    const endpoints_config = ENDPOINTS_CONFIG;
     try {
       // Delete all files in local and remote directories
-      await deleteAllFilesInDir('/config/menus/local');
-      await deleteAllFilesInDir('/config/menus/remote');
-      await deleteAllFilesInDir('/config/menus');
-      await deleteAllFilesInDir('/assets/ipxe');
-      await deleteFiles('/assets/index.html');
-      await deleteFiles('/assets/index.htm');
+      await deleteAllFilesInDir(path.join(MENU_DIR, 'local'));
+      await deleteAllFilesInDir(path.join(MENU_DIR, 'remote'));
+      await deleteAllFilesInDir(MENU_DIR);
+      await deleteAllFilesInDir(path.join(ASSETS_ROOT, 'ipxe'));
+      await deleteFiles(path.join(ASSETS_ROOT, 'index.html'));
+      await deleteFiles(path.join(ASSETS_ROOT, 'index.htm'));
       await deleteFiles(endpoints_config);
-      await fsp.rm('/config/menus/remote/sigs', { recursive: true, force: true });
-      await fsp.rm('/config/menus/rom', { recursive: true, force: true });
+      await fsp.rm(path.join(MENU_DIR, 'remote/sigs'), { recursive: true, force: true });
+      await fsp.rm(path.join(MENU_DIR, 'rom'), { recursive: true, force: true });
 
       // get default
       const { endpoint_url } = getEndpointUrls();
@@ -245,9 +250,9 @@ async function emptymenu(socket) {
 
 // Disable sigs by editing boot.cfg files
 async function disablesigs() {
-  const bootcfgr = '/config/menus/remote/boot.cfg';
-  const bootcfgl = '/config/menus/local/boot.cfg';
-  const bootcfgm = '/config/menus/boot.cfg';
+  const bootcfgr = path.join(MENU_DIR, 'remote/boot.cfg');
+  const bootcfgl = path.join(MENU_DIR, 'local/boot.cfg');
+  const bootcfgm = path.join(MENU_DIR, 'boot.cfg');
   try {
     const fileExists = await fsp.stat(bootcfgr).then(() => true).catch(() => false);
     const localExists = await fsp.stat(bootcfgl).then(() => true).catch(() => false);
@@ -264,9 +269,9 @@ async function disablesigs() {
 
 // Fully promisified layermenu
 async function layermenu(socket = null, filename = null) {
-  const targetDir = path.resolve('/config/menus/');
-  const romDir = path.resolve('/config/menus/rom/ipxe'); // ROM files are here
-  const indexDir = path.resolve('/config/menus/rom'); // Index files 
+  const targetDir = path.resolve(MENU_DIR);
+  const romDir = path.resolve(MENU_DIR, 'rom/ipxe'); // ROM files are here
+  const indexDir = path.resolve(MENU_DIR, 'rom'); // Index files 
 
   const { local_files, remote_files } = await getipxefiles();
   const { list_rom_files } = await getremoteromfiles();
@@ -304,7 +309,7 @@ function isValidFile(filename, exts) {
 
 // Helper to get the absolute root path for a given layer
 function getLayerRoot(islocal) {
-  return path.resolve('/config/menus/', islocal ? 'local' : 'remote') + path.sep;
+  return path.resolve(MENU_DIR, islocal ? 'local' : 'remote') + path.sep;
 }
 
 // Helper to get the full file path for a given filename and layer
@@ -341,7 +346,7 @@ async function getipxefiles() {
 
 // Get ROM files
 async function getromfiles() {
-  const romDir = path.resolve('/config/menus/rom/ipxe');
+  const romDir = path.resolve(MENU_DIR, 'rom/ipxe');
   // Make sure all destination directories exist
   await fsp.mkdir(romDir, { recursive: true });
   const list_rom_files = await listFiles(romDir, ['efi', 'kpxe', 'dsk', 'pdsk', 'iso', 'img']);
@@ -349,7 +354,7 @@ async function getromfiles() {
 }
 
 async function getindexfiles() {
-  const assetsDir = path.resolve('/config/menus/rom');
+  const assetsDir = path.resolve(MENU_DIR, 'rom');
   // Make sure all destination directories exist
   await fsp.mkdir(assetsDir, { recursive: true });
   const list_index_files = await listFiles(assetsDir, ['html', 'htm']);
@@ -357,7 +362,7 @@ async function getindexfiles() {
 }
 
 async function getremoteromfiles() {
-  const remoteDir = path.resolve('/config/menus/remote');
+  const remoteDir = path.resolve(MENU_DIR, 'remote');
   // Make sure all destination directories exist
   await fsp.mkdir(remoteDir, { recursive: true });
   const list_rom_files = await listFiles(remoteDir, ['efi', 'kpxe', 'dsk', 'pdsk', 'iso', 'img']);
@@ -365,7 +370,7 @@ async function getremoteromfiles() {
 }
 
 async function getremoteindexfiles() {
-  const remoteDir = path.resolve('/config/menus/remote');
+  const remoteDir = path.resolve(MENU_DIR, 'remote');
   // Make sure all destination directories exist
   await fsp.mkdir(remoteDir, { recursive: true });
   const list_index_files = await listFiles(remoteDir, ['html', 'htm']);

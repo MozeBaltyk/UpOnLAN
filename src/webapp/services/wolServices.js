@@ -1,19 +1,23 @@
 'use strict';
 const fs = require('fs');
+const path = require('path');
 const yaml = require('js-yaml');
 const { exec } = require('child_process');
+
+const CONFIG_ROOT = process.env.UPONLAN_CONFIG || '/config';
+const WOL_CONFIG = path.join(CONFIG_ROOT, 'wol.yml');
 
 function isValidMac(mac) {
   return /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(mac);
 }
 
 function readWolConfig() {
-  const content = fs.readFileSync('/config/wol.yml', 'utf8');
+  const content = fs.readFileSync(WOL_CONFIG, 'utf8');
   return yaml.load(content) || { wakeonlan: [] };
 }
 
 function writeWolConfig(data) {
-  fs.writeFileSync('/config/wol.yml', yaml.dump(data));
+  fs.writeFileSync(WOL_CONFIG, yaml.dump(data));
 }
 
 function getWolEntries() {

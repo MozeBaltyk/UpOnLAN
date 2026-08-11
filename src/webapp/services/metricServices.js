@@ -2,6 +2,7 @@
 'use strict';
 const axios = require('axios');
 const fs = require('fs');
+const path = require('path');
 const { getLocalNginx } = require('./utilServices');
 
 // Nginx Metrics Collection
@@ -46,7 +47,7 @@ function getNginxMetrics() {
 }
 
 // --- TFTP METRICS ---
-const LOG_PATH = '/logs/tftp/tftpd.log';
+const LOG_PATH = path.join(process.env.UPONLAN_LOGS || '/logs', 'tftp/tftpd.log');
 let lastSize = 0;
 let latestTftpMetrics = { requests: 0, timestamp: Date.now() };
 
@@ -92,9 +93,12 @@ module.exports = {
   getNginxMetrics,
   collectTftpMetrics,
   getTftpMetrics,
+  parseTftpRequestsFromLog,
 };
 
-// Start periodic polling 10s
+// Start periodic polling 10s (skipped under test so no stray timers)
 const POLL_INTERVAL = 10000;
-setInterval(collectNginxMetrics, POLL_INTERVAL);
-setInterval(collectTftpMetrics, POLL_INTERVAL);
+if (process.env.NODE_ENV !== 'test') {
+  setInterval(collectNginxMetrics, POLL_INTERVAL);
+  setInterval(collectTftpMetrics, POLL_INTERVAL);
+}

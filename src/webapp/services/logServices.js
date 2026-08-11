@@ -1,6 +1,6 @@
 'use strict';
 const fs = require('fs');
-const RootLogPath = "/logs";
+const RootLogPath = process.env.UPONLAN_LOGS || "/logs";
 
 function readLogFile(logPath) {
   try {

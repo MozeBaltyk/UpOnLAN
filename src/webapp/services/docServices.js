@@ -4,7 +4,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const marked = require('marked');
 
-const DOCS_DIR = path.resolve('/docs');
+const DOCS_DIR = path.resolve(process.env.UPONLAN_DOCS || '/docs');
 
 // Recursively get all .md files with relative paths
 async function listDocs(dir = DOCS_DIR, baseDir = DOCS_DIR) {

@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const { getAssetOrigin, downloader } = require('./utilServices');
 
+const ASSETS_ROOT = process.env.UPONLAN_ASSETS || '/assets';
+
 async function dlremote(dlfiles, callback, socket) {
   let asset_url;
   try {
@@ -16,7 +18,7 @@ async function dlremote(dlfiles, callback, socket) {
   const dlarray = [];
   for (let dlfile of dlfiles) {
     const safePath = dlfile.replace(/^\/+/, '/'); // prevent double slashes
-    const dlpath = path.join('/assets', path.dirname(safePath));
+    const dlpath = path.join(ASSETS_ROOT, path.dirname(safePath));
 
     fs.mkdirSync(dlpath, { recursive: true });
 

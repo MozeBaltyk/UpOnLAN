@@ -1,6 +1,7 @@
 config/**
 assets/**
 node_modules
+coverage
 .c9
 package-lock.json
 release/githubout/**

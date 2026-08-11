@@ -11,6 +11,8 @@ const exec = require('child_process').exec;
 const { promisify } = require('util');
 const execPromise = promisify(exec);
 const { spawn } = require('child_process');
+// Root of the config volume; overridable so tests run against fixtures.
+const CONFIG_ROOT = process.env.UPONLAN_CONFIG || '/config';
 let cachedNginxURL = null;
 let ansibleState = {
   process: null,
@@ -64,7 +66,7 @@ async function cancelAnsiblePlaybook() {
 }
 
 async function runAnsiblePlaybook(playbookPath, options, socket, progressCallback) {
-  const logDir = '/logs/ansible';
+  const logDir = path.join(process.env.UPONLAN_LOGS || '/logs', 'ansible');
   await fs.promises.mkdir(logDir, { recursive: true });
 
   // Whitelist option keys (fail closed) and sanitize values so client input
@@ -208,7 +210,7 @@ function isValidUrl(urlString) {
 }
 
 function getMenuData() {
-  const configPath = '/config/endpoints.yml';
+  const configPath = path.join(CONFIG_ROOT, 'endpoints.yml');
   if (!fs.existsSync(configPath)) {
     return { version: 'none', origin: 'none' };
   }
@@ -257,7 +259,7 @@ function getLocalNginx() {
     return cachedNginxURL;
   }
 
-  const configPath = '/config/nginx/site-confs/default';
+  const configPath = path.join(CONFIG_ROOT, 'nginx/site-confs/default');
 
   try {
     const configContent = fs.readFileSync(configPath, 'utf8');

@@ -7,6 +7,9 @@ const readdirp = require('readdirp');
 const { getMenuOrigin, getLocalNginx, getMenuVersion, getAssetOrigin } = require('../services/utilServices');
 const { dlremote } = require('../services/assetServices');
 
+const CONFIG_ROOT = process.env.UPONLAN_CONFIG || '/config';
+const ASSETS_ROOT = process.env.UPONLAN_ASSETS || '/assets';
+
 module.exports = function registerAssetHandlers(socket, io) {
   // Download remote files
   socket.on('dlremote', (files) => {
@@ -19,9 +22,9 @@ module.exports = function registerAssetHandlers(socket, io) {
   // Send local endpoints and asset files to client
   socket.on('getlocal', async function () {
     try {
-      const endpointsFile = fs.readFileSync('/config/endpoints.yml', 'utf8');
+      const endpointsFile = fs.readFileSync(path.join(CONFIG_ROOT, 'endpoints.yml'), 'utf8');
       const endpoints = yaml.load(endpointsFile);
-      const localfiles = await readdirp.promise('/assets/.');
+      const localfiles = await readdirp.promise(ASSETS_ROOT + '/.');
       const assets = localfiles.map(f => '/' + f.path);
       const menuversion = getMenuVersion();
       const menuorigin = getMenuOrigin();
@@ -39,10 +42,10 @@ module.exports = function registerAssetHandlers(socket, io) {
     try {
       for (let  file of dlfiles) {
         const cleanPath = file.replace(/^\/+/, '');
-        const fullPath = path.join('/assets', cleanPath);
+        const fullPath = path.join(ASSETS_ROOT, cleanPath);
 
         // Prevent directory traversal
-        if (!fullPath.startsWith(path.resolve('/assets'))) {
+        if (!fullPath.startsWith(path.resolve(ASSETS_ROOT))) {
           console.warn('Blocked delete outside /assets:', fullPath);
           continue;
         }

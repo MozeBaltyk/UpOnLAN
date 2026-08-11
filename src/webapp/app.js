@@ -81,8 +81,13 @@ app.use(process.env.SUBFOLDER || '/', baseRoutes);
 // Register socket.io handlers
 socketHandlers(io);
 
-// Start server
-const port = Number(process.env.WEB_APP_PORT) || 3000;
-http.listen(port, () => {
-  console.log(`Server is listening on port ${port}`);
-});
+// Export components so tests can boot the server on their own port.
+module.exports = { app, http, io };
+
+// Start server (only when run directly: `node app.js`)
+if (require.main === module) {
+  const port = Number(process.env.WEB_APP_PORT) || 3000;
+  http.listen(port, () => {
+    console.log(`Server is listening on port ${port}`);
+  });
+}

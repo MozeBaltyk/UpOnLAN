@@ -1,6 +1,6 @@
 endpoints:
   oracle-8-x86_64:
-    path: /asset-mirror/releases/download/6-1525fd25/
+    path: /releases/download/oracle-8-x86_64/
     files:
     - vmlinuz
     - initrd
@@ -9,7 +9,7 @@ endpoints:
     version: '8'
     arch: x86_64
   oracle-8-aarch64:
-    path: /asset-mirror/releases/download/6-1525fd25/
+    path: /releases/download/oracle-8-aarch64/
     files:
     - vmlinuz
     - initrd
@@ -18,7 +18,7 @@ endpoints:
     version: '8'
     arch: aarch64
   oracle-9-x86_64:
-    path: /asset-mirror/releases/download/U5-5d86c3df/
+    path: /releases/download/oracle-9-x86_64/
     files:
     - vmlinuz
     - initrd
@@ -27,7 +27,7 @@ endpoints:
     version: '9'
     arch: x86_64
   oracle-9-aarch64:
-    path: /asset-mirror/releases/download/U5-f2411221/
+    path: /releases/download/oracle-9-aarch64/
     files:
     - vmlinuz
     - initrd
@@ -36,7 +36,7 @@ endpoints:
     version: '9'
     arch: aarch64
   harvester:
-    path: /asset-mirror/releases/download/v1.5.0-c82c6d22/
+    path: /releases/download/harvester/
     files:
     - harvester-vmlinuz-amd64
     - harvester-initrd-amd64
@@ -46,7 +46,7 @@ endpoints:
     os: harvester
     version: v1.5.0
   proxmox-backup-server:
-    path: /asset-mirror/releases/download/3.4-1-f308cf4b/
+    path: /releases/download/proxmox-backup-server/
     files:
     - initrd
     - vmlinuz
@@ -54,7 +54,7 @@ endpoints:
     os: proxmox-backup-server
     version: 3.4-1
   proxmox-ve:
-    path: /asset-mirror/releases/download/8.4-1-613c19ff/
+    path: /releases/download/proxmox-ve/
     files:
     - initrd
     - proxmox.iso
@@ -62,7 +62,7 @@ endpoints:
     os: proxmox-ve
     version: 8.4-1
   proxmox-mailgateway:
-    path: /asset-mirror/releases/download/8.2-1-8374c64d/
+    path: /releases/download/proxmox-mailgateway/
     files:
     - initrd
     - vmlinuz

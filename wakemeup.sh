@@ -66,88 +66,49 @@ test-network-and-vm () {
     sudo ./scripts/verify_kvm_boot.sh ${network_name} testpxe ${pxe}
 }
 
-# test-assets: build the menu tarball + re-root release/githubout asset files into
-# the /releases/download/<key>/ URL layout, serve it locally, deploy the container
-# pointed at that mirror. Validates endpoints.yml end-to-end without publishing a
-# GitHub release. Run 'test' separately afterwards for the PXE-boot verification.
+# test-assets: build the menu tarball + local asset mirror under release/mirror,
+# serve it locally, deploy the container pointed at that mirror. Validates
+# endpoints.yml end-to-end without publishing a GitHub release.
 # Usage: ./wakemeup.sh -a test-assets
 test-assets () {
-    local version="local-$(date +%s)"
-
-    # pick a free port (default 8899 may be taken by an old mirror)
+    local version="$(grep -Eo 'set menu_version .*' ./release/menus/version.ipxe | awk '{print $3}')"
     local port=${LOCAL_PORT:-8899}
+
+    bash scripts/release_assets.sh
+    bash scripts/release_menu.sh "$version"
+
+    if [ ! -f release/githubout/menus.tar.gz ]; then
+        echo "[test-assets] Missing release/githubout/menus.tar.gz"
+        git checkout -- release/menus/version.ipxe
+        return 1
+    fi
+    if [ ! -d release/mirror ]; then
+        echo "[test-assets] Missing release/mirror"
+        git checkout -- release/menus/version.ipxe
+        return 1
+    fi
+
     while ss -tln | grep -q ":$port "; do
         port=$((port + 1))
     done
 
-    # 1. build menu tarball (bundles release/assets/endpoints.yml)
-    bash scripts/release_menu.sh "$version"
-
-    # 2. mirror githubout into the release URL layout the webapp/init.sh expect:
-    #    menus.tar.gz at /releases/download/<version>/, asset files at
-    #    /releases/download/<os>-<ver>-<arch>/ (same KEY build.sh writes in endpoints.yml)
-    local mirror; mirror=$(mktemp -d)
-    mkdir -p "$mirror/releases/download/$version"
-    cp release/githubout/menus.tar.gz "$mirror/releases/download/$version/"
-    local dir rest arch os ver key
-    shopt -s nullglob
-    for dir in release/githubout/*/*/*/releases/*/; do
-        rest="${dir#release/githubout/}"
-        arch="${rest%%/*}"; rest="${rest#*/}"
-        os="${rest%%/*}";   rest="${rest#*/}"
-        ver="${rest%%/*}"
-        key="${os}-${ver}-${arch}"
-        mkdir -p "$mirror/releases/download/$key"
-        cp "$dir"* "$mirror/releases/download/$key/"
-    done
-    shopt -u nullglob
-
-    # Preflight: fail fast if the local mirror is incomplete. In test-assets
-    # mode there is NO GitHub fallback — missing files are a hard error.
-    if [ ! -f release/githubout/endpoints.yml ]; then
-        echo "[test-assets] Missing release/githubout/endpoints.yml. Run the assets/menu build first."
-        git checkout -- release/menus/version.ipxe
-        return 1
-    fi
-    while IFS= read -r relpath; do
-        [ -z "$relpath" ] && continue
-        if [ ! -f "$mirror/$relpath" ]; then
-            echo "[test-assets] Missing local asset: $relpath"
-            git checkout -- release/menus/version.ipxe
-            return 1
-        fi
-    done < <(python3 - <<'PY'
-import os, yaml, pathlib
-data = yaml.safe_load(pathlib.Path('release/githubout/endpoints.yml').read_text()) or {}
-for key, cfg in (data.get('endpoints') or {}).items():
-    base = cfg.get('path', '').lstrip('/')
-    for name in cfg.get('files', []) or []:
-        print(f'{base}{name}')
-PY
-)
-
-    python3 -m http.server "$port" --directory "$mirror" >/dev/null 2>&1 &
+    python3 -m http.server "$port" --directory ./release/mirror >/dev/null 2>&1 &
     local server_pid=$!
 
-    # 3. temp manifest: point the container at the local mirror (podman's
-    #    host.containers.internal always resolves to the host, no IP guessing)
     local tmp; tmp=$(mktemp)
     sed -e "s|https://github.com/mozebaltyk/uponlan|http://host.containers.internal:${port}|" \
         -e "s|value: \"0.0.2\"|value: \"$version\"|" \
         ./manifests/uponlan.yaml > "$tmp"
 
-    # 4. rebuild image (init.sh/endpoints changes live in the image) and deploy
     build
     sudo podman play kube --down ./manifests/uponlan.yaml 2>/dev/null || true
     sudo podman play kube "$tmp"
     rm -f "$tmp"
 
     echo -e "\n[test-assets] container is fetching menus+assets from http://host.containers.internal:${port} version ${version}"
-    echo "[test-assets] mirror is LIVE on port ${port} (temp dir: ${mirror}) - keep it running while you test the webapp"
+    echo "[test-assets] mirror is LIVE on port ${port} (release/mirror) - keep it running while you test the webapp"
     echo "[test-assets] stop it with: kill ${server_pid}"
-    echo "[test-assets] then run './wakemeup.sh -a test' for the PXE boot check"
 
-    # 5. restore what release_menu.sh rewrote so the tree stays clean
     git checkout -- release/menus/version.ipxe
 }
 
@@ -191,12 +152,12 @@ print_help () {
     echo "4. redeploy - redeploy uponlan container"
     echo "5. logs - display logs from uponlan container"
     echo "6. connect - connect to uponlan container"
-    echo "7. test - pxeboot a VM on kvm domain"
     echo "8. network - check kvm/podman networks info"
     echo "9. build-runner - build Ansible container"
     echo "10. run-runner - run Ansible container"
     echo "11. test-webapp - run webapp tests inside the container"
     echo "12. test-assets - deploy from local githubout mirror (no pxe test)"
+    echo "13. test-pxeboot - pxeboot a VM on kvm domain"
     echo ""
 }
 
@@ -220,11 +181,11 @@ case $action in
     redeploy) echo "Action: redeploy uponlan container";;
     logs) echo "Action: display logs from uponlan container";;
     connect) echo "Action: connect to uponlan container";;
-    test) echo "Action: test pxe boot with a kvm domain";;
-    test-assets) echo "Action: deploy from local githubout mirror + test pxe boot";;
     network) echo "Action: check kvm/podman networks info";;
     build-runner) echo "Action: build Ansible container";;
     run-runner) echo "Action: run Ansible container";;
+    test-pxeboot) echo "Action: test pxe boot with a kvm domain";;
+    test-assets) echo "Action: deploy with local assets";;
     test-webapp) echo "Action: run webapp tests in container";;
     *) echo "Invalid action: $action"; print_help; exit 1;;
 esac

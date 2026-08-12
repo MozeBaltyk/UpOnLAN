@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # basic var setting
-output_dir="../githubout"
+output_dir="${OUTPUT_DIR:-../githubout}"
 
 # trigger build
 trigger() {
@@ -37,12 +37,17 @@ trigger() {
 }
 
 # build the output contents based on build type
+curl_opts=('-Lf')
+if [ -z "${NO_RESUME:-}" ]; then
+  curl_opts+=('-C' '-')
+fi
 build() {
   local build_dir="$1"
   if [ "${BUILD_TYPE}" == "iso_extraction" ]; then
       URL="${URL//REPLACE_ARCH/${ARCH}}"
       echo "Extracting from $URL"
-      curl -C - --retry 5 --retry-delay 5 --retry-connrefused -Lf -o "${build_dir}/$(basename "${URL}")" "${URL}" || { echo "Failed to download ${URL}"; exit 1; }
+      rm -f "${build_dir}/$(basename "${URL}")".part*
+      curl "${curl_opts[@]}" --retry 5 --retry-delay 5 --retry-connrefused -o "${build_dir}/$(basename "${URL}")" "${URL}" || { echo "Failed to download ${URL}"; exit 1; }
       iso_extraction "$build_dir"
   elif [ "${BUILD_TYPE}" == "direct_file" ]; then
     echo "Building direct file download for ${OS} ${VERSION} (${ARCHS})"
@@ -51,7 +56,8 @@ build() {
         echo "Downloading: ${DLD}"
         URL="${DLD%|*}"
         OUT="${DLD#*|}"
-        curl -C - --retry 5 --retry-delay 5 --retry-connrefused -Lf -o "${build_dir}/${OUT}" "${URL}" || { echo "Failed to download ${URL}"; exit 1; }
+        rm -f "${build_dir}/${OUT}".part*
+        curl "${curl_opts[@]}" --retry 5 --retry-delay 5 --retry-connrefused -o "${build_dir}/${OUT}" "${URL}" || { echo "Failed to download ${URL}"; exit 1; }
     done <<< "${EXTRACTS}"
   fi
 }

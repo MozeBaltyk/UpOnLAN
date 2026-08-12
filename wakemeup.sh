@@ -66,10 +66,12 @@ test-network-and-vm () {
     sudo ./scripts/verify_kvm_boot.sh ${network_name} testpxe ${pxe}
 }
 
-# test-local: build a menu tarball from the local endpoints.yml, serve it from a
-# temp mirror, deploy the container pointed at that mirror, then PXE-boot-test.
-# Usage: ./wakemeup.sh -a test-local [pxe_config]
-test-local () {
+# test-assets: build the menu tarball + re-root release/githubout asset files into
+# the /releases/download/<key>/ URL layout, serve it locally, deploy the container
+# pointed at that mirror, then PXE-boot-test. Validates endpoints.yml end-to-end
+# without publishing a GitHub release.
+# Usage: ./wakemeup.sh -a test-assets [pxe_config]
+test-assets () {
     local version="local-$(date +%s)"
     local pxe="uponlan"
     [[ $# -gt 0 ]] && pxe=$1
@@ -83,10 +85,24 @@ test-local () {
     # 1. build menu tarball (bundles release/assets/endpoints.yml)
     bash scripts/release_menu.sh "$version"
 
-    # 2. serve it under the URL layout init.sh expects
+    # 2. mirror githubout into the release URL layout the webapp/init.sh expect:
+    #    menus.tar.gz at /releases/download/<version>/, asset files at
+    #    /releases/download/<os>-<ver>-<arch>/ (same KEY build.sh writes in endpoints.yml)
     local mirror; mirror=$(mktemp -d)
     mkdir -p "$mirror/releases/download/$version"
     cp release/githubout/menus.tar.gz "$mirror/releases/download/$version/"
+    local dir rest arch os ver key
+    shopt -s nullglob
+    for dir in release/githubout/*/*/*/releases/*/; do
+        rest="${dir#release/githubout/}"
+        arch="${rest%%/*}"; rest="${rest#*/}"
+        os="${rest%%/*}";   rest="${rest#*/}"
+        ver="${rest%%/*}"
+        key="${os}-${ver}-${arch}"
+        mkdir -p "$mirror/releases/download/$key"
+        cp "$dir"* "$mirror/releases/download/$key/"
+    done
+    shopt -u nullglob
     python3 -m http.server "$port" --directory "$mirror" >/dev/null 2>&1 &
     local server_pid=$!
 
@@ -103,7 +119,7 @@ test-local () {
     sudo podman play kube "$tmp"
     rm -f "$tmp"
 
-    echo -e "\n[test-local] container is fetching menus from http://host.containers.internal:${port} version ${version}"
+    echo -e "\n[test-assets] container is fetching menus+assets from http://host.containers.internal:${port} version ${version}"
     test-network-and-vm "$pxe" || local rc=$?
 
     kill "$server_pid" 2>/dev/null || true
@@ -160,7 +176,7 @@ print_help () {
     echo "9. build-runner - build Ansible container"
     echo "10. run-runner - run Ansible container"
     echo "11. test-webapp - run webapp tests inside the container"
-    echo "12. test-local [pxe] - deploy from local menus mirror then pxeboot test"
+    echo "12. test-assets [pxe] - deploy from local githubout mirror then pxeboot test"
     echo ""
 }
 
@@ -185,7 +201,7 @@ case $action in
     logs) echo "Action: display logs from uponlan container";;
     connect) echo "Action: connect to uponlan container";;
     test) echo "Action: test pxe boot with a kvm domain";;
-    test-local) echo "Action: deploy from local menus mirror + test pxe boot";;
+    test-assets) echo "Action: deploy from local githubout mirror + test pxe boot";;
     network) echo "Action: check kvm/podman networks info";;
     build-runner) echo "Action: build Ansible container";;
     run-runner) echo "Action: run Ansible container";;

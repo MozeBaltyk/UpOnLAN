@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# verify_kvm_boot.sh <network_name> [vm_name] [timeout_seconds]
+# verify_kvm_boot.sh <network_name> [vm_name] [pxe_type] [timeout_seconds]
 #
 # Verifies a PXE boot attempt end-to-end against the UpOnLAN container:
 #   1. VM exists and is running
@@ -9,10 +9,22 @@ set -e
 #   3. Container TFTP log shows the VM fetching the iPXE bootloader
 #   4. Container nginx access log shows the VM fetching the menu over HTTP
 # Exits 0 on success, 1 on failure. Use after scripts/create_kvm_test_vm.sh.
+#
+# NOTE: the container is reached through podman port forwarding, so the source
+# IP seen in the logs is the podman gateway (10.89.0.x), NOT the VM's IP.
+# We therefore grep for the boot-file name, which is NAT-proof.
 
 network_name=${1:-uponlan}
 vm_name=${2:-testpxe}
-timeout=${3:-90}
+pxe_type=${3:-uponlan}
+timeout=${4:-90}
+
+# boot file token to search for in the logs (differs per pxe_type)
+case "$pxe_type" in
+    local)     token="undionly.0";;
+    uefi.http|efi.http) token="uponlan.xyz.efi";;
+    *)         token="${pxe_type}.xyz";;
+esac
 
 log () { echo -e "[verify] $*"; }
 
@@ -47,20 +59,20 @@ if [ -z "$cid" ]; then
     exit 1
 fi
 
-log "Watching container logs for boot traffic from $vm_ip..."
+log "Watching container logs for '$token' (NAT source, so matching by file name)..."
 tftp_hits=0
 http_hits=0
 for i in $(seq 1 $((timeout / 2))); do
-    tftp_hits=$(sudo podman exec "$cid" sh -c "grep -c '$vm_ip' /logs/tftp/tftpd.log 2>/dev/null || true" | tr -d '[:space:]')
-    http_hits=$(sudo podman exec "$cid" sh -c "grep -c '^$vm_ip ' /logs/nginx/access.log 2>/dev/null || true" | tr -d '[:space:]')
+    tftp_hits=$(sudo podman exec "$cid" sh -c "grep -c '$token' /logs/tftp/tftpd.log 2>/dev/null || true" | tr -d '[:space:]')
+    http_hits=$(sudo podman exec "$cid" sh -c "grep -c '$token' /logs/nginx/access.log 2>/dev/null || true" | tr -d '[:space:]')
     [ "${tftp_hits:-0}" -gt 0 ] && [ "${http_hits:-0}" -gt 0 ] && break
     sleep 2
 done
 
-[ "${tftp_hits:-0}" -gt 0 ] && log "OK: TFTP served the bootloader to $vm_ip ($tftp_hits hit(s))" \
-                            || log "WARN: no TFTP request from $vm_ip in /logs/tftp/tftpd.log"
-[ "${http_hits:-0}" -gt 0 ] && log "OK: nginx served the menu to $vm_ip ($http_hits hit(s))" \
-                            || log "WARN: no HTTP request from $vm_ip in /logs/nginx/access.log"
+[ "${tftp_hits:-0}" -gt 0 ] && log "OK: TFTP served '$token' ($tftp_hits hit(s))" \
+                            || log "WARN: no '$token' request in /logs/tftp/tftpd.log"
+[ "${http_hits:-0}" -gt 0 ] && log "OK: nginx served '$token' ($http_hits hit(s))" \
+                            || log "WARN: no '$token' request in /logs/nginx/access.log"
 
 # --- verdict ---
 if [ "${tftp_hits:-0}" -gt 0 ] && [ "${http_hits:-0}" -gt 0 ]; then

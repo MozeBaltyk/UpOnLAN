@@ -2,6 +2,8 @@ config/**
 assets/**
 node_modules
 coverage
+__pycache__/
+*.pyc
 .c9
 package-lock.json
 release/output/**

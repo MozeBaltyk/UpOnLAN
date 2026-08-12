@@ -1,6 +1,6 @@
 # UpOnLAN.xyz
 
-**[Start Here](docs/StartHere.md) • [Features](#features) • [Getting Started](docs/UpOnLAN/01-GettingStarted.md) • [PXE Basics](docs/UpOnLAN/02-PXEBootBasics.md) • [Deployment](docs/UpOnLAN/Deployment.md) • [Operations](docs/UpOnLAN/Operations.md)**
+**[Start Here](docs/StartHere.md) • [Features](#features) • [Getting Started](docs/01-GettingStarted.md) • [PXE Basics](docs/02-PXEBootBasics.md) • [Deployment](docs/UpOnLAN/Deployment.md) • [Operations](docs/UpOnLAN/Operations.md)**
 
 This project is a cold fork of Netboot.xyz with the goal of unifying and simplifying the upstream into an all-in-one solution. Its main purpose is to provide an editor for iPXE menus, build the boot mediums and serve them on the fly. Additional features include Wake-on-LAN, PXE menu testing and installation, and documentation in the webapp for developing custom PXE menus. 
     

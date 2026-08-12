@@ -31,5 +31,5 @@ Expect an UpOnLAN pod/container in the first command and container logs in the s
 ### Safe next steps
 
 - Read [PXE Basics](02-PXEBootBasics.md) before changing network-boot settings.
-- Read [Deployment](Deployment.md) for ports, authentication, remote versus local deployment, and release artifacts.
-- Read [Operations](Operations.md) for logs, backup, recovery, and destructive operations.
+- Read [Deployment](UpOnLAN/Deployment.md) for ports, authentication, remote versus local deployment, and release artifacts.
+- Read [Operations](UpOnLAN/Operations.md) for logs, backup, recovery, and destructive operations.

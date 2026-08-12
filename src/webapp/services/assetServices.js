@@ -16,13 +16,14 @@ async function dlremote(dlfiles, callback, socket) {
     return;
   }
   const dlarray = [];
+  const origin = asset_url.replace(/\/+$/, '');
   for (let dlfile of dlfiles) {
-    const safePath = dlfile.replace(/^\/+/, '/'); // prevent double slashes
+    const safePath = dlfile.replace(/^\/+/, '');
     const dlpath = path.join(ASSETS_ROOT, path.dirname(safePath));
 
     fs.mkdirSync(dlpath, { recursive: true });
 
-    const full_url = asset_url + safePath;
+    const full_url = `${origin}/${safePath}`;
     dlarray.push({ 'url': full_url, 'path': dlpath });
   }
   await downloader(dlarray, socket);

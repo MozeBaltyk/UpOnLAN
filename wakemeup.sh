@@ -101,6 +101,31 @@ test-assets () {
         cp "$dir"* "$mirror/releases/download/$key/"
     done
     shopt -u nullglob
+
+    # Preflight: fail fast if the local mirror is incomplete. In test-assets
+    # mode there is NO GitHub fallback — missing files are a hard error.
+    if [ ! -f release/githubout/endpoints.yml ]; then
+        echo "[test-assets] Missing release/githubout/endpoints.yml. Run the assets/menu build first."
+        git checkout -- release/menus/version.ipxe
+        return 1
+    fi
+    while IFS= read -r relpath; do
+        [ -z "$relpath" ] && continue
+        if [ ! -f "$mirror/$relpath" ]; then
+            echo "[test-assets] Missing local asset: $relpath"
+            git checkout -- release/menus/version.ipxe
+            return 1
+        fi
+    done < <(python3 - <<'PY'
+import os, yaml, pathlib
+data = yaml.safe_load(pathlib.Path('release/githubout/endpoints.yml').read_text()) or {}
+for key, cfg in (data.get('endpoints') or {}).items():
+    base = cfg.get('path', '').lstrip('/')
+    for name in cfg.get('files', []) or []:
+        print(f'{base}{name}')
+PY
+)
+
     python3 -m http.server "$port" --directory "$mirror" >/dev/null 2>&1 &
     local server_pid=$!
 

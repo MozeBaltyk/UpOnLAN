@@ -327,9 +327,10 @@ function getEndpointUrls() {
       raw_url = endpoint_url;
     }
   } else {
-    // For other endpoints, just use the base URL
-    api_url = endpoint_url;
-    raw_url = endpoint_url;
+    // For local mirrors / non-GitHub endpoints, keep a trailing slash so
+    // callers can append path segments safely (e.g. `${api_url}releases`).
+    api_url = `${endpoint_url}/`;
+    raw_url = api_url;
   }
 
   // Latest release URL

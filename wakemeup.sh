@@ -50,14 +50,69 @@ network () {
 
 test () {
     read -p "Which pxe_config do you want to test? [uponlan]: " pxe_config
-    network_name="uponlan"
-    pxe_config=${pxe_config:-"uponlan"}
+    local pxe=${pxe_config:-"uponlan"}   # local or uponlan or netboot or uefi.http
+    test-network-and-vm "$pxe"
+}
+
+# Shared: create KVM network, boot a VM, verify PXE boot reaches the container.
+test-network-and-vm () {
+    local pxe=$1
+    local network_name="uponlan"
     sudo chmod +x ./scripts/create_kvm_test_network.sh
-    sudo ./scripts/create_kvm_test_network.sh ${network_name} ${pxe_config}
+    sudo ./scripts/create_kvm_test_network.sh ${network_name} ${pxe}
     sudo chmod +x ./scripts/create_kvm_test_vm.sh
-    sudo ./scripts/create_kvm_test_vm.sh ${network_name} ${pxe_config}
+    sudo ./scripts/create_kvm_test_vm.sh ${network_name} ${pxe}
     sudo chmod +x ./scripts/verify_kvm_boot.sh
-    sudo ./scripts/verify_kvm_boot.sh ${network_name} testpxe ${pxe_config}
+    sudo ./scripts/verify_kvm_boot.sh ${network_name} testpxe ${pxe}
+}
+
+# test-local: build a menu tarball from the local endpoints.yml, serve it from a
+# temp mirror, deploy the container pointed at that mirror, then PXE-boot-test.
+# Usage: ./wakemeup.sh -a test-local [pxe_config]
+test-local () {
+    local version="local-$(date +%s)"
+    local pxe="uponlan"
+    [[ $# -gt 0 ]] && pxe=$1
+
+    # pick a free port (default 8899 may be taken by an old mirror)
+    local port=${LOCAL_PORT:-8899}
+    while ss -tln | grep -q ":$port "; do
+        port=$((port + 1))
+    done
+
+    # 1. build menu tarball (bundles release/assets/endpoints.yml)
+    bash scripts/release_menu.sh "$version"
+
+    # 2. serve it under the URL layout init.sh expects
+    local mirror; mirror=$(mktemp -d)
+    mkdir -p "$mirror/releases/download/$version"
+    cp release/githubout/menus.tar.gz "$mirror/releases/download/$version/"
+    python3 -m http.server "$port" --directory "$mirror" >/dev/null 2>&1 &
+    local server_pid=$!
+
+    # 3. temp manifest: point the container at the local mirror (podman's
+    #    host.containers.internal always resolves to the host, no IP guessing)
+    local tmp; tmp=$(mktemp)
+    sed -e "s|https://github.com/mozebaltyk/uponlan|http://host.containers.internal:${port}|" \
+        -e "s|value: \"0.0.2\"|value: \"$version\"|" \
+        ./manifests/uponlan.yaml > "$tmp"
+
+    # 4. rebuild image (init.sh/endpoints changes live in the image), deploy, test
+    build
+    sudo podman play kube --down ./manifests/uponlan.yaml 2>/dev/null || true
+    sudo podman play kube "$tmp"
+    rm -f "$tmp"
+
+    echo -e "\n[test-local] container is fetching menus from http://host.containers.internal:${port} version ${version}"
+    test-network-and-vm "$pxe" || local rc=$?
+
+    kill "$server_pid" 2>/dev/null || true
+    rm -rf "$mirror"
+
+    # 5. restore what release_menu.sh rewrote so the tree stays clean
+    git checkout -- release/menus/version.ipxe
+
+    return ${rc:-0}
 }
 
 test-webapp () {
@@ -105,6 +160,7 @@ print_help () {
     echo "9. build-runner - build Ansible container"
     echo "10. run-runner - run Ansible container"
     echo "11. test-webapp - run webapp tests inside the container"
+    echo "12. test-local [pxe] - deploy from local menus mirror then pxeboot test"
     echo ""
 }
 
@@ -129,6 +185,7 @@ case $action in
     logs) echo "Action: display logs from uponlan container";;
     connect) echo "Action: connect to uponlan container";;
     test) echo "Action: test pxe boot with a kvm domain";;
+    test-local) echo "Action: deploy from local menus mirror + test pxe boot";;
     network) echo "Action: check kvm/podman networks info";;
     build-runner) echo "Action: build Ansible container";;
     run-runner) echo "Action: run Ansible container";;

@@ -34,9 +34,13 @@ else
   fi
 fi
 
-# Import menus
-echo "[uponlanxyz-init] Import menu from ${ENDPOINT_URL} version ${MENU_VERSION}"
-curl -L ${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz -o /config/menus/menus.tar.gz
+# Import menus: use a staged tarball (bind-mounted by test-local) if present, else download
+if [[ -f /config/menus.tar.gz ]]; then
+  echo "[uponlanxyz-init] Using staged menus.tar.gz (local test)"
+else
+  echo "[uponlanxyz-init] Import menu from ${ENDPOINT_URL} version ${MENU_VERSION}"
+  curl -L ${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz -o /config/menus/menus.tar.gz
+fi
 
 # Extract menus if exists
 if [[ ! -f /config/menus/menus.tar.gz ]]; then

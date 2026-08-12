@@ -66,15 +66,19 @@ test-network-and-vm () {
     sudo ./scripts/verify_kvm_boot.sh ${network_name} testpxe ${pxe}
 }
 
-# test-assets: build the menu tarball + local asset mirror under release/mirror,
-# serve it locally, deploy the container pointed at that mirror. Validates
-# endpoints.yml end-to-end without publishing a GitHub release.
-# Usage: ./wakemeup.sh -a test-assets
+# mirror-assets: build the local asset mirror under release/mirror.
+# test-assets: deploy from the local asset mirror under release/mirror.
+# Usage: ./wakemeup.sh -a <action>
+mirror-assets () {
+    bash scripts/release_assets.sh "${asset_target:-}"
+    echo "[mirror-assets] local asset mirror built at ./release/mirror"
+    [ -n "${asset_target:-}" ] && echo "[mirror-assets] target: ${asset_target}"
+}
+
 test-assets () {
     local version="$(grep -Eo 'set menu_version .*' ./release/menus/version.ipxe | awk '{print $3}')"
     local port=${LOCAL_PORT:-8899}
 
-    bash scripts/release_assets.sh
     bash scripts/release_menu.sh "$version"
 
     if [ ! -f release/githubout/menus.tar.gz ]; then
@@ -82,8 +86,9 @@ test-assets () {
         git checkout -- release/menus/version.ipxe
         return 1
     fi
-    if [ ! -d release/mirror ]; then
+    if [ ! -d release/mirror/releases/download ]; then
         echo "[test-assets] Missing release/mirror"
+        echo "[test-assets] Run './wakemeup.sh -a mirror-assets [target]' first"
         git checkout -- release/menus/version.ipxe
         return 1
     fi
@@ -91,6 +96,9 @@ test-assets () {
     while ss -tln | grep -q ":$port "; do
         port=$((port + 1))
     done
+
+    mkdir -p "release/mirror/releases/download/${version}"
+    cp "release/githubout/menus.tar.gz" "release/mirror/releases/download/${version}/menus.tar.gz"
 
     python3 -m http.server "$port" --directory ./release/mirror >/dev/null 2>&1 &
     local server_pid=$!
@@ -152,6 +160,7 @@ print_help () {
     echo "4. redeploy - redeploy uponlan container"
     echo "5. logs - display logs from uponlan container"
     echo "6. connect - connect to uponlan container"
+    echo "7. mirror-assets - build local asset mirror"
     echo "8. network - check kvm/podman networks info"
     echo "9. build-runner - build Ansible container"
     echo "10. run-runner - run Ansible container"
@@ -181,6 +190,7 @@ case $action in
     redeploy) echo "Action: redeploy uponlan container";;
     logs) echo "Action: display logs from uponlan container";;
     connect) echo "Action: connect to uponlan container";;
+    mirror-assets) echo "Action: build local asset mirror";;
     network) echo "Action: check kvm/podman networks info";;
     build-runner) echo "Action: build Ansible container";;
     run-runner) echo "Action: run Ansible container";;

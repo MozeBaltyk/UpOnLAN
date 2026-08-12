@@ -36,12 +36,12 @@ Allowed Actions
 4. redeploy - redeploy uponlan container
 5. logs - display logs from uponlan container
 6. connect - connect to uponlan container
-7. mirror-assets - build local asset mirror
+7. mirror-assets - build local asset output
 8. network - check kvm/podman networks info
 9. build-runner - build Ansible container
 10. run-runner - run Ansible container
 11. test-webapp - run webapp tests in container
-12. test-assets - deploy with local assets
+12. deploy --local - deploy with local menu and assets from release/output
 13. test-pxeboot - pxeboot a VM on kvm domain
 ```
 
@@ -53,13 +53,19 @@ Use these when you want to test without guessing:
 
 ```bash
 ./wakemeup.sh -a mirror-assets
-./wakemeup.sh -a test-assets
+./scripts/release_menu.sh 0.0.2
+./wakemeup.sh -a deploy --local
 ./wakemeup.sh -a test-webapp
 ./wakemeup.sh -a test-pxeboot
 ```
 
-`mirror-assets` builds `release/mirror/` from the asset release tree.
-`test-assets` serves that mirror locally and boots the container against it.
+Release artifacts come in two layers:
+- **menu artifact**: `release/output/releases/download/<version>/menus.tar.gz` from `release/menus/`
+- **asset output**: `release/output/endpoints.yml` + `release/output/releases/download/<asset-key>/...` from `release/assets/`
+
+`mirror-assets` builds the asset side of `release/output/`.
+`scripts/release_menu.sh <version>` builds the menu artifact into `release/output/`.
+`deploy --local` does not build anything. It stages config from the already prepared `release/output/` and deploys through `manifests/uponlan-local.yaml`.
 `test-webapp` runs the webapp test suite inside the container.
 `test-pxeboot` boots a VM for PXE testing.
 
@@ -67,6 +73,7 @@ Use these when you want to test without guessing:
 asset_target=harvester ./wakemeup.sh -a mirror-assets
 ```
 
-Use `asset_target` to mirror just one asset set while debugging.
+Use `asset_target` to build just one asset set while debugging.
 
-`release/mirror/` is local-only. GitHub release flow stays unchanged.
+`release/output/endpoints.yml` is the asset catalog consumed separately from `menus.tar.gz`.
+`release/output/` is the single local/pipeline release layout.

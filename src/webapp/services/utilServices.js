@@ -211,12 +211,10 @@ function isValidUrl(urlString) {
 
 function getMenuData() {
   const menuPath = path.join(CONFIG_ROOT, 'menu.yml');
-  const legacyPath = path.join(CONFIG_ROOT, 'endpoints.yml');
-  const configPath = fs.existsSync(menuPath) ? menuPath : legacyPath;
-  if (!fs.existsSync(configPath)) return { version: 'none', origin: 'none' };
+  if (!fs.existsSync(menuPath)) return { version: 'none', origin: 'none' };
 
   try {
-    const fileContent = fs.readFileSync(configPath, 'utf8');
+    const fileContent = fs.readFileSync(menuPath, 'utf8');
     const yamlData = yaml.load(fileContent);
     const menu = yamlData?.menu || {};
     return {

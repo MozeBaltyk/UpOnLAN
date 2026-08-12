@@ -4,9 +4,7 @@ node_modules
 coverage
 .c9
 package-lock.json
-release/githubout/**
-release/mirror/**
-release/menus/endpoints.yml
+release/output/**
 release/menus/rom/**
 uponlan.xml
 .vscode

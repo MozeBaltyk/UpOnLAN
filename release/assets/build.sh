@@ -28,7 +28,11 @@ trigger() {
           GENERIC_ARCH="${ARCH}"
         fi
         KEY="${OS}-${VERSION}-${GENERIC_ARCH}"
-        build_dir="${output_dir}/${GENERIC_ARCH}/${OS}/${VERSION}/releases/${RELEASE}"
+        if [ "${MIRROR_LAYOUT:-}" = "github" ]; then
+          build_dir="${output_dir}/releases/download/${KEY}"
+        else
+          build_dir="${output_dir}/${GENERIC_ARCH}/${OS}/${VERSION}/releases/${RELEASE}"
+        fi
         mkdir -p "${build_dir}"
         build "${build_dir}"
         endpoints

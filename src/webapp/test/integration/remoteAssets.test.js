@@ -1,26 +1,20 @@
-// Verifies the Remote Assets tab data flow end-to-end, as it happens in the
-// container: init.sh extracts endpoints.yml from menus.tar.gz into
-// /config/endpoints.yml, then the webapp serves it via the getlocal socket.
-// Uses the real endpoints.yml shipped in release/githubout/menus.tar.gz.
+// Verifies the Remote Assets tab data flow end-to-end using the real generated
+// asset catalog from release/output/endpoints.yml. The webapp serves that file
+// via the getlocal socket as the available remote endpoints list.
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
-import { execFileSync } from 'child_process';
 import { describe, expect, it, beforeAll } from 'vitest';
 import { bootApp, once } from '../helpers/bootApp.js';
 
 const REPO_ROOT = path.join(__dirname, '..', '..', '..', '..');
-const TARBALL = path.join(REPO_ROOT, 'release', 'githubout', 'menus.tar.gz');
+const ENDPOINTS = path.join(REPO_ROOT, 'release', 'output', 'endpoints.yml');
 
-describe('remote assets from shipped menus.tar.gz', () => {
+describe('remote assets from generated release output', () => {
   let endpointsYml;
 
   beforeAll(() => {
-    // Replicate init.sh: extract tarball, read endpoints.yml from inside it
-    expect(fs.existsSync(TARBALL)).toBe(true);
-    const extractDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uponlan-tar-'));
-    execFileSync('tar', ['-xzf', TARBALL, '-C', extractDir, './endpoints.yml']);
-    endpointsYml = fs.readFileSync(path.join(extractDir, 'endpoints.yml'), 'utf8');
+    expect(fs.existsSync(ENDPOINTS)).toBe(true);
+    endpointsYml = fs.readFileSync(ENDPOINTS, 'utf8');
   });
 
   it('serves endpoint entries through the getlocal socket', async () => {

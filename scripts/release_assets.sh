@@ -1,8 +1,11 @@
 #!/bin/bash
 set -e
 
-mkdir -p release/mirror/releases/download
+mirror_root="release/output"
 target="${1:-}"
+
+rm -rf "$mirror_root"
+mkdir -p "$mirror_root/releases/download"
 
 for i in $(ls release/assets/*/setting.sh); do
     os=$(basename $(dirname $i))
@@ -11,22 +14,17 @@ for i in $(ls release/assets/*/setting.sh); do
     fi
     echo "Processing $os"
     cd ./release/assets
-    NO_RESUME=1 OUTPUT_DIR=../mirror ./build.sh "$os"
+    NO_RESUME=1 OUTPUT_DIR=../output MIRROR_LAYOUT=github ./build.sh "$os"
     cd -
 done
 
 # Create a GitHub-like releases/latest response for local testing.
-cat > release/mirror/releases/latest <<'EOF'
+cat > "$mirror_root/releases/latest" <<'EOF'
 {"tag_name":"local"}
 EOF
 
-# Re-root the raw build output into GitHub-style release URLs.
-for d in release/mirror/*/*/*/releases/*/; do
-    rel="${d#release/mirror/}"
-    arch="${rel%%/*}"; rel="${rel#*/}"
-    os="${rel%%/*}";   rel="${rel#*/}"
-    ver="${rel%%/*}"
-    key="${os}-${ver}-${arch}"
-    mkdir -p "release/mirror/releases/download/${key}"
-    cp "$d"* "release/mirror/releases/download/${key}/"
-done
+if [ ! -f "$mirror_root/endpoints.yml" ]; then
+    cat > "$mirror_root/endpoints.yml" <<'EOF'
+endpoints: {}
+EOF
+fi

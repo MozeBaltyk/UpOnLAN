@@ -49,19 +49,17 @@ else
   echo "[uponlanxyz-init] Extracting menus.tar.gz"
   tar -xzf /config/menus/menus.tar.gz -C /config/menus/remote
   rm -f /config/menus/menus.tar.gz
-  if [[ -f /config/menus/remote/endpoints.yml ]]; then
-    mv /config/menus/remote/endpoints.yml /config/endpoints.yml
-    echo "[uponlanxyz-init] Extracted endpoints.yml"
-  else
-    echo "[uponlanxyz-init] No endpoints.yml found in extracted menus"
-  fi
   cp /config/menus/remote/* /config/menus/
 fi
 
-# Ensure endpoints.yml exists
+# Ensure endpoints.yml exists from the asset-side release output
 if [[ ! -f /config/endpoints.yml ]]; then
-  echo "[uponlanxyz-init] No endpoints.yml found, creating a default one"
-  echo "endpoints: {}" > /config/endpoints.yml
+  endpoint_catalog_url="${ENDPOINT_URL}/endpoints.yml"
+  echo "[uponlanxyz-init] Import endpoints.yml from ${endpoint_catalog_url}"
+  if ! curl -fsL ${endpoint_catalog_url} -o /config/endpoints.yml; then
+    echo "[uponlanxyz-init] No endpoints.yml found from asset release, creating a default one"
+    echo "endpoints: {}" > /config/endpoints.yml
+  fi
 fi
 
 # Ensure menu.yml exists

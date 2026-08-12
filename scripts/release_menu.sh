@@ -9,24 +9,14 @@ fi
 HARD_RELEASE=$1
 
 echo -e "\n### Releasing menu version ${HARD_RELEASE} ###\n"
-mkdir -p ./release/githubout
+release_dir="./release/output/releases/download/${HARD_RELEASE}"
+mkdir -p "$release_dir"
 
 # Set Version
 sed -i -e "s/set menu_version .*$/set menu_version ${HARD_RELEASE}/" ./release/menus/version.ipxe
 
 # ipxe Artefacts
-mv ./release/menus/ipxe/* ./release/githubout/ 2> /dev/null || true
-
-# Ship the asset endpoints catalog inside menus.tar.gz. Runtime menu metadata
-# now lives in /config/menu.yml.
-if [ -f ./release/githubout/endpoints.yml ]; then
-  cp ./release/githubout/endpoints.yml ./release/menus/endpoints.yml
-elif [ -f ./release/assets/endpoints.yml ]; then
-  cp ./release/assets/endpoints.yml ./release/menus/endpoints.yml
-else
-  echo "endpoints: {}" > ./release/menus/endpoints.yml
-fi
+mv ./release/menus/ipxe/* "$release_dir"/ 2> /dev/null || true
 
 # tar all Menus Artefacts
-tar -czf menus.tar.gz -C ./release/menus .
-mv menus.tar.gz release/githubout/.
+tar -czf "$release_dir/menus.tar.gz" -C ./release/menus .

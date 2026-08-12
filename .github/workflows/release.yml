@@ -44,6 +44,7 @@ jobs:
     - name: Build Menu release
       run: |
         echo "Building release for version ${{ steps.get_version.outputs.TAG_VERSION }}"
+        ./scripts/release_assets.sh
         ./scripts/release_menu.sh ${{ steps.get_version.outputs.TAG_VERSION }}
 
     - name: Extract release notes
@@ -53,7 +54,7 @@ jobs:
     - name: Create Release/Assets for Menu
       uses: svenstaro/upload-release-action@v2
       with:
-        file: release/githubout/*
+        file: release/output/**/*
         file_glob: true
         overwrite: true
         prerelease: false

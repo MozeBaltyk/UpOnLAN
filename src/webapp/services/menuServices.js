@@ -82,12 +82,10 @@ async function upgrademenu(version, callback, socket) {
   const { endpoint_url } = getEndpointUrls();
   const remote_folder = path.join(MENU_DIR, 'remote') + path.sep;
   const targetDir = MENU_DIR + path.sep;
-  const endpoint_config = ENDPOINTS_CONFIG;
 
   try {
     // Clean folders
     await deleteAllFilesInDir(targetDir);
-    await deleteFiles(endpoint_config);
 
     // Wipe current remote
     const remote_files = await fsp.readdir(remote_folder, { withFileTypes: true });
@@ -111,19 +109,8 @@ async function upgrademenu(version, callback, socket) {
     await exec(untarcmd);
     await fsp.unlink(tarFile);
 
-    // Write asset endpoints and menu metadata separately.
+    // Write menu metadata only; asset endpoints are managed separately.
     const origin = endpoint_url;
-    const remote_endpoints_config = path.join(remote_folder, 'endpoints.yml');
-
-    let yamlData = { endpoints: {} };
-    try {
-      const fileContent = await fsp.readFile(remote_endpoints_config, 'utf8');
-      yamlData = yaml.load(fileContent) || yamlData;
-    } catch {
-      yamlData = { endpoints: {} };
-    }
-
-    await fsp.writeFile(endpoint_config, yaml.dump({ endpoints: yamlData.endpoints || {} }));
     await fsp.writeFile(MENU_CONFIG, yaml.dump({ menu: { origin, version } }));
 
     //  layermenu using Promise wrapper
@@ -141,7 +128,6 @@ async function upgrademenu(version, callback, socket) {
 async function upgrademenunetboot(version, callback, socket) {
   const remote_folder = path.join(MENU_DIR, 'remote') + path.sep;
   const targetDir = MENU_DIR + path.sep;
-  const endpoint_config = ENDPOINTS_CONFIG;
 
   try {
     await deleteAllFilesInDir(targetDir);
@@ -177,26 +163,12 @@ async function upgrademenunetboot(version, callback, socket) {
       downloads.push({ url: download_endpoint + file, path: remote_folder });
     }
 
-    downloads.push({
-      url: `https://raw.githubusercontent.com/netbootxyz/netboot.xyz/${version}/endpoints.yml`,
-      path: CONFIG_ROOT + path.sep,
-    });
-
     await downloader(downloads, socket)
 
     const tarFile = path.join(remote_folder, 'menus.tar.gz');
     await exec(`tar xf ${tarFile} -C ${remote_folder}`);
     await fsp.unlink(tarFile);
     const displayVersion = isCommitSha ? 'Development' : version;
-  
-    let yamlData = { endpoints: {} };
-    try {
-      const fileContent = await fsp.readFile(endpoint_config, 'utf8');
-      yamlData = yaml.load(fileContent) || yamlData;
-    } catch {
-      yamlData = { endpoints: {} };
-    }
-    await fsp.writeFile(endpoint_config, yaml.dump({ endpoints: yamlData.endpoints || {} }));
     await fsp.writeFile(MENU_CONFIG, yaml.dump({ menu: { origin, version: displayVersion } }));
   
     await layermenu(socket, null);
@@ -212,7 +184,6 @@ async function upgrademenunetboot(version, callback, socket) {
 
 // Empty Menu
 async function emptymenu(socket) {
-    const endpoints_config = ENDPOINTS_CONFIG;
     try {
       // Delete all files in local and remote directories
       await deleteAllFilesInDir(path.join(MENU_DIR, 'local'));
@@ -221,14 +192,12 @@ async function emptymenu(socket) {
       await deleteAllFilesInDir(path.join(ASSETS_ROOT, 'ipxe'));
       await deleteFiles(path.join(ASSETS_ROOT, 'index.html'));
       await deleteFiles(path.join(ASSETS_ROOT, 'index.htm'));
-      await deleteFiles(endpoints_config);
       await deleteFiles(MENU_CONFIG);
       await fsp.rm(path.join(MENU_DIR, 'remote/sigs'), { recursive: true, force: true });
       await fsp.rm(path.join(MENU_DIR, 'rom'), { recursive: true, force: true });
 
       // get default
       const { endpoint_url } = getEndpointUrls();
-      await fsp.writeFile(endpoints_config, yaml.dump({ endpoints: {} }), 'utf8');
       await fsp.writeFile(MENU_CONFIG, yaml.dump({ menu: { origin: endpoint_url } }), 'utf8');
       logWithTimestamp(`menu.yml reset with origin: ${endpoint_url}`);
       // Render empty menu

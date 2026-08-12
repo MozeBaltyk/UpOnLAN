@@ -1,17 +1,17 @@
-// Unit tests: URL derivation (endpoints.yml -> api/raw/latest), asset origin
+// Unit tests: URL derivation (menu.yml -> api/raw/latest), asset origin
 // special-casing, and nginx listen-directive parsing. Pure string/fs logic
 // against a real fixture config; no server, no mocks.
 import fs from 'fs';
 import path from 'path';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { createFixtureRoot } from '../helpers/fixtures.js';
 
-let endpointsFile;
+let menuFile;
 let nginxFile;
 
 beforeAll(() => {
   const root = createFixtureRoot();
-  endpointsFile = path.join(root, 'config', 'endpoints.yml');
+  menuFile = path.join(root, 'config', 'menu.yml');
   nginxFile = path.join(root, 'config', 'nginx', 'site-confs', 'default');
   process.env.UPONLAN_CONFIG = path.join(root, 'config');
 });
@@ -23,7 +23,7 @@ async function loadServices() {
 
 describe('utilServices.getEndpointUrls', () => {
   it('derives api/raw/latest URLs from a github origin', async () => {
-    fs.writeFileSync(endpointsFile, 'menu:\n  origin: https://github.com/mozebaltyk/uponlan\n');
+    fs.writeFileSync(menuFile, 'menu:\n  origin: https://github.com/mozebaltyk/uponlan\n');
     const svc = await loadServices();
     const { endpoint_url, api_url, raw_url, latest_url } = svc.getEndpointUrls();
     expect(endpoint_url).toBe('https://github.com/mozebaltyk/uponlan');
@@ -33,14 +33,14 @@ describe('utilServices.getEndpointUrls', () => {
   });
 
   it('falls back to the default endpoint when origin is missing/invalid', async () => {
-    fs.writeFileSync(endpointsFile, 'menu: {}\n');
+    fs.writeFileSync(menuFile, 'menu: {}\n');
     const svc = await loadServices();
     const { endpoint_url } = svc.getEndpointUrls();
     expect(endpoint_url).toBe('https://github.com/mozebaltyk/uponlan');
   });
 
   it('normalizes trailing slashes on the origin', async () => {
-    fs.writeFileSync(endpointsFile, 'menu:\n  origin: https://github.com/mozebaltyk/uponlan///\n');
+    fs.writeFileSync(menuFile, 'menu:\n  origin: https://github.com/mozebaltyk/uponlan///\n');
     const svc = await loadServices();
     const { endpoint_url } = svc.getEndpointUrls();
     expect(endpoint_url).toBe('https://github.com/mozebaltyk/uponlan');
@@ -49,13 +49,13 @@ describe('utilServices.getEndpointUrls', () => {
 
 describe('utilServices.getAssetOrigin', () => {
   it('special-cases the netboot.xyz repo', async () => {
-    fs.writeFileSync(endpointsFile, 'menu:\n  origin: https://github.com/netbootxyz/netboot.xyz\n');
+    fs.writeFileSync(menuFile, 'menu:\n  origin: https://github.com/netbootxyz/netboot.xyz\n');
     const svc = await loadServices();
     expect(svc.getAssetOrigin()).toBe('https://github.com/netbootxyz');
   });
 
   it('returns the plain origin otherwise', async () => {
-    fs.writeFileSync(endpointsFile, 'menu:\n  origin: https://example.com/foo\n');
+    fs.writeFileSync(menuFile, 'menu:\n  origin: https://example.com/foo\n');
     const svc = await loadServices();
     expect(svc.getAssetOrigin()).toBe('https://example.com/foo');
   });

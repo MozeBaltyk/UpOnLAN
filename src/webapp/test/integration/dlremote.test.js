@@ -14,13 +14,15 @@ describe('dlremote failure surfaces to client', () => {
       '    path: /releases/download/oracle-8-x86_64/',
       '    files:',
       '    - vmlinuz',
+    ].join('\n');
+    const menuYml = [
       'menu:',
       '  origin: http://127.0.0.1:1',
       '  version: local-test',
     ].join('\n');
 
     const app = await bootApp({
-      fixtures: { 'config/endpoints.yml': endpointsYml },
+      fixtures: { 'config/endpoints.yml': endpointsYml, 'config/menu.yml': menuYml },
     });
 
     try {

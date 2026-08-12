@@ -96,7 +96,7 @@ describe('socket event round-trips', () => {
     await once(socket, 'connect');
     const [args] = await Promise.all([once(socket, 'renderlocal'), Promise.resolve(socket.emit('getlocal'))]);
     const [endpoints, assets, menuversion] = args;
-    expect(endpoints.menu.version).toBe('0.0.2'); // from fixture endpoints.yml
+    expect(endpoints.endpoints['oracle-8-x86_64']).toBeDefined();
     expect(assets.sort()).toEqual(['/ipxe/test-rom.ipxe', '/sample.txt']); // fixture assets dir
     expect(menuversion).toBe('0.0.2');
     socket.close();

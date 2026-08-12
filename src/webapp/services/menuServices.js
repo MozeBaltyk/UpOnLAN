@@ -12,6 +12,7 @@ const CONFIG_ROOT = process.env.UPONLAN_CONFIG || '/config';
 const ASSETS_ROOT = process.env.UPONLAN_ASSETS || '/assets';
 const MENU_DIR = path.join(CONFIG_ROOT, 'menus');
 const ENDPOINTS_CONFIG = path.join(CONFIG_ROOT, 'endpoints.yml');
+const MENU_CONFIG = path.join(CONFIG_ROOT, 'menu.yml');
 const { 
   downloader,
   deleteAllFilesInDir,
@@ -110,28 +111,20 @@ async function upgrademenu(version, callback, socket) {
     await exec(untarcmd);
     await fsp.unlink(tarFile);
 
-    // Write version and origin to config files
+    // Write asset endpoints and menu metadata separately.
     const origin = endpoint_url;
     const remote_endpoints_config = path.join(remote_folder, 'endpoints.yml');
 
-    let yamlData = {};
+    let yamlData = { endpoints: {} };
     try {
       const fileContent = await fsp.readFile(remote_endpoints_config, 'utf8');
-      yamlData = yaml.load(fileContent) || {};
+      yamlData = yaml.load(fileContent) || yamlData;
     } catch {
-      yamlData = {};
+      yamlData = { endpoints: {} };
     }
 
-    // Ensure endpoints array exists
-    if (!yamlData.endpoints) {
-      yamlData.endpoints = [];
-    }
-
-    // Always update menu
-    yamlData.menu = { origin, version };
-
-    // Write full YAML to endpoint config
-    await fsp.writeFile(endpoint_config, yaml.dump(yamlData));
+    await fsp.writeFile(endpoint_config, yaml.dump({ endpoints: yamlData.endpoints || {} }));
+    await fsp.writeFile(MENU_CONFIG, yaml.dump({ menu: { origin, version } }));
 
     //  layermenu using Promise wrapper
     await layermenu(socket, null);
@@ -196,18 +189,15 @@ async function upgrademenunetboot(version, callback, socket) {
     await fsp.unlink(tarFile);
     const displayVersion = isCommitSha ? 'Development' : version;
   
-    let yamlData = {};
+    let yamlData = { endpoints: {} };
     try {
       const fileContent = await fsp.readFile(endpoint_config, 'utf8');
-      yamlData = yaml.load(fileContent) || {};
+      yamlData = yaml.load(fileContent) || yamlData;
     } catch {
-      yamlData = {};
+      yamlData = { endpoints: {} };
     }
-    if (!yamlData.endpoints) {
-      yamlData.endpoints = [];
-    }
-    yamlData.menu = { origin, version: displayVersion };
-    await fsp.writeFile(endpoint_config, yaml.dump(yamlData));
+    await fsp.writeFile(endpoint_config, yaml.dump({ endpoints: yamlData.endpoints || {} }));
+    await fsp.writeFile(MENU_CONFIG, yaml.dump({ menu: { origin, version: displayVersion } }));
   
     await layermenu(socket, null);
     await disablesigs();
@@ -232,14 +222,15 @@ async function emptymenu(socket) {
       await deleteFiles(path.join(ASSETS_ROOT, 'index.html'));
       await deleteFiles(path.join(ASSETS_ROOT, 'index.htm'));
       await deleteFiles(endpoints_config);
+      await deleteFiles(MENU_CONFIG);
       await fsp.rm(path.join(MENU_DIR, 'remote/sigs'), { recursive: true, force: true });
       await fsp.rm(path.join(MENU_DIR, 'rom'), { recursive: true, force: true });
 
       // get default
       const { endpoint_url } = getEndpointUrls();
-      const yamlData = { endpoints: [], menu: { origin: endpoint_url } };
-      await fsp.writeFile(endpoints_config, yaml.dump(yamlData), 'utf8');
-      logWithTimestamp(`endpoints.yml reset with origin: ${endpoint_url}`);
+      await fsp.writeFile(endpoints_config, yaml.dump({ endpoints: {} }), 'utf8');
+      await fsp.writeFile(MENU_CONFIG, yaml.dump({ menu: { origin: endpoint_url } }), 'utf8');
+      logWithTimestamp(`menu.yml reset with origin: ${endpoint_url}`);
       // Render empty menu
       await layermenu(socket, null);
     } catch (err) {

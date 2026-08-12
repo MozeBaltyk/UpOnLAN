@@ -1215,7 +1215,7 @@ socket.on('dldata', function(url, count, stats){
   $('#statusbar').empty();
 $('#statusbar').append('\
   <div class="row">\
-    <div class="col-2">' + count[0] + ' of ' + count[1] + '</div>\
+    <div class="col-auto pr-1 text-nowrap small">' + count[0] + ' of ' + count[1] + '</div>\
     <div class="col-10">\
       <div class="progress mb-1">\
         <div class="progress-bar" role="progressbar" style="width: ' + stats.progress + '%;" aria-valuenow="' + stats.progress + '" aria-valuemin="0" aria-valuemax="100"></div>\

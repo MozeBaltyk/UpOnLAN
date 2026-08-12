@@ -210,10 +210,10 @@ function isValidUrl(urlString) {
 }
 
 function getMenuData() {
-  const configPath = path.join(CONFIG_ROOT, 'endpoints.yml');
-  if (!fs.existsSync(configPath)) {
-    return { version: 'none', origin: 'none' };
-  }
+  const menuPath = path.join(CONFIG_ROOT, 'menu.yml');
+  const legacyPath = path.join(CONFIG_ROOT, 'endpoints.yml');
+  const configPath = fs.existsSync(menuPath) ? menuPath : legacyPath;
+  if (!fs.existsSync(configPath)) return { version: 'none', origin: 'none' };
 
   try {
     const fileContent = fs.readFileSync(configPath, 'utf8');
@@ -224,7 +224,7 @@ function getMenuData() {
       origin: menu.origin || 'none'
     };
   } catch (err) {
-    console.error('Error reading endpoints.yml:', err.message);
+    console.error('Error reading menu config:', err.message);
     return { version: 'none', origin: 'none' };
   }
 }
@@ -248,7 +248,7 @@ function getAssetOrigin() {
     }
     return parsedUrl.toString();
   } catch (err) {
-    console.error('Invalid URL in endpoints.yml:', err.message);
+    console.error('Invalid URL in menu config:', err.message);
     return origin;
   }
 }

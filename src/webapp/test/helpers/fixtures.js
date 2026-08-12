@@ -14,7 +14,8 @@ function write(dir, file, content) {
 
 function buildFixtureFilesystem(root, overrides = {}) {
   const files = {
-    'config/endpoints.yml': `endpoints: []\nmenu:\n  origin: https://github.com/mozebaltyk/uponlan\n  version: 0.0.2\n`,
+    'config/endpoints.yml': `endpoints:\n  oracle-8-x86_64:\n    path: /releases/download/oracle-8-x86_64/\n    files:\n    - vmlinuz\n    - initrd\n    os: oracle\n    version: '8'\n    arch: x86_64\n`,
+    'config/menu.yml': `menu:\n  origin: https://github.com/mozebaltyk/uponlan\n  version: 0.0.2\n`,
     'config/wol.yml': `wakeonlan:\n  - default_mac: "00:11:22:33:44:55"\n    name: Test Machine\n`,
     'config/nginx/site-confs/default': `server {\n  listen 443 ssl;\n  server_name _;\n}\n`,
     'config/menus/remote/boot.cfg': `#!ipxe\nset sigs_enabled true\n`,

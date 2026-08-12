@@ -28,7 +28,7 @@ trigger() {
           GENERIC_ARCH="${ARCH}"
         fi
         KEY="${OS}-${VERSION}-${GENERIC_ARCH}"
-        build_dir="${output_dir}/releases/download/${KEY}"
+        build_dir="${output_dir}/${GENERIC_ARCH}/${OS}/${VERSION}/releases/${RELEASE}"
         mkdir -p "${build_dir}"
         build "${build_dir}"
         endpoints

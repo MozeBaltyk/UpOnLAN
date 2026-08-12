@@ -79,6 +79,15 @@ test-assets () {
     local version="$(grep -Eo 'set menu_version .*' ./release/menus/version.ipxe | awk '{print $3}')"
     local port=${LOCAL_PORT:-8899}
 
+    if [ ! -f release/mirror/endpoints.yml ]; then
+        echo "[test-assets] Missing release/mirror/endpoints.yml"
+        echo "[test-assets] Run './wakemeup.sh -a mirror-assets [target]' first"
+        git checkout -- release/menus/version.ipxe
+        return 1
+    fi
+    mkdir -p release/githubout
+    cp release/mirror/endpoints.yml release/githubout/endpoints.yml
+
     bash scripts/release_menu.sh "$version"
 
     if [ ! -f release/githubout/menus.tar.gz ]; then

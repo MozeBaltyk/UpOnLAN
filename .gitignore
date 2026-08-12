@@ -5,9 +5,10 @@ coverage
 .c9
 package-lock.json
 release/githubout/**
+release/mirror/**
 release/menus/endpoints.yml
 release/menus/rom/**
 uponlan.xml
 .vscode
 .vscode-test
-.local/**
+.local

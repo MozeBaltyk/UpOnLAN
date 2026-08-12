@@ -61,13 +61,19 @@ fi
 # Ensure endpoints.yml exists
 if [[ ! -f /config/endpoints.yml ]]; then
   echo "[uponlanxyz-init] No endpoints.yml found, creating a default one"
-  echo "menu: {}" > /config/endpoints.yml
+  echo "endpoints: {}" > /config/endpoints.yml
 fi
 
-# Apply patches using yq
-yq -i ".menu.title = \"${TITLE:-UpOnLAN.xyz}\"" /config/endpoints.yml
-yq -i ".menu.version = \"${MENU_VERSION}\"" /config/endpoints.yml
-yq -i ".menu.origin = \"${ENDPOINT_URL:-https://github.com/mozebaltyk/uponlan}\"" /config/endpoints.yml
+# Ensure menu.yml exists
+if [[ ! -f /config/menu.yml ]]; then
+  echo "[uponlanxyz-init] No menu.yml found, creating a default one"
+  echo "menu: {}" > /config/menu.yml
+fi
+
+# Apply menu metadata using yq
+yq -i ".menu.title = \"${TITLE:-UpOnLAN.xyz}\"" /config/menu.yml
+yq -i ".menu.version = \"${MENU_VERSION}\"" /config/menu.yml
+yq -i ".menu.origin = \"${ENDPOINT_URL:-https://github.com/mozebaltyk/uponlan}\"" /config/menu.yml
 
 # init wol.yml
 if [[ ! -f /config/wol.yml ]]; then

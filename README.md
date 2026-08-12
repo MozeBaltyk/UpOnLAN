@@ -9,10 +9,12 @@ PXE booting is especially relevant for automating bare-metal installations and e
 ## Features
 
 This webapp aims to:
-- Serve a PXE menu via iPXE with real-time edits
-- Serve Assets during PXE install
-- Documentation about iPXE and UpOnLAN 
-- Provide logs and live system metrics (TFTP, usage, boot activity, etc.)
+- Serve the PXE menu with real-time edits and local overrides
+- Serve install assets during PXE boot
+- Manage Wake-on-LAN entries
+- Show logs and live metrics
+- Provide built-in docs for iPXE and UpOnLAN
+- Support local testing/mirroring of releases and assets
 
 
 ## Get Started
@@ -34,8 +36,37 @@ Allowed Actions
 4. redeploy - redeploy uponlan container
 5. logs - display logs from uponlan container
 6. connect - connect to uponlan container
-7. test - pxeboot a VM on kvm domain
+7. mirror-assets - build local asset mirror
 8. network - check kvm/podman networks info
+9. build-runner - build Ansible container
+10. run-runner - run Ansible container
+11. test-webapp - run webapp tests in container
+12. test-assets - deploy with local assets
+13. test-pxeboot - pxeboot a VM on kvm domain
 ```
 
 ---
+
+## Test
+
+Use these when you want to test without guessing:
+
+```bash
+./wakemeup.sh -a mirror-assets
+./wakemeup.sh -a test-assets
+./wakemeup.sh -a test-webapp
+./wakemeup.sh -a test-pxeboot
+```
+
+`mirror-assets` builds `release/mirror/` from the asset release tree.
+`test-assets` serves that mirror locally and boots the container against it.
+`test-webapp` runs the webapp test suite inside the container.
+`test-pxeboot` boots a VM for PXE testing.
+
+```bash
+asset_target=harvester ./wakemeup.sh -a mirror-assets
+```
+
+Use `asset_target` to mirror just one asset set while debugging.
+
+`release/mirror/` is local-only. GitHub release flow stays unchanged.

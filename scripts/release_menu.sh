@@ -17,9 +17,8 @@ sed -i -e "s/set menu_version .*$/set menu_version ${HARD_RELEASE}/" ./release/m
 # ipxe Artefacts
 mv ./release/menus/ipxe/* ./release/githubout/ 2> /dev/null || true
 
-# Ship endpoints.yml inside menus.tar.gz so the webapp can populate the
-# Remote Assets tab (init.sh imports it from inside the tarball).
-# Prefer the assets build output, then the committed default.
+# Ship the asset endpoints catalog inside menus.tar.gz. Runtime menu metadata
+# now lives in /config/menu.yml.
 if [ -f ./release/githubout/endpoints.yml ]; then
   cp ./release/githubout/endpoints.yml ./release/menus/endpoints.yml
 elif [ -f ./release/assets/endpoints.yml ]; then

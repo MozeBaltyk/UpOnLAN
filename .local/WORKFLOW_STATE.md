@@ -62,7 +62,9 @@ Move ordered Getting Started and PXE Basics guides to the `docs/` root so they a
 - Final lint: `git diff --check` from repository root passed with no output.
 
 ## Commit
-- Prepared intended documentation and workflow-state changes for commit; `.codegraph/` remains explicitly untracked and excluded.
+- Committed documentation navigation updates: `bf2a21d docs: move entry guides to root`.
+- Pushed successfully: `git push` created and set upstream `origin/fix/security-hardening` without force.
+- Staged intended files only; `.codegraph/` remains untracked and excluded.
 
 ## Open Questions
 - Intended audiences and supported deployment environments are not yet specified; assess existing public docs as the baseline.

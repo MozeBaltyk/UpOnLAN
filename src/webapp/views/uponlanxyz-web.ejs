@@ -148,12 +148,6 @@ socket.on('renderdash', function(response){
   var menuversion = response.menuversion;
   var menuorigin = response.menuorigin;
   var remotemenuversion = response.remotemenuversion;
-  // Navbar status chips
-  setStatusChips([
-    { text: 'Menus v' + menuversion, color: 'secondary', title: 'Local menu version' },
-    { text: (menuversion != remotemenuversion ? 'v' + remotemenuversion + ' available' : 'Up to date'), color: (menuversion != remotemenuversion ? 'success' : 'secondary'), title: 'Remote menu version' },
-    { text: webversion, color: 'info', title: 'Webapp version' }
-  ]);
   var cpustats = response.cpu;
   var cpupercent = response.CPUpercent;
   var memstats = response.mem;

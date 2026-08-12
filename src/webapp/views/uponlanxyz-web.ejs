@@ -1141,8 +1141,8 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
     let t;
     return function() { clearTimeout(t); t = setTimeout(fn, 150); };
   };
-  $('#localsearch').keyup(debounceSearch(function(){ localtable.search($(this).val()).draw(); }));
-  $('#remotesearch').keyup(debounceSearch(function(){ remotetable.search($(this).val()).draw(); }));
+  $('#localsearch').keyup(debounceSearch(function(){ localtable.search($('#localsearch').val()).draw(); }));
+  $('#remotesearch').keyup(debounceSearch(function(){ remotetable.search($('#remotesearch').val()).draw(); }));
 });
 function remoteselect(){   
   $('.remotecheck').each(function() {

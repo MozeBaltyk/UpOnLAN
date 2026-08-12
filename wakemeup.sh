@@ -68,13 +68,11 @@ test-network-and-vm () {
 
 # test-assets: build the menu tarball + re-root release/githubout asset files into
 # the /releases/download/<key>/ URL layout, serve it locally, deploy the container
-# pointed at that mirror, then PXE-boot-test. Validates endpoints.yml end-to-end
-# without publishing a GitHub release.
-# Usage: ./wakemeup.sh -a test-assets [pxe_config]
+# pointed at that mirror. Validates endpoints.yml end-to-end without publishing a
+# GitHub release. Run 'test' separately afterwards for the PXE-boot verification.
+# Usage: ./wakemeup.sh -a test-assets
 test-assets () {
     local version="local-$(date +%s)"
-    local pxe="uponlan"
-    [[ $# -gt 0 ]] && pxe=$1
 
     # pick a free port (default 8899 may be taken by an old mirror)
     local port=${LOCAL_PORT:-8899}
@@ -113,22 +111,19 @@ test-assets () {
         -e "s|value: \"0.0.2\"|value: \"$version\"|" \
         ./manifests/uponlan.yaml > "$tmp"
 
-    # 4. rebuild image (init.sh/endpoints changes live in the image), deploy, test
+    # 4. rebuild image (init.sh/endpoints changes live in the image) and deploy
     build
     sudo podman play kube --down ./manifests/uponlan.yaml 2>/dev/null || true
     sudo podman play kube "$tmp"
     rm -f "$tmp"
 
     echo -e "\n[test-assets] container is fetching menus+assets from http://host.containers.internal:${port} version ${version}"
-    test-network-and-vm "$pxe" || local rc=$?
-
-    kill "$server_pid" 2>/dev/null || true
-    rm -rf "$mirror"
+    echo "[test-assets] mirror is LIVE on port ${port} (temp dir: ${mirror}) - keep it running while you test the webapp"
+    echo "[test-assets] stop it with: kill ${server_pid}"
+    echo "[test-assets] then run './wakemeup.sh -a test' for the PXE boot check"
 
     # 5. restore what release_menu.sh rewrote so the tree stays clean
     git checkout -- release/menus/version.ipxe
-
-    return ${rc:-0}
 }
 
 test-webapp () {
@@ -176,7 +171,7 @@ print_help () {
     echo "9. build-runner - build Ansible container"
     echo "10. run-runner - run Ansible container"
     echo "11. test-webapp - run webapp tests inside the container"
-    echo "12. test-assets [pxe] - deploy from local githubout mirror then pxeboot test"
+    echo "12. test-assets - deploy from local githubout mirror (no pxe test)"
     echo ""
 }
 

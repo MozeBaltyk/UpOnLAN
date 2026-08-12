@@ -16,7 +16,11 @@ module.exports = function registerAssetHandlers(socket, io) {
     dlremote(files, (err, result) => {
       if (err) return socket.emit('error', err.message);
       socket.emit('dlremotedone', result);
-    }, socket);
+    }, socket).catch((err) => {
+      // downloader throws on 404/network errors; surface it instead of dying silently
+      console.error('dlremote failed:', err.message);
+      socket.emit('error', 'Download failed: ' + err.message);
+    });
   });
 
   // Send local endpoints and asset files to client

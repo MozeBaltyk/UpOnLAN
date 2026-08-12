@@ -38,20 +38,6 @@ function showLoading(selector, message) {
   );
 }
 
-// Navbar status chips (menu version / origin / asset counts)
-function setStatusChips(chips) {
-  const container = document.getElementById('statuschips');
-  if (!container) return;
-  container.innerHTML = '';
-  (chips || []).forEach(function(chip) {
-    const b = document.createElement('span');
-    b.className = 'badge badge-' + (chip.color || 'secondary') + ' p-2 mr-1';
-    b.title = chip.title || chip.text;
-    b.textContent = chip.text;
-    container.appendChild(b);
-  });
-}
-
 // Highlight active nav item
 function setActiveNav(id) {
   $('.nav-item').removeClass('active');
@@ -1036,15 +1022,12 @@ function renderlocal(){
 }
 socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotemenuorigin,remoteassetorigin,localnginxurl){
   $('#pagecontent').empty();
-  setStatusChips([
-    { text: 'Remote ' + remotemenuversion, color: 'info', title: 'Remote menu version' },
-    { text: (endpoints.endpoints ? Object.keys(endpoints.endpoints).length : 0) + ' endpoints', color: 'secondary', title: 'Configured asset endpoints' }
-  ]);
   $('#pagecontent').append(`
   <div class="card-group">
     <div class="card">
       <div class="card-header">
         Remote Assets at <a target="_blank" href="${remotemenuorigin}/releases/${remotemenuversion}">${remotemenuversion}</a>
+        <span class="badge badge-secondary ml-2">${endpoints.endpoints ? Object.keys(endpoints.endpoints).length : 0} endpoints</span>
         <br>
         <span style="float:right;">
           <div class="form-row">
@@ -1193,10 +1176,18 @@ function dlremote(){
     }
   }).promise().done(function(){
     if(dlfiles.length != 0){
+      showToast('Pulling ' + dlfiles.length + ' file(s)...', 'info');
       socket.emit('dlremote',dlfiles);
+    } else {
+      showToast('Select at least one remote asset first', 'warning');
     }
   });
 }
+// After a pull completes, re-render so assets move to the Local column
+socket.on('dlremotedone', function(){
+  showToast('Download finished', 'success');
+  renderlocal();
+});
 // Re-render local hook
 socket.on('renderlocalhook', function(){
   if($('#localassets').length){

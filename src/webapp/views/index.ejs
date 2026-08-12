@@ -43,11 +43,10 @@
         gap: 0.5rem;
         max-width: min(90vw, 380px);
       }
-      /* Navbar status chips */
-      #statuschips .badge { font-weight: 500; }
+      /* Navbar status bar (download progress) */
       #statusbar { width: auto; min-width: 280px; max-width: 100%; }
       @media (max-width: 991.98px) {
-        #statuschips, #statusbar { width: 100%; margin: 0.25rem 0; }
+        #statusbar { width: 100%; margin: 0.25rem 0; }
       }
     </style>
   </head>
@@ -77,9 +76,6 @@
           </li>
         </ul>
         <ul class="navbar-nav ml-auto align-items-lg-center">
-          <li class="nav-item">
-            <div id="statuschips" class="d-flex flex-wrap justify-content-end mr-lg-3"></div>
-          </li>
           <li class="nav-item">
             <div id="statusbar" class="mx-lg-2"></div>
           </li>

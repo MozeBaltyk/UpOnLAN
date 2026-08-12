@@ -35,29 +35,9 @@ Walk the boot steps from [Networks summary](../Networks.md):
 
 The webapp **Monitor** tab tails Nginx, TFTP and webapp activity in real time — it is the first place to look during a failed boot.
 
-### Automated PXE test on KVM
-
-`./wakemeup.sh -a test` creates a throwaway KVM network + VM and PXE-boots it against the running container. It verifies the chain end-to-end (DHCP lease → TFTP bootloader → HTTP menu) and exits 0/1 accordingly.
-
-```bash
-./wakemeup.sh -a test
-# Which pxe_config? [uponlan]  →  local | uponlan | netboot | uefi.http
-```
-
-- `uponlan` (default): dnsmasq points the VM at the container's own TFTP/nginx (`rom/ipxe/uponlan.xyz*` — run the ROM build first if the artifact check warns).
-- `uefi.http`: VM boots UEFI with OVMF and fetches the bootloader over HTTP (requires `ovmf`/`edk2-ovmf` on the host).
-- `local`: boots from the KVM host's own TFTP — useful as a baseline before involving UpOnLAN.
-- Troubleshoot manually with `virsh screenshot testpxe`, `virsh console testpxe`, and `virsh net-dhcp-leases uponlan`.
-
----
-
 ## 🧱 Menu build fails in the webapp
 
-Builds run in a separate Ansible container:
-
-1. `./wakemeup.sh -a run-runner` starts the runner container.
-2. `./wakemeup.sh -a connect` gets a shell; build logs are stored in `/logs/ansible/`.
-3. If the runner image is outdated: `./wakemeup.sh -a build-runner` first.
+The webapp runs `/ansible/build_rom.yml` itself; it does not require the optional runner container. Use `./wakemeup.sh -a logs` or the Monitor tab to inspect the webapp and build output.
 
 ---
 
@@ -71,18 +51,9 @@ Full test documentation: [Developpement → Testing](../UpOnLAN/Developpement.md
 
 ---
 
-## 📦 Persistent data
+## 📦 Data and recovery
 
-Data survives redeploys in named volumes (see `wakemeup.sh`):
-
-| Volume | Mount | Content |
-|--------|-------|---------|
-| `uponlan-config` | `/config` | `endpoints.yml`, menu files |
-| `uponlan-assets` | `/assets` | Mirrored bootable assets |
-| — | `/docs` | Served documentation |
-| — | `/logs` | Webapp / nginx / ansible logs |
-
-`./wakemeup.sh -a destroy` removes the container **and** its images — volumes are kept, so configuration and assets survive.
+The shipped manifests use ephemeral `emptyDir` storage for `/config`, `/assets`, `/menu`, and `/logs`. Pod replacement or `./wakemeup.sh -a destroy` does not preserve this data. See [Operations](Operations.md) for backup and recovery steps.
 
 ---
 

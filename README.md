@@ -1,6 +1,6 @@
 # UpOnLAN.xyz
 
-**[Features](#features) • [Get Started](#get-started)**
+**[Start Here](docs/StartHere.md) • [Features](#features) • [Getting Started](docs/UpOnLAN/01-GettingStarted.md) • [PXE Basics](docs/UpOnLAN/02-PXEBootBasics.md) • [Deployment](docs/UpOnLAN/Deployment.md) • [Operations](docs/UpOnLAN/Operations.md)**
 
 This project is a cold fork of Netboot.xyz with the goal of unifying and simplifying the upstream into an all-in-one solution. Its main purpose is to provide an editor for iPXE menus, build the boot mediums and serve them on the fly. Additional features include Wake-on-LAN, PXE menu testing and installation, and documentation in the webapp for developing custom PXE menus. 
     
@@ -42,12 +42,11 @@ Allowed Actions
 10. run-runner - run Ansible container
 11. test-webapp - run webapp tests in container
 12. deploy --local - deploy with local menu and assets from release/output
-13. test-pxeboot - pxeboot a VM on kvm domain
 ```
 
 ---
 
-## Test
+## Local release and tests
 
 Use these when you want to test without guessing:
 
@@ -56,7 +55,6 @@ Use these when you want to test without guessing:
 ./scripts/release_menu.sh 0.0.2
 ./wakemeup.sh -a deploy --local
 ./wakemeup.sh -a test-webapp
-./wakemeup.sh -a test-pxeboot
 ```
 
 Release artifacts come in two layers:
@@ -67,8 +65,6 @@ Release artifacts come in two layers:
 `scripts/release_menu.sh <version>` builds the menu artifact into `release/output/`.
 `deploy --local` does not build anything. It stages config from the already prepared `release/output/` and deploys through `manifests/uponlan-local.yaml`.
 `test-webapp` runs the webapp test suite inside the container.
-`test-pxeboot` boots a VM for PXE testing.
-
 ```bash
 asset_target=harvester ./wakemeup.sh -a mirror-assets
 ```
@@ -77,3 +73,5 @@ Use `asset_target` to build just one asset set while debugging.
 
 `release/output/endpoints.yml` is the asset catalog consumed separately from `menus.tar.gz`.
 `release/output/` is the single local/pipeline release layout.
+
+See [Deployment](docs/UpOnLAN/Deployment.md) for remote and local deployment, ports, security, and release artifacts. See [Operations](docs/UpOnLAN/Operations.md) for logs, recovery, backup, and destructive-operation behavior.

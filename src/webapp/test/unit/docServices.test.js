@@ -11,6 +11,11 @@ describe('docServices.buildTree', () => {
     expect(tree.guides.basics['getting-started'].__file).toBe('guides/basics/getting-started.md');
   });
 
+  it('hides a leading numeric ordering prefix while preserving the file path', () => {
+    const tree = buildTree(['01-GettingStarted.md']);
+    expect(tree.GettingStarted.__file).toBe('01-GettingStarted.md');
+  });
+
   it('returns an empty tree for no docs', () => {
     expect(buildTree([])).toEqual({});
   });

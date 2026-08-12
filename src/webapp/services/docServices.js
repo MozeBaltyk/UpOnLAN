@@ -42,7 +42,7 @@ function buildTree(paths) {
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       const isFile = part.endsWith('.md');
-      const name = part.replace(/\.md$/, '');
+      const name = part.replace(/\.md$/, '').replace(/^\d{2}-/, '');
 
       if (i === parts.length - 1) {
         // Leaf node

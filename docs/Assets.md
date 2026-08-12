@@ -21,7 +21,7 @@ The general flow is:
 
 ## 🚧 Why UpOnLAN Helps
 
-One of the key problems UpOnLAN solves is **making these three components available locally and securely**, even when:
+One of the key problems UpOnLAN solves is **making these three components available locally**, even when:
 
 - The original vendor doesn’t provide stable HTTPS downloads.
 - The initramfs cannot verify HTTPS endpoints (due to missing CA certificates).
@@ -30,7 +30,7 @@ One of the key problems UpOnLAN solves is **making these three components availa
 This is why the **Assets** tab exists in the web app:
 
 - ✅ Mirror LiveCDs locally.
-- ✅ Serve these assets via HTTPS from your local UpOnLAN instance.
+- ✅ Serve these assets over the configured Nginx HTTP port. Put a TLS-capable reverse proxy in front if HTTPS is required.
 - ✅ Provide helper scripts to extract kernel, initramfs, and squashfs directly from ISO files.
 - ✅ Automatically populate an `endpoints.yml` configuration file for your iPXE menus.
 

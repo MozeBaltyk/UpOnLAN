@@ -18,10 +18,13 @@ for i in $(ls release/assets/*/setting.sh); do
     cd -
 done
 
-# Create a GitHub-like releases/latest response for local testing.
-cat > "$mirror_root/releases/latest" <<'EOF'
+# Create a GitHub-like releases/latest response for local testing, but only
+# when release_menu.sh has not already pointed it at a real menu version.
+if [ ! -f "$mirror_root/releases/latest" ]; then
+    cat > "$mirror_root/releases/latest" <<'EOF'
 {"tag_name":"local"}
 EOF
+fi
 
 if [ ! -f "$mirror_root/endpoints.yml" ]; then
     cat > "$mirror_root/endpoints.yml" <<'EOF'

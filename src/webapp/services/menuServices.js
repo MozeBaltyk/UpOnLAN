@@ -51,11 +51,34 @@ async function fetchDevReleases() {
   const { api_url } = getEndpointUrls();
   const options = { headers: { 'user-agent': 'node.js' } };
 
-  const releasesResponse = await fetch(api_url + 'releases', options);
-  if (!releasesResponse.ok) {
-    throw new Error(`GitHub API error fetching ${api_url}. Status: ${releasesResponse.status}`);
+  let releases;
+  try {
+    // GitHub-style API: GET /releases returns a JSON array.
+    const releasesResponse = await fetch(api_url + 'releases', options);
+    if (!releasesResponse.ok) {
+      throw new Error(`GitHub API error fetching ${api_url}. Status: ${releasesResponse.status}`);
+    }
+    releases = await releasesResponse.json();
+    if (!Array.isArray(releases)) {
+      throw new Error(`Endpoint ${api_url} did not return a release list`);
+    }
+  } catch (err) {
+    // Flat-file mirrors (deploy --local) serve /releases as an HTML directory
+    // listing, not a JSON API. Fall back to the releases/latest file that the
+    // release scripts write into the mirror.
+    const latest = await fetch(`${api_url}releases/latest`, options)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
+    if (latest && latest.tag_name) {
+      releases = [{
+        tag_name: latest.tag_name,
+        html_url: `${api_url}releases/download/${latest.tag_name}/`,
+      }];
+    } else {
+      throw new Error(`No releases found at ${api_url}. Expected a GitHub API or a mirror with a releases/latest file.`);
+    }
   }
-  return releasesResponse.json();
+  return releases;
 }
 
 // Fetch Netboot releases

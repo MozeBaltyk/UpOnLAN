@@ -38,6 +38,30 @@ This allows you to fully control and serve all necessary assets locally, ensurin
 
 ---
 
+## 🔗 How menus link to assets
+
+A menu entry boots an OS by fetching its kernel, initramfs, and rootfs over HTTP. Nothing "links" the two — the iPXE script and the endpoint catalog must simply agree on the URL layout:
+
+```text
+iPXE menu (.ipxe)                endpoint catalog (endpoints.yml)
+   │                                   │
+   │ kernel <origin><path>vmlinuz      │ path: /releases/download/<key>/
+   │ initrd  <origin><path>initrd  ←→  │ files: [vmlinuz, initrd, squashfs.img]
+   │                                   │
+   ▼                                   ▼
+<origin> = boot HTTP origin: the local nginx root (/assets) or a GitHub release
+```
+
+1. **`endpoints.yml`** declares a boot bundle: a `path` plus the `files` served under it (kernel, initrd, rootfs, checksums...).
+2. **The Assets tab** mirrors those files with *Pull Selected* (`dlremote`): each `path + file` is downloaded from the configured origin into `/assets` at the same relative path. Nginx serves `/assets` as its web root, so every mirrored file is reachable at `<boot host>:${NGINX_PORT}<path><file>`.
+3. **The iPXE menu** points `kernel` / `initrd` / rootfs at exactly those URLs. The menu's `${live_endpoint}` (defined in `release/menus/boot.cfg`) is the boot origin — either the local nginx URL or a GitHub release base.
+
+The consequence: **the path and file names in a menu must match an endpoint's `path` + `files`** in `endpoints.yml`. If they drift, the boot fails even though the assets are fully mirrored.
+
+> ⚠️ Current state of the shipped menus: `harvester.ipxe`, `oracle.ipxe`, `proxmox.ipxe`, and `ubuntu.ipxe` still use the upstream Netboot.xyz asset layout (`/asset-mirror/releases/download/<version>-<hash>/` and vendor file names like `harvester-vmlinuz-amd64`), and `boot.cfg` defaults `live_endpoint` to `https://github.com/netbootxyz`. They therefore boot from the Netboot.xyz mirror, not from a locally mirrored bundle. Pointing them at an UpOnLAN mirror means rewriting their URLs to the endpoint layout above.
+
+---
+
 ## ➕ Adding a New Endpoint
 
 An **endpoint** is one entry in `endpoints.yml` that points an iPXE menu (and the Assets tab in the webapp) at a bootable bundle. The key is unique and doubles as the release tag/directory the files are served from:

@@ -32,7 +32,7 @@ The shipped Nginx configuration listens on plain HTTP port `8080`; it does not p
 
 ### Release artifacts
 
-`./wakemeup.sh -a mirror-assets` runs `scripts/release_assets.sh` and recreates the asset side of `release/output`, including `endpoints.yml` and `releases/download/<asset-key>/`.
+`./wakemeup.sh -a mirror-assets` runs `scripts/release_assets.sh` and recreates the asset side of `release/output`, including `endpoints.yml` and `releases/download/<asset-key>/`. Set `asset_target=<os>` to build a single asset set while debugging, e.g. `asset_target=harvester ./wakemeup.sh -a mirror-assets`.
 
 `./scripts/release_menu.sh <version>` updates `release/menus/version.ipxe` and writes `release/output/releases/download/<version>/menus.tar.gz`. Build assets first, then the menu artifact, before using `deploy --local`.
 

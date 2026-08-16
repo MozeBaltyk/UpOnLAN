@@ -32,22 +32,21 @@ As prerequisites:
 * A KVM install with `virt-manager`, Not mandatory but good to have for testing purpose 
 
 ```bash
-Usage: ./wakemeup.sh -a <action>
+Usage: ./wakemeup.sh -a <action> [--local]
 
 Allowed Actions
 ---------------
 1. build - build uponlan image
-2. deploy - deploy uponlan container
+2. deploy [--local] - deploy uponlan container; --local serves local menus/assets from release/output
 3. destroy - destroy uponlan container
 4. redeploy - redeploy uponlan container
 5. logs - display logs from uponlan container
 6. connect - connect to uponlan container
-7. mirror-assets - build local asset output
+7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets
 8. network - check kvm/podman networks info
 9. build-runner - build Ansible container
 10. run-runner - run Ansible container
 11. test-webapp - run webapp tests in container
-12. deploy --local - deploy with local menu and assets from release/output
 ```
 
 ---

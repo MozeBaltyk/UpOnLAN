@@ -1,6 +1,6 @@
 # UpOnLAN.xyz
 
-**[Features](#features) • [Getting Started](docs/01-GettingStarted.md) • [PXE Basics](docs/02-PXEBootBasics.md) • [ROM builds](docs/iPXE/ROM%20Build.md) • [Deployment](docs/UpOnLAN/Deployment.md) • [Operations](docs/UpOnLAN/Operations.md)**
+**[Features](#features) • [Getting Started](docs/01-Getting%20Started.md) • [PXE Basics](docs/02-PXE%20Basics.md) • [ROM builds](docs/iPXE/ROM%20Build.md) • [Deployment](docs/UpOnLAN/Deployment.md) • [Operations](docs/UpOnLAN/Operations.md)**
 
 This project is a cold fork of Netboot.xyz with the goal of unifying and simplifying the upstream into an all-in-one solution. Its main purpose is to provide an editor for iPXE menus, build the boot mediums and serve them on the fly. Additional features include Wake-on-LAN, PXE menu testing and installation, and documentation in the webapp for developing custom PXE menus. 
     
@@ -18,7 +18,7 @@ This webapp aims to:
 
 ## Documentation goals
 
-The documentation covers both **using and operating UpOnLAN** and the **PXE/iPXE knowledge needed to deploy it safely**. Start with [Getting Started](docs/01-GettingStarted.md), then [PXE Basics](docs/02-PXEBootBasics.md) to understand the DHCP, TFTP, iPXE, HTTP, firmware, and asset flow. The remaining guides explain UpOnLAN menu editing, ROM builds, deployment, operations, and troubleshooting.
+The documentation covers both **using and operating UpOnLAN** and the **PXE/iPXE knowledge needed to deploy it safely**. Start with [Getting Started](docs/01-Getting%20Started.md), then [PXE Basics](docs/02-PXE%20Basics.md) to understand the DHCP, TFTP, iPXE, HTTP, firmware, and asset flow. The remaining guides explain UpOnLAN menu editing, ROM builds, deployment, operations, and troubleshooting.
 
 UpOnLAN serves the boot environment; it does not configure DHCP. Network-boot setup therefore requires coordinating the documented UpOnLAN service with your network's DHCP configuration and testing the correct BIOS or UEFI boot target.
 

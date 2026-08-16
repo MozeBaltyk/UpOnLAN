@@ -35,3 +35,30 @@ This is why the **Assets** tab exists in the web app:
 - ✅ Automatically populate an `endpoints.yml` configuration file for your iPXE menus.
 
 This allows you to fully control and serve all necessary assets locally, ensuring reliable and repeatable booting even in isolated environments.
+
+---
+
+## ➕ Adding a New Endpoint
+
+An **endpoint** is one entry in `endpoints.yml` that points an iPXE menu (and the Assets tab in the webapp) at a bootable bundle. The key is unique and doubles as the release tag/directory the files are served from:
+
+```yaml
+endpoints:
+  oracle-9-x86_64:                     # unique key == release tag == directory
+    path: /releases/download/oracle-9-x86_64/  # files are served under <mirror origin><path>
+    files:
+    - vmlinuz                          # kernel
+    - initrd                           # initramfs
+    - squashfs.img                     # rootfs (if the OS uses one)
+    os: oracle                         # shown in the Assets tab
+    version: '9'
+    arch: x86_64
+```
+
+To add a new endpoint:
+
+1. **Create a build recipe** at `release/assets/<os>/setting.sh`. The script is sourced by `release/assets/build.sh` and must export `OS`, `VERSION`, `ARCHS`, `BUILD_TYPE`, and `EXTRACTS` (`URL|output_file` lines, one per file, with `REPLACE_ARCH` for per-arch URLs). See `release/assets/harvester/setting.sh` for `direct_file` (download prebuilt artifacts) and `release/assets/oracle9/setting.sh` for `iso_extraction` (pull kernel/initrd/rootfs out of an ISO).
+2. **Run `scripts/release_assets.sh`** — it executes every recipe and appends the generated entries to `release/output/endpoints.yml` (this is the file the webapp serves).
+3. **Mirror the entry in `release/assets/endpoints.yml`** — the committed file is the reference catalog; keep it in sync with the generated output so the Assets tab is correct before the pipeline runs.
+
+The generated endpoint key is `${OS}-${VERSION}-${GENERIC_ARCH}` (`amd64` → `x86_64`, `aarch64` → `arm64`), so one multi-arch OS produces one endpoint per architecture.

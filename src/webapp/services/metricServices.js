@@ -15,6 +15,34 @@ let latestNginxMetrics = {
   timestamp: Date.now(),
 };
 
+// Pure: turns a raw stub_status sample into per-interval deltas relative to a
+// previous sample. First sample and counter resets (nginx reload/restart) both
+// report zero activity instead of a fake delta or a spike.
+function computeNginxDeltas(previousSample, sample) {
+  const { accepts, handled, requests, active, timestamp } = sample;
+
+  if (!previousSample) {
+    return { accepts: 0, handled: 0, requests: 0, active, timestamp };
+  }
+
+  const reset =
+    accepts < previousSample.accepts ||
+    handled < previousSample.handled ||
+    requests < previousSample.requests;
+
+  if (reset) {
+    return { accepts: 0, handled: 0, requests: 0, active, timestamp };
+  }
+
+  return {
+    accepts: accepts - previousSample.accepts,
+    handled: handled - previousSample.handled,
+    requests: requests - previousSample.requests,
+    active,
+    timestamp,
+  };
+}
+
 async function collectNginxMetrics() {
   try {
     const nginxurl = getLocalNginx();
@@ -22,20 +50,16 @@ async function collectNginxMetrics() {
     const lines = data.trim().split('\n');
     const active = parseInt(lines[0].split(':')[1].trim(), 10);
     const [accepts, handled, requests] = lines[2].trim().split(/\s+/).map(Number);
-    const now = Date.now();
 
-    if (previous) {
-      const deltaMetrics = {
-        accepts: Math.max(0, accepts - previous.accepts),
-        handled: Math.max(0, handled - previous.handled),
-        requests: Math.max(0, requests - previous.requests),
-        active,
-        timestamp: now,
-      };
-
-      latestNginxMetrics = deltaMetrics;
+    // Reject a malformed stub_status response instead of letting NaN poison
+    // the deltas. previous is left untouched, so the next good poll resumes.
+    if (![active, accepts, handled, requests].every(Number.isFinite)) {
+      console.error('NGINX /status returned unexpected data:', JSON.stringify(lines));
+      return;
     }
 
+    const now = Date.now();
+    latestNginxMetrics = computeNginxDeltas(previous, { accepts, handled, requests, active, timestamp: now });
     previous = { accepts, handled, requests, timestamp: now };
   } catch (err) {
     console.error('Error collecting NGINX metrics:', err.message);
@@ -94,6 +118,7 @@ module.exports = {
   collectTftpMetrics,
   getTftpMetrics,
   parseTftpRequestsFromLog,
+  computeNginxDeltas,
 };
 
 // Start periodic polling 10s (skipped under test so no stray timers)

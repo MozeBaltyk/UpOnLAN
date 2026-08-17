@@ -19,7 +19,7 @@ module.exports = function(io) {
     registerMenuHandlers(socket, io);
     registerAssetHandlers(socket, io);
     registerLogHandlers(socket, io);
-    registerMetricHandlers(socket);
+    registerMetricHandlers(io, socket);
     registerWolHandlers(socket);
     registerDocHandlers(socket);
   });

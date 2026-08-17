@@ -1339,8 +1339,21 @@ function loaddoc(filename) {
 }
 // Handle document content response
 socket.on('docs:get:response', function({ filename, content }) {
-  const htmlContent = typeof marked !== 'undefined' ? marked.parse(content) : `<pre>${content}</pre>`;
-  $('#doc-viewer').html(`${htmlContent}`);
+  // content is already server-rendered HTML (docServices.getDocContent).
+  // Inject directly: re-parsing HTML as markdown mangles code blocks that
+  // contain blank lines (e.g. '# comment' lines re-render as <h1> headings).
+  $('#doc-viewer').html(content);
+});
+
+// Internal doc links: [foo](path/to/foo.md) navigate through the viewer.
+// The server strips leading ../ and appends .md if missing; we just decode
+// %20-style encoding and drop any #anchor before emitting.
+$('#doc-viewer').on('click', 'a', function(e) {
+  const href = $(this).attr('href');
+  if (href && href.split('#')[0].endsWith('.md')) {
+    e.preventDefault();
+    loaddoc(decodeURIComponent(href.split('#')[0]));
+  }
 });
 
 //// Render WOL page ////

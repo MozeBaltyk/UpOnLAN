@@ -43,22 +43,27 @@ This allows you to fully control and serve all necessary assets locally, ensurin
 A menu entry boots an OS by fetching its kernel, initramfs, and rootfs over HTTP. Nothing "links" the two — the iPXE script and the endpoint catalog must simply agree on the URL layout:
 
 ```text
-iPXE menu (.ipxe)                endpoint catalog (endpoints.yml)
-   │                                   │
-   │ kernel <origin><path>vmlinuz      │ path: /releases/download/<key>/
-   │ initrd  <origin><path>initrd  ←→  │ files: [vmlinuz, initrd, squashfs.img]
-   │                                   │
-   ▼                                   ▼
-<origin> = boot HTTP origin: the local nginx root (/assets) or a GitHub release
+iPXE menu (.ipxe)                      endpoint catalog (endpoints.yml)
+    │                                          │
+    │ kernel ${mirror_endpoint}${asset_path}<key>/vmlinuz
+    │ initrd  ${mirror_endpoint}${asset_path}<key>/initrd
+    │                                          │  path: /assets/<key>/  (local mirror)
+    │                                          │  files: [vmlinuz, initrd, squashfs.img]
+    ▼                                          ▼
+<key> = <os>-<version>-<arch>; the files must match the endpoint's `files`
 ```
 
-1. **`endpoints.yml`** declares a boot bundle: a `path` plus the `files` served under it (kernel, initrd, rootfs, checksums...).
-2. **The Assets tab** mirrors those files with *Pull Selected* (`dlremote`): each `path + file` is downloaded from the configured origin into `/assets` at the same relative path. Nginx serves `/assets` as its web root, so every mirrored file is reachable at `<boot host>:${NGINX_PORT}<path><file>`.
-3. **The iPXE menu** points `kernel` / `initrd` / rootfs at exactly those URLs. The menu's `${live_endpoint}` (defined in `release/menus/boot.cfg`) is the boot origin — either the local nginx URL or a GitHub release base.
+1. **`endpoints.yml`** declares a boot bundle: a `path` plus the `files` served under it (kernel, initrd, rootfs, checksums...). Its `path` is relative to the *asset origin*: `/assets/<key>/` for the local mirror, `/releases/download/<key>/` for GitHub release assets.
+2. **The Assets tab** mirrors those files with *Pull Selected* (`dlremote`): each `path + file` is downloaded from the configured origin into `/assets/<key>/`. Nginx serves `/assets` as its web root, so every mirrored file is reachable at `<boot host>:${NGINX_PORT}/<key>/<file>`.
+3. **The iPXE menu** points `kernel` / `initrd` / rootfs at exactly those URLs, via two variables defined in `release/menus/boot.cfg`:
+   - `${mirror_endpoint}` — the boot origin for **your** mirrored assets. Defaults to `https://github.com/MozeBaltyk/UpOnLAN`; a local deployment overrides it in `release/menus/local-vars.ipxe` to the nginx URL (e.g. `http://192.168.7.1:8080`).
+   - `${asset_path}` — the path prefix. Defaults to `/releases/download/` (GitHub release layout); the local override sets it to `/` because nginx serves `/assets` at its root, so the local URL is `<mirror_endpoint>/<key>/<file>`.
 
-The consequence: **the path and file names in a menu must match an endpoint's `path` + `files`** in `endpoints.yml`. If they drift, the boot fails even though the assets are fully mirrored.
+The full boot URL is `${mirror_endpoint}${asset_path}<key>/<file>`. On GitHub that resolves to `https://github.com/MozeBaltyk/UpOnLAN/releases/download/<key>/<file>`; locally it resolves to `http://192.168.7.1:8080/<key>/<file>` (which nginx maps to `/assets/<key>/<file>`).
 
-> ⚠️ Current state of the shipped menus: `harvester.ipxe`, `oracle.ipxe`, `proxmox.ipxe`, and `ubuntu.ipxe` still use the upstream Netboot.xyz asset layout (`/asset-mirror/releases/download/<version>-<hash>/` and vendor file names like `harvester-vmlinuz-amd64`), and `boot.cfg` defaults `live_endpoint` to `https://github.com/netbootxyz`. They therefore boot from the Netboot.xyz mirror, not from a locally mirrored bundle. Pointing them at an UpOnLAN mirror means rewriting their URLs to the endpoint layout above.
+The consequence: **the `<key>` and file names in a menu must match an endpoint's `<key>` + `files`** in `endpoints.yml`. If they drift, the boot fails even though the assets are fully mirrored.
+
+> ⚠️ Current state of the shipped menus: `talos.ipxe`, `harvester.ipxe`, and `oracle.ipxe` already use the endpoint layout above (`${mirror_endpoint}${asset_path}<key>/`). `proxmox.ipxe` and `ubuntu.ipxe` still use the upstream Netboot.xyz layout via the separate `${live_endpoint}` (`https://github.com/netbootxyz`), so they boot from the Netboot.xyz mirror until an UpOnLAN recipe for them is mirrored — see the *Develop a new menu with its own assets* section further down.
 
 ---
 
@@ -69,7 +74,7 @@ An **endpoint** is one entry in `endpoints.yml` that points an iPXE menu (and th
 ```yaml
 endpoints:
   oracle-9-x86_64:                     # unique key == release tag == directory
-    path: /releases/download/oracle-9-x86_64/  # files are served under <mirror origin><path>
+    path: /assets/oracle-9-x86_64/     # files are served under <origin><path>
     files:
     - vmlinuz                          # kernel
     - initrd                           # initramfs
@@ -79,10 +84,39 @@ endpoints:
     arch: x86_64
 ```
 
+> `path` is `/assets/<key>/` for the local mirror and `/releases/download/<key>/` for GitHub release assets (`release/assets/build.sh` sets it from `MIRROR_LAYOUT`). The menu never hardcodes either — it composes `${mirror_endpoint}${asset_path}<key>/`.
+
 To add a new endpoint:
 
-1. **Create a build recipe** at `release/assets/<os>/setting.sh`. The script is sourced by `release/assets/build.sh` and must export `OS`, `VERSION`, `ARCHS`, `BUILD_TYPE`, and `EXTRACTS` (`URL|output_file` lines, one per file, with `REPLACE_ARCH` for per-arch URLs). See `release/assets/harvester/setting.sh` for `direct_file` (download prebuilt artifacts) and `release/assets/oracle9/setting.sh` for `iso_extraction` (pull kernel/initrd/rootfs out of an ISO).
-2. **Run `scripts/release_assets.sh`** — it executes every recipe and appends the generated entries to `release/output/endpoints.yml` (this is the file the webapp serves).
-3. **Mirror the entry in `release/assets/endpoints.yml`** — the committed file is the reference catalog; keep it in sync with the generated output so the Assets tab is correct before the pipeline runs.
+1. **Create a build recipe** at `release/assets/<os>/setting.sh`. The script is sourced by `release/assets/build.sh` and must export `OS`, `VERSION`, `ARCHS`, `BUILD_TYPE`, and `EXTRACTS` (`URL|output_file` lines, one per file, with `REPLACE_ARCH` for per-arch URLs). See `release/assets/talos/setting.sh` for `direct_file` (download prebuilt artifacts) and `release/assets/oracle9/setting.sh` for `iso_extraction` (pull kernel/initrd/rootfs out of an ISO).
+2. **Run `scripts/release_assets.sh [<os>]`** — it executes the recipe and appends the generated entry to `release/output/assets/endpoints.yml` (the file `init.sh` serves to the webapp).
+3. **Keep `release/assets/endpoints.yml` in sync** — the committed file is the reference catalog; mirror the generated entry there so the Assets tab is correct before the pipeline runs.
 
 The generated endpoint key is `${OS}-${VERSION}-${GENERIC_ARCH}` (`amd64` → `x86_64`, `aarch64` → `arm64`), so one multi-arch OS produces one endpoint per architecture.
+
+## ➕ Develop a new menu with its own assets
+
+Adding a brand-new boot entry is a two-sided change: an **asset recipe** (so the kernel/initrd/rootfs exist) and a **menu entry** (so the iPXE menu offers it and points at those files). End to end:
+
+1. **Write the asset recipe** `release/assets/<os>/setting.sh` (see *Adding a New Endpoint* above) and run `./wakemeup.sh -a mirror-assets` (or `asset_target=<os> ... -a mirror-assets`) to produce `release/output/assets/<key>/` and its `endpoints.yml` entry.
+
+2. **Write the menu script** `release/menus/<os>.ipxe`. The boot handler composes its URLs from the two `boot.cfg` variables and the endpoint key:
+
+   ```ipxe
+   #!ipxe
+   goto ${menu} ||
+
+   :<os>
+   set <os>_url ${mirror_endpoint}${asset_path}<key>/
+   kernel ${<os>_url}vmlinuz <boot params>
+   initrd ${<os>_url}initrd
+   boot
+   ```
+
+   Use `<key> = <os>-<version>-<arch>` exactly as generated, and the exact file names from `endpoints.yml` `files`. This is the contract — no other "wiring" exists between menu and assets.
+
+3. **Register the entry** in the parent menu so it appears in the menu tree. For a Linux installer, add an `item <os> <label>` to `release/menus/linux.ipxe` (and `linux-arm.ipxe` if it has an arm64 bundle). The main `menu.ipxe` chains `linux.ipxe` when the user selects *Linux Network Installs*.
+
+4. **Rebuild and redeploy.** Run `scripts/release_menu.sh <version>` (fails fast if the ROMs are missing) then `./wakemeup.sh -a redeploy --local`, or the one-shot `scripts/build_release.sh <version>`. The new entry appears on the next boot.
+
+A working reference is `talos.ipxe` + `release/assets/talos/setting.sh`: the recipe mirrors `vmlinuz`/`initrd` to `<key> = talos-v1.13.8-<arch>`, and the menu boots `${mirror_endpoint}${asset_path}talos-v1.13.8-${arch}/vmlinuz` with a config-URL parameter item.

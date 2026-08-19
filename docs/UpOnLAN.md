@@ -9,6 +9,9 @@ This web app aims to:
 - Serve Assets during PXE install
 - Documentation about iPXE and UpOnLAN 
 - Provide logs and live system metrics (TFTP, usage, boot activity, etc.)
+- Mirror menus and assets for local testing (`release/output` → `menu/` + `assets/`)
+- Create and manage a diskless KVM test VM with an interactive serial console (BIOS/UEFI)
+- Build serial-enabled iPXE ROMs and boot media
 
 ---
 

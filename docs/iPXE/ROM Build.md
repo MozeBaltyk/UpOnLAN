@@ -6,6 +6,32 @@ The iPXE binary is the first executable a machine loads; the menu is content it 
 
 Build a custom binary when the executable must carry an embedded wrapper or a custom default boot flow. Build media when the target must start iPXE from local/removable media rather than the existing network-boot path.
 
+## Why a VM must boot a ROM to show the menu
+
+A common source of confusion is that the iPXE menu does not render "directly" on a libvirt VM — every boot still loads an iPXE **binary** first. The reason comes down to the difference between the *menu* and the *boot program*:
+
+- The **menu (`menu.ipxe`, `boot.cfg`)** is a *script*: plain-text instructions (`kernel`, `initrd`, `chain`, `menu`, `item`, `choose`). It is content, not an executable.
+- The **iPXE binary** is the *interpreter* that reads and runs that script. The VM firmware has no such interpreter.
+
+On power-on the path is therefore always two stages:
+
+```text
+VM firmware (SeaBIOS / OVMF)                  no iPXE interpreter
+        │
+        ▼
+iPXE binary (option ROM / e1000 ROM / efi)    the interpreter — DHCPs first
+        │
+        ▼
+menu.ipxe  (TFTP or HTTP)                     the script — rendered by iPXE
+```
+
+Two QEMU/libvirt details make this unavoidable in practice:
+
+1. **Ubuntu's QEMU ships no e1000 PXE option ROM.** The emulated NIC therefore does nothing network-wise by default — the guest never even issues a DHCP request. SeaBIOS (BIOS) has no built-in PXE client either: it delegates PXE to the NIC's option ROM. So a `<rom file=.../>` pointing at a built iPXE option ROM is required, or the BIOS guest has no network boot path at all.
+2. **Stock iPXE ROMs are VGA-only.** The serial Console tab shows whatever iPXE writes to the serial port. The distro/`ipxe-qemu` binaries do not enable `CONSOLE_SERIAL`, so their menu output goes to a VGA framebuffer the serial console never sees. The ROM built by `scripts/build_ipxe_roms.sh` defines `CONSOLE_SERIAL`, which is what makes the menu text appear on the PTY serial console.
+
+So the menu is never rendered by libvirt directly — it is rendered *by the iPXE binary* that the ROM (or the UEFI network stack) puts into the guest. The "boot on ROM" step is simply loading that interpreter; building the ROM with `CONSOLE_SERIAL` is what routes its output to the serial console.
+
 Choose output for the target:
 
 - **Legacy BIOS:** select Legacy disks for BIOS-compatible iPXE boot files.

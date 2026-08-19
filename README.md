@@ -15,6 +15,8 @@ This webapp aims to:
 - Show logs and live metrics
 - Provide built-in docs for iPXE and UpOnLAN
 - Support local testing/mirroring of releases and assets
+- Create and manage a diskless KVM test VM with an interactive serial console (BIOS/UEFI)
+- Build serial-enabled iPXE ROMs and boot media
 
 ## Documentation goals
 
@@ -61,12 +63,12 @@ Use these when you want to test without guessing:
 ./wakemeup.sh -a test-webapp
 ```
 
-Release artifacts come in two layers:
-- **menu artifact**: `release/output/releases/download/<version>/menus.tar.gz` from `release/menus/`
-- **asset output**: `release/output/endpoints.yml` + `release/output/releases/download/<asset-key>/...` from `release/assets/`
+Release artifacts come in two layers, split under `release/output/`:
+- **menu layer**: `release/output/menu/latest` + `release/output/menu/<version>/menus.tar.gz` from `release/menus/`
+- **asset layer**: `release/output/assets/endpoints.yml` + `release/output/assets/<asset-key>/...` from `release/assets/`
 
-`mirror-assets` builds the asset side of `release/output/`.
-`scripts/release_menu.sh <version>` builds the menu artifact into `release/output/`.
+`mirror-assets` builds the asset layer of `release/output/`.
+`scripts/release_menu.sh <version>` builds the menu layer into `release/output/`.
 `deploy --local` does not build anything. It stages config from the already prepared `release/output/` and deploys through `manifests/uponlan-local.yaml`.
 `test-webapp` runs the webapp test suite inside the container.
 ```bash
@@ -75,8 +77,8 @@ asset_target=harvester ./wakemeup.sh -a mirror-assets
 
 Use `asset_target` to build just one asset set while debugging.
 
-`release/output/endpoints.yml` is the asset catalog consumed separately from `menus.tar.gz`.
-`release/output/` is the single local/pipeline release layout.
+`release/output/assets/endpoints.yml` is the asset catalog consumed separately from `menus.tar.gz`.
+`release/output/` is the single local/pipeline release layout, mirroring the GitHub release structure (`menu/` and `assets/` namespaces).
 
 See [Deployment](docs/UpOnLAN/Deployment.md) for remote and local deployment, ports, security, and release artifacts. See [Operations](docs/UpOnLAN/Operations.md) for logs, recovery, backup, and destructive-operation behavior.
 

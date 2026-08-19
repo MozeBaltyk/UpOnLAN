@@ -21,16 +21,15 @@ This is more of a roadmap or wish list than a finalized feature set — but it s
 - [x] Add new actions to menu choices
 - [x] Support custom endpoint URLs
 - [x] Web app displays logs and live metrics
-- [x] Test **PXE boot** with a Libvirt VM
+- [x] Test **PXE boot** with a KVM VM via the web console (serial console, BIOS/UEFI)
 - [x] Display iPXE and UpOnLAN documentation in the web app
-- [x] Build 🔄 PXE boot files directly from the web app (via backend Ansible playbooks)
-- [x] Automated test suite: unit / integration / e2e / smoke layers
+- [x] Build 🔄 serial-enabled iPXE ROMs and boot media (`scripts/build_ipxe_roms.sh` + Ansible)
+- [x] Automated test suite: webapp Vitest (unit / integration / e2e / smoke) + release specs (`tests/specs`)
 - [ ] Release menus, assets, and Docker images
 - [ ] List **Cloud-init** assets 📝 (with a "category" column)
-- [ ] Provide a standard UpOnLAN menu with:
-  - 🐧 Rocky Linux 8/9, Ubuntu, Oracle Linux 8/9
-  - 🌾 Harvester
-  - 🧱 Proxmox
+- [ ] Provide a fully local UpOnLAN menu (endpoint-layout assets for every entry):
+  - [x] Harvester, Oracle Linux 8/9, Talos Linux (mirrored via `release/assets`)
+  - [ ] Rocky Linux, Ubuntu, Proxmox (still boot the Netboot.xyz mirror via `${live_endpoint}`)
 - [ ] Build and publish 🔁 UpOnLAN container images via CI pipeline
 - [x] Provide a 🌐 **Wake-On-LAN** service with web GUI:
   - [x] Add/delete entries

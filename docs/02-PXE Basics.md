@@ -23,6 +23,8 @@ TFTP server -- iPXE boot program --> client
 - **HTTP server:** serves menus and larger boot/install content after iPXE starts.
 - **Assets:** the kernels, initrds, installers, and other files selected by a menu entry.
 
+> The menu is a *script*, not an executable — it only renders after an iPXE binary is running and fetches it. See [ROM Build](iPXE/ROM%20Build.md) for why a libvirt VM must load an iPXE binary (`CONSOLE_SERIAL`) from an option ROM (BIOS) or the OVMF network stack (UEFI) before it can show the menu on the serial console.
+
 ### UpOnLAN's boundary
 
 UpOnLAN manages and builds menus, serves TFTP/iPXE and HTTP menus/assets, mirrors assets, and provides Wake-on-LAN and a web interface. It does not provide or configure DHCP, and it does not make a network boot target trustworthy by itself.

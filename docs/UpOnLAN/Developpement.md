@@ -8,13 +8,17 @@ This documentation act as a PRD (Product Requirements Document) describing the t
 
 The **UpOnLAN WebApp** allows users to:
 
-✅ Manage PXE boot menus with layered local/remote configuration       
+✅ Manage PXE boot menus with layered local/remote configuration
 
-✅ Download, update, or override assets like ISOs, kernels, and boot files       
+✅ Download, update, or override assets like ISOs, kernels, and boot files
 
-✅ Trigger builds via Ansible playbooks to generate ROMs, ISOs, or other boot artifacts       
+✅ Build serial-enabled iPXE ROMs and boot media (via `scripts/build_ipxe_roms.sh` / Ansible)
 
-✅ Monitor build progress and system status in real-time via WebSockets        
+✅ Create and manage a diskless KVM test VM with an interactive serial console (BIOS/UEFI)
+
+✅ Trigger builds via Ansible playbooks to generate ROMs, ISOs, or other boot artifacts
+
+✅ Monitor build progress and system status in real-time via WebSockets
 
 ✅ Access project documentation directly from the web interface      
 
@@ -42,17 +46,18 @@ This projects includes several components :
 tree -L 2
 .
 ├── Containerfile     # Build UpOnLAN.xyz image
-├── ansible           # Divers roles to used by webapp in backend and Github Workflows
+├── ansible           # Roles used by the webapp backend and Github Workflows
 ├── docs              # Markdown docs displayed in the webapp
 ├── manifests         # K8s manifests to deploy with podman kube play or on K8s platform.
-├── release           # Default menus and assets used in UpOnLAN.xyz
-├── scripts           # Scripts to test iPXE menu through libvirt VM
-├── src               
-│   ├── defaults      # Default config used by init.sh during deployement
-│   ├── etc           # Config supervisor services (TFTP,nginx,webapp)
-│   ├── init.sh       # Init script launched by start.sh
-│   ├── start.sh      # Startup script launched by the containerfile
-│   └── webapp        # The webapp code source
+├── release           # Default menus (menus/) and asset recipes (assets/) shipped with UpOnLAN
+├── scripts           # Release/build scripts: iPXE ROMs, asset mirror, menu tarball
+├── src
+│   ├── defaults      # Default config used by init.sh during deployment
+│   ├── etc           # Config supervisor services (TFTP, nginx, webapp)
+│   ├── init.sh       # Init script launched by start.sh
+│   ├── start.sh      # Startup script launched by the containerfile
+│   └── webapp        # The webapp source code
+├── tests             # Release-flow specs (tests/specs, Python) for scripts + layout
 └── wakemeup.sh       # helper to launch and test UpOnLAN.xyz
 ```
 
@@ -191,4 +196,8 @@ In CI, `.github/workflows/test.yml` runs the four layers on every push/PR touchi
 - Container volumes (`/config`, `/assets`, `/docs`, `/logs`) are overridable via the `UPONLAN_CONFIG`, `UPONLAN_ASSETS`, `UPONLAN_DOCS`, `UPONLAN_LOGS` env vars so tests run against fixture files with **zero mocking**.
 - `app.js` exports `{ app, http, io }` and only listens when run directly (`require.main === module`), letting tests boot the server on an ephemeral port.
 - `npm` is a build-only dependency in the container image (purged after install), so in-container runs invoke vitest directly: `node node_modules/vitest/vitest.mjs run`.
+
+### Release-flow specs (Python)
+
+The shell scripts and the `release/output` layout are covered by a separate Python `unittest` suite in `tests/specs/` (run `./tests/specs/run.sh`). These validate the release pipeline — the `menu/` + `assets/` layout, `build.sh` layouts (GitHub vs local), `release_assets.sh` targeted/untargeted behavior, `release_menu.sh` fail-fast, the iPXE `asset_path` resolution (GitHub vs local), and `init.sh` / `wakemeup.sh` URL construction — against the real scripts in a temp directory with only `curl`/`sudo`/`python3` stubbed.
 

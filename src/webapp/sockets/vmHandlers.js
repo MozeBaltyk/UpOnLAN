@@ -26,8 +26,9 @@ function normalizeFirmware(firmware) {
   return firmware === 'efi' ? 'efi' : 'bios';
 }
 
-// virsh subcommands the container sudoers whitelist allows.
-const POWER_ACTIONS = { on: 'start', off: 'destroy', reboot: 'reboot' };
+// virsh subcommands the container sudoers whitelist allows (restart is a
+// power cycle — destroy + start — handled separately below).
+const POWER_ACTIONS = { on: 'start', off: 'destroy' };
 
 // `virsh console` is exclusive per domain; keep one attachment per VM so a
 // second tab doesn't fight the first. Map: VM name -> child process.
@@ -168,6 +169,30 @@ module.exports = function registerVmHandlers(socket) {
   socket.on('vm:status', sendStatus);
 
   socket.on('vm:power', async (action) => {
+    // 'restart' is a power cycle: destroy (if running) then start. The guest
+    // boots into the iPXE menu, where there is no OS to ACPI-reboot, so a clean
+    // destroy+start is the reliable restart; on a stopped VM it just powers on.
+    if (action === 'restart') {
+      const state = await getVmState();
+      if (state === 'not found') {
+        socket.emit('vm:action:result', { action, ok: false, message: `VM '${VM_NAME}' is not defined on the host` });
+        sendStatus();
+        return;
+      }
+      if (state === 'running') {
+        const d = await runVirsh(['destroy', VM_NAME]);
+        if (!d.ok) {
+          socket.emit('vm:action:result', { action, ok: false, message: d.err });
+          sendStatus();
+          return;
+        }
+      }
+      const s = await runVirsh(['start', VM_NAME]);
+      socket.emit('vm:action:result', { action, ok: s.ok, message: s.ok ? `VM '${VM_NAME}' restarted` : s.err });
+      sendStatus();
+      return;
+    }
+
     const virshAction = POWER_ACTIONS[action];
     if (!virshAction) {
       socket.emit('vm:action:result', { action, ok: false, message: `Unknown action: ${action}` });

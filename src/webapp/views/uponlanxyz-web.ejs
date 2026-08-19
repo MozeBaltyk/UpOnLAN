@@ -630,9 +630,45 @@ if ($('#buildModal').length === 0) {
   `);
 }
 
+// Firmware selection modal for the Console tab's Create VM button.
+if ($('#vmFirmwareModal').length === 0) {
+  $('body').append(`
+    <div class="modal fade" id="vmFirmwareModal" tabindex="-1" role="dialog" aria-labelledby="vmFirmwareModalLabel">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="vmFirmwareModalLabel">Create VM — firmware</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p>Select the firmware for the new diskless VM:</p>
+            <button type="button" class="btn btn-outline-dark btn-block text-left mb-2" data-firmware="bios">
+              <strong>BIOS</strong><br>
+              <small>Legacy boot via the e1000 iPXE option ROM.</small>
+            </button>
+            <button type="button" class="btn btn-outline-dark btn-block text-left" data-firmware="efi">
+              <strong>UEFI</strong><br>
+              <small>OVMF boot via the iPXE EFI binary.</small>
+            </button>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+$(document).on('click', '#vmFirmwareModal [data-firmware]', function () {
+  $('#vmFirmwareModal').modal('hide');
+  socket.emit('vm:create', $(this).data('firmware'));
+});
+
 // Show modal on Build button click
 $(document).on('click', '#btnBuild', function () {
-  $('#bootVersionInput').attr('placeholder', current_menu_version);
   $('#buildModal').modal('show');
 });
 
@@ -1499,8 +1535,8 @@ socket.on('vm:status', function(data) {
   if (data.error) showToast(data.error, 'danger');
 });
 socket.on('vm:action:result', function(res) {
-  if (res.ok && res.action === 'on') {
-    // VM booted — reconnect the serial console (stale session is force-replaced).
+  if (res.ok && (res.action === 'on' || res.action === 'create' || res.action === 'restart')) {
+    // VM booted/created/restarted — reconnect the serial console (stale session is force-replaced).
     setTimeout(function() { socket.emit('vm:console:start'); }, 2000);
   } else if (res.ok && res.action === 'off') {
     socket.emit('vm:console:stop');
@@ -1522,14 +1558,9 @@ function renderconsole() {
       <div class="card-header">VM Console</div>
       <div class="card-body">
         <div class="d-flex align-items-center mb-3">
-          <button class="btn btn-success btn-sm mr-2" onclick="vmPower('on')">Power On</button>
-          <button class="btn btn-danger btn-sm mr-2" onclick="vmPower('off')">Power Off</button>
-          <select id="vm-firmware" class="form-control form-control-sm mr-2" style="width:auto;display:inline-block;" title="Firmware for the created VM">
-            <option value="bios">BIOS</option>
-            <option value="efi">UEFI</option>
-          </select>
           <button class="btn btn-outline-success btn-sm mr-2" onclick="vmCreate()">Create VM</button>
           <button class="btn btn-outline-danger btn-sm mr-2" onclick="vmDestroy()">Destroy VM</button>
+          <button class="btn btn-outline-primary btn-sm mr-2" onclick="vmRestart()">Restart VM</button>
           <span id="vm-state" class="text-muted ml-2"></span>
         </div>
         <div id="vm-console" style="height:72vh; min-height:420px; background:#000;"></div>
@@ -1560,12 +1591,12 @@ function renderconsole() {
   socket.emit('vm:console:start');
 }
 
-function vmPower(action) {
-  socket.emit('vm:power', action);
+function vmCreate() {
+  $('#vmFirmwareModal').modal('show');
 }
 
-function vmCreate() {
-  socket.emit('vm:create', document.getElementById('vm-firmware').value);
+function vmRestart() {
+  socket.emit('vm:power', 'restart');
 }
 
 function vmDestroy() {

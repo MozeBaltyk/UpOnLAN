@@ -28,8 +28,8 @@ This is more of a roadmap or wish list than a finalized feature set — but it s
 - [ ] Release menus, assets, and Docker images
 - [ ] List **Cloud-init** assets 📝 (with a "category" column)
 - [ ] Provide a fully local UpOnLAN menu (endpoint-layout assets for every entry):
-  - [x] Harvester, Oracle Linux 8/9, Talos Linux (mirrored via `release/assets`)
-  - [ ] Rocky Linux, Ubuntu, Proxmox (still boot the Netboot.xyz mirror via `${live_endpoint}`)
+  - [x] Harvester, Oracle Linux 8/9, Talos Linux, Proxmox (PBS/PMG/VE), Ubuntu (subiquity)
+  - [ ] Rocky Linux (still boots `download.rockylinux.org` directly; no local recipe)
 - [ ] Build and publish 🔁 UpOnLAN container images via CI pipeline
 - [x] Provide a 🌐 **Wake-On-LAN** service with web GUI:
   - [x] Add/delete entries

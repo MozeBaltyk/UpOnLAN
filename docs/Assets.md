@@ -63,7 +63,7 @@ The full boot URL is `${mirror_endpoint}${asset_path}<key>/<file>`. On GitHub th
 
 The consequence: **the `<key>` and file names in a menu must match an endpoint's `<key>` + `files`** in `endpoints.yml`. If they drift, the boot fails even though the assets are fully mirrored.
 
-> ⚠️ Current state of the shipped menus: `talos.ipxe`, `harvester.ipxe`, and `oracle.ipxe` already use the endpoint layout above (`${mirror_endpoint}${asset_path}<key>/`). `proxmox.ipxe` and `ubuntu.ipxe` still use the upstream Netboot.xyz layout via the separate `${live_endpoint}` (`https://github.com/netbootxyz`), so they boot from the Netboot.xyz mirror until an UpOnLAN recipe for them is mirrored — see the *Develop a new menu with its own assets* section further down.
+> ⚠️ Current state of the shipped menus: `talos.ipxe`, `harvester.ipxe`, `oracle.ipxe`, `proxmox.ipxe` (PBS/PMG/VE), and `ubuntu.ipxe` (subiquity) all use the endpoint layout above (`${mirror_endpoint}${asset_path}<key>/`) and have mirrored recipes under `release/assets/`. The remaining non-local entries boot straight from a vendor mirror, not Netboot.xyz: `rockylinux.ipxe` uses `${rockylinux_mirror}` (download.rockylinux.org) and `ubuntu.ipxe`'s legacy `d-i` installer uses `${ubuntu_mirror}` (archive.ubuntu.com). `boot.cfg`'s `${live_endpoint}` is now unused.
 
 ---
 

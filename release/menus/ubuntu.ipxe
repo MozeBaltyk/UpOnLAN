@@ -89,22 +89,22 @@ md5sum linux initrd.gz
 boot
 
 :oracular_amd64
-set kernel_url ${live_endpoint}/ubuntu-squash/releases/download/24.10-fcf8807c/
+set kernel_url ${mirror_endpoint}${asset_path}ubuntu-${ubuntu_version}-${arch}/
 set codename oracular
 set version_number 24.10
 goto sub_boot
 :oracular_arm64
-set kernel_url ${live_endpoint}/ubuntu-squash/releases/download/24.10-f22a7742/
+set kernel_url ${mirror_endpoint}${asset_path}ubuntu-${ubuntu_version}-${arch}/
 set codename oracular
 set version_number 24.10
 goto sub_boot
 :plucky_amd64
-set kernel_url ${live_endpoint}/ubuntu-squash/releases/download/25.04-8094159e/
+set kernel_url ${mirror_endpoint}${asset_path}ubuntu-${ubuntu_version}-${arch}/
 set codename plucky
 set version_number 25.04
 goto sub_boot
 :plucky_arm64
-set kernel_url ${live_endpoint}/ubuntu-squash/releases/download/25.04-e56e947a/
+set kernel_url ${mirror_endpoint}${asset_path}ubuntu-${ubuntu_version}-${arch}/
 set codename plucky
 set version_number 25.04
 goto sub_boot

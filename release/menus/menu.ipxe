@@ -5,8 +5,12 @@ isset ${arch} && goto skip_arch_detect ||
 cpuid --ext 29 && set arch x86_64 || set arch i386
 iseq ${buildarch} arm64 && set arch arm64 ||
 :skip_arch_detect
-chain --autofree boot.cfg ||
-ntp 0.pool.ntp.org ||
+chain --autofree local-vars.ipxe ||
+chain --autofree boot.cfg || goto bootcfg_failed
+chain --autofree version.ipxe
+# ponytail: NTP deliberately not run before the menu - it blocks presentation on
+# isolated lab networks (no DNS/Internet) and nothing in the menus consumes the
+# timestamp. Re-add behind a variable only if a boot entry needs a synced clock.
 iseq ${cls} serial && goto ignore_cls ||
 set cls:hex 1b:5b:4a  # ANSI clear screen sequence - "^[[J"
 set cls ${cls:string}
@@ -15,11 +19,15 @@ set cls ${cls:string}
 isset ${menu} && goto ${menu} ||
 isset ${ip} || dhcp
 
+# Defensive fallback so a degraded menu (e.g. boot.cfg missing) still renders
+# instead of erroring on an empty timeout. boot.cfg overrides this normally.
+isset ${boot_timeout} || set boot_timeout 0
+
 :main_menu
 clear menu
 set space:hex 20:20
 set space ${space:string}
-isset ${next-server} && menu ${site_name} v${version} - next-server: ${next-server} || menu ${site_name}
+isset ${next-server} && menu ${site_name} v${menu_version} - next-server: ${next-server} || menu ${site_name}
 item --gap Default:
 item local ${space} Boot from local hdd
 item --gap Distributions:
@@ -28,9 +36,16 @@ iseq ${menu_linux_arm} 1 && item linux-arm ${space} Linux Network Installs (arm6
 item netinfo ${space} Network card info
 
 isset ${menu} && set timeout 0 || set timeout ${boot_timeout}
-choose --timeout ${timeout} --default ${menu} menu || goto local
+choose --timeout ${timeout} --default ${menu} menu || goto menu_timeout
 echo ${cls}
-goto ${menu} 
+goto ${menu}
+
+:menu_timeout
+# Diskless PXE client: the old default fell through to "Boot from local hdd",
+# which cannot work without a disk and reboot-looped back to PXE. Keep the
+# operator at the menu instead.
+echo No boot selection made - returning to menu
+goto main_menu
 
 :change_menu
 chain ${menu}.ipxe || goto error
@@ -42,8 +57,31 @@ prompt
 goto main_menu
 
 :local
-echo Booting from local disks ...
-exit 1
+# Diskless PXE client: there is no local disk. `choose` returns 0 on timeout
+# (selecting the first item, "local"), so `|| goto menu_timeout` above never
+# fires — the timeout lands here. Re-render instead of `exit 1` (which drops
+# to the iPXE shell via embed.ipxe's `:menu_failed`).
+echo No local disk - returning to menu
+goto main_menu
+
+:linux
+chain linux.ipxe || goto error
+goto main_menu
+
+:linux-arm
+chain linux-arm.ipxe || goto error
+goto main_menu
+
+:netinfo
+chain netinfo.ipxe || goto error
+goto main_menu
+
+:bootcfg_failed
+echo ERROR: could not load boot.cfg (missing file, TFTP/HTTP serving problem, or permission denied)
+echo Menu variables were not initialized - boot entries may be incomplete.
+echo Retry from the shell with: chain --autofree boot.cfg
+shell
+goto main_menu
 
 :shell
 echo Type "exit" to return to menu.

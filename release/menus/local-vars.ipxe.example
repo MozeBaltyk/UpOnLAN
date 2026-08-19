@@ -1,0 +1,7 @@
+#!ipxe
+# Local-asset override. Copy this file to local-vars.ipxe (next to menu.ipxe,
+# in the TFTP root /config/menus) and point mirror_endpoint at your local nginx
+# asset mirror. menu.ipxe chains local-vars.ipxe before boot.cfg, so this wins
+# over boot.cfg's GitHub default. release_menu.sh excludes local-vars.ipxe from
+# menus.tar.gz, so a lab IP never leaks into a shipped release.
+set mirror_endpoint http://192.168.7.1:8080

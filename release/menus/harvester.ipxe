@@ -8,11 +8,9 @@ goto ${menu} ||
 
 :harvester
 set os Harvester
-set os_arch ${arch}
-iseq ${os_arch} x86_64 && set os_arch amd64 ||
-menu ${os} - ${os_arch}
+menu ${os} - ${arch}
 item --gap Harvester:
-item harvester_url ${space} Begin install of Harvester ${os} v1.5.0
+item harvester_url ${space} Begin install of Harvester ${os} v1.7.3 (${arch})
 item --gap Parameters:
 item harvester_config_url ${space} Set config-create or config-join.yaml URL: ${harvester_config_url}
 choose --default ${menu} menu || goto harvester_exit
@@ -26,18 +24,20 @@ clear menu
 goto harvester
 
 :harvester_url
-set harvester_url ${live_endpoint}/asset-mirror/releases/download/v1.5.0-c82c6d22/
+# ponytail: version pinned to the mirrored bundle (harvester-v1.7.3-<arch> in
+# endpoints.yml); re-bump when release_assets mirrors a newer Harvester.
+set harvester_url ${mirror_endpoint}/releases/download/harvester-v1.7.3-${arch}/
 goto harvester_boot
 
 :harvester_boot
 set install_params harvester.install.automatic=true harvester.install.config_url=${harvester_config_url}
-set boot_params ip=dhcp net.ifnames=1 console=ttyS0 console=tty1 rd.cos.disable root=live:${harvester_url}/harvester-rootfs-${os_arch}.squashfs rd.noverifyssl
+set boot_params ip=dhcp net.ifnames=1 console=ttyS0 console=tty1 rd.cos.disable root=live:${harvester_url}squashfs.img rd.noverifyssl
 imgfree
-kernel ${harvester_url}/harvester-vmlinuz-${os_arch} ${install_params} ${boot_params} initrd=initrd.magic ${cmdline}
-initrd ${harvester_url}/harvester-initrd-${os_arch}
+kernel ${harvester_url}vmlinuz ${install_params} ${boot_params} initrd=initrd.magic ${cmdline}
+initrd ${harvester_url}initrd
 echo
 echo MD5sums:
-md5sum harvester-vmlinuz-${os_arch} harvester-initrd-${os_arch}
+md5sum vmlinuz initrd
 boot
 
 :harvester_exit

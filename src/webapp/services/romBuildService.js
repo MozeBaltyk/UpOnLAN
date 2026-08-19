@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
-const BUILD_SCRIPT = '/scripts/build_ipxe_roms.sh';
+const BUILD_SCRIPT = process.env.UPONLAN_ROM_BUILD_SCRIPT || '/scripts/build_ipxe_roms.sh';
 const CONFIG_ROOT = process.env.UPONLAN_CONFIG || '/config';
 // Media-mode output: the TFTP/HTTP ROM root (nginx serves /config/menus/rom at /rom).
 const OUT_ROM = path.join(CONFIG_ROOT, 'menus', 'rom', 'ipxe');

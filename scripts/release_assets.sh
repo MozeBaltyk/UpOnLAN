@@ -4,7 +4,11 @@ set -e
 mirror_root="release/output"
 target="${1:-}"
 
-rm -rf "$mirror_root"
+# A full (untargeted) run resets the mirror; a targeted run adds/refreshes
+# just that asset set on top of what is already there.
+if [ -z "$target" ]; then
+    rm -rf "$mirror_root"
+fi
 mkdir -p "$mirror_root/releases/download"
 
 for i in $(ls release/assets/*/setting.sh); do

@@ -24,7 +24,7 @@ function buildFixtureFilesystem(root, overrides = {}) {
     'config/menus/rom/.keep': '',
     'docs/index.md': `# Home\n\nWelcome to UpOnLAN.\n`,
     'docs/guides/advanced.md': `## Advanced\n\nDeep content.\n`,
-    'logs/tftp/tftpd.log': `[INFO] RRQ from 10.0.0.1 for example.ipxe\n[INFO] WRQ from 10.0.0.2 for upload\nunrelated line\n`,
+    'logs/tftp/tftpd.log': `dnsmasq-tftp[40]: sent /config/menus/menu.ipxe to 10.0.0.1\ndnsmasq-tftp[40]: sent /config/menus/boot.cfg to 10.0.0.1\nunrelated line\n`,
     'logs/nginx/access.log': `127.0.0.1 - - [01/Jan/2026:00:00:00 +0000] "GET / HTTP/1.1" 200\n`,
     'logs/nginx/error.log': `[error] nothing to see here\n`,
     'logs/webapp/webapp.log': `[2026-01-01T00:00:00.000Z] server started\n`,

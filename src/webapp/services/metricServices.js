@@ -77,7 +77,13 @@ let latestTftpMetrics = { requests: 0, timestamp: Date.now() };
 
 function parseTftpRequestsFromLog(logData) {
   const lines = logData.split('\n');
-  return lines.filter(line => line.includes('RRQ') || line.includes('WRQ')).length;
+  // Support both TFTP servers the project can front, so the metric is
+  // daemon-agnostic:
+  //   - dnsmasq (--enable-tftp):  "sent <file> to <ip>"
+  //   - tftp-hpa:                 "RRQ/WRQ from <ip> for <file>"
+  return lines.filter(line =>
+    / sent .+ to \S+/.test(line) || /\b(?:RRQ|WRQ)\b/.test(line)
+  ).length;
 }
 
 function collectTftpMetrics() {

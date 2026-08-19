@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Build iPXE ROMs and boot media with CONSOLE_SERIAL + a dhcp-first embedded
-# chain -> menu.ipxe.
+# Build iPXE ROMs and boot media with a dhcp-first embedded chain -> menu.ipxe.
 #
 # Usage:
 #   build_ipxe_roms.sh                     # release set (TFTP binaries + e1000 option ROM)
@@ -19,11 +18,17 @@
 #   iso:    uponlan.xyz.iso   (genfsimg: needs lkrn + efi, built automatically)
 #   usb:    uponlan.xyz.img   (genfsimg: needs lkrn + efi, built automatically)
 #
+# Serial console is per-firmware: BIOS targets are built with CONSOLE_SERIAL
+# (SeaBIOS has no serial output); UEFI targets are built WITHOUT it, because
+# OVMF already redirects its console to the serial port and a second (iPXE)
+# serial writer doubles every character on the UEFI console.
+#
 # Notes:
 # - ipxe-gas242-binutils.patch: binutils 2.42 rejects `.arch i386/i586` in
 #   64-bit default mode (EFI targets). Patch moves the `.codeXX` mode directive
 #   before `.arch`; semantics for 16/32-bit BIOS builds are unchanged.
-# - NO_WERROR=1: gcc 13 trips -Werror=array-bounds in core/acpi.c.
+# - gcc 14/15 defaults to C23 and promotes several legacy-C warnings to hard
+#   errors; the build pins -std=gnu11 and downgrades them (see EXTRA_CFLAGS_VAL).
 # - liblzma-dev is required (zbin compresses the ROM images).
 set -euo pipefail
 
@@ -56,9 +61,10 @@ cd "$WORK/ipxe/src"
 echo "[ipxe] applying binutils-2.42 patch"
 patch -p1 -f < "$REPO_ROOT/scripts/ipxe-gas242-binutils.patch"
 
-echo "[ipxe] enabling serial console"
+# config/local/console.h is written per-phase below: CONSOLE_SERIAL for BIOS
+# (SeaBIOS has no serial console), empty for UEFI (OVMF already writes serial —
+# a second serial writer doubles every character on the UEFI console).
 mkdir -p config/local
-printf '#define CONSOLE_SERIAL\n' > config/local/console.h
 
 cat > "$WORK/embed.ipxe" <<'EOF'
 #!ipxe
@@ -80,21 +86,27 @@ shell
 EOF
 
 # Resolve the make targets + artifact mapping from the requested formats.
-make_targets=""
+bios_targets=""
+efi_targets=""
 artifacts=()
 gen_iso=0 gen_usb=0
+
+add_bios() { bios_targets="$bios_targets $1"; }
+add_efi() { efi_targets="$efi_targets $1"; }
+
 IFS=',' read -ra FMT <<< "$FORMATS"
 for f in "${FMT[@]}"; do
   case "$f" in
     release)
-      make_targets="$make_targets bin/undionly.kpxe bin/ipxe.pxe bin-x86_64-efi/ipxe.efi bin/8086100e.rom"
+      add_bios "bin/undionly.kpxe"; add_bios "bin/ipxe.pxe"; add_bios "bin/8086100e.rom"
+      add_efi "bin-x86_64-efi/ipxe.efi"
       artifacts+=("bin/undionly.kpxe:uponlan.xyz-undionly.kpxe")
       artifacts+=("bin/ipxe.pxe:uponlan.xyz.kpxe")
       artifacts+=("bin-x86_64-efi/ipxe.efi:uponlan.xyz.efi")
       artifacts+=("bin/8086100e.rom:uponlan.xyz-e1000.rom")
       ;;
     legacy)
-      make_targets="$make_targets bin/ipxe.kpxe bin/ipxe.dsk bin/ipxe.pdsk bin/ipxe.lkrn bin/undionly.kpxe"
+      add_bios "bin/ipxe.kpxe"; add_bios "bin/ipxe.dsk"; add_bios "bin/ipxe.pdsk"; add_bios "bin/ipxe.lkrn"; add_bios "bin/undionly.kpxe"
       artifacts+=("bin/ipxe.kpxe:uponlan.xyz.kpxe")
       artifacts+=("bin/ipxe.dsk:uponlan.xyz.dsk")
       artifacts+=("bin/ipxe.pdsk:uponlan.xyz.pdsk")
@@ -102,7 +114,7 @@ for f in "${FMT[@]}"; do
       artifacts+=("bin/undionly.kpxe:uponlan.xyz-undionly.kpxe")
       ;;
     efi)
-      make_targets="$make_targets bin-x86_64-efi/ipxe.efi bin-x86_64-efi/snp.efi bin-x86_64-efi/snponly.efi"
+      add_efi "bin-x86_64-efi/ipxe.efi"; add_efi "bin-x86_64-efi/snp.efi"; add_efi "bin-x86_64-efi/snponly.efi"
       artifacts+=("bin-x86_64-efi/ipxe.efi:uponlan.xyz.efi")
       artifacts+=("bin-x86_64-efi/snp.efi:uponlan.xyz-snp.efi")
       artifacts+=("bin-x86_64-efi/snponly.efi:uponlan.xyz-snponly.efi")
@@ -113,14 +125,34 @@ for f in "${FMT[@]}"; do
   esac
 done
 
-# ISO/USB images are built by genfsimg from the lkrn + efi binaries.
+# ISO/USB images are built by genfsimg from the lkrn (BIOS) + efi (UEFI) binaries.
 if [ "$gen_iso" = 1 ] || [ "$gen_usb" = 1 ]; then
-  make_targets="$make_targets bin/ipxe.lkrn bin-x86_64-efi/ipxe.efi"
+  add_bios "bin/ipxe.lkrn"
+  add_efi "bin-x86_64-efi/ipxe.efi"
 fi
 
-echo "[ipxe] building: $FORMATS"
 # shellcheck disable=SC2086
-make -j"$(nproc)" $make_targets EMBED="$WORK/embed.ipxe" NO_WERROR=1
+# iPXE is C99-era code; gcc 14/15 defaults to C23, which (a) makes `()` mean
+# "no args" instead of "unspecified args" (breaking the DRIVER() macro's
+# two-arg callbacks) and (b) promotes several legacy-C warnings to hard errors.
+# Pin the old standard and downgrade those warnings back (the general -Wno-error
+# does NOT affect them in gcc 14+).
+EXTRA_CFLAGS_VAL="-std=gnu11 -Wno-error=implicit-function-declaration -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=implicit-int"
+
+# Phase 1: BIOS with a serial console (SeaBIOS has no serial output of its own).
+if [ -n "$bios_targets" ]; then
+  echo "[ipxe] building BIOS (serial):$bios_targets"
+  printf '#define CONSOLE_SERIAL\n' > config/local/console.h
+  make -j"$(nproc)" $bios_targets EMBED="$WORK/embed.ipxe" NO_WERROR=1 EXTRA_CFLAGS="$EXTRA_CFLAGS_VAL"
+fi
+
+# Phase 2: UEFI WITHOUT a serial console — OVMF already redirects its console to
+# the serial port, and a second (iPXE) serial writer doubles every character.
+if [ -n "$efi_targets" ]; then
+  echo "[ipxe] building UEFI (no serial):$efi_targets"
+  : > config/local/console.h
+  make -j"$(nproc)" $efi_targets EMBED="$WORK/embed.ipxe" NO_WERROR=1 EXTRA_CFLAGS="$EXTRA_CFLAGS_VAL"
+fi
 
 mkdir -p "$OUT_ROM"
 for pair in "${artifacts[@]}"; do

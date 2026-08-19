@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
-# Build the iPXE ROMs the PXE network advertises and the test VM's NIC loads.
+# Build iPXE ROMs and boot media with CONSOLE_SERIAL + a dhcp-first embedded
+# chain -> menu.ipxe.
 #
-# Produces (with CONSOLE_SERIAL + a dhcp-first embedded chain -> menu.ipxe):
+# Usage:
+#   build_ipxe_roms.sh                     # release set (TFTP binaries + e1000 option ROM)
+#   build_ipxe_roms.sh legacy,efi,iso,usb  # boot media (media mode)
+#   OUT_ROM=/path build_ipxe_roms.sh ...   # override the output dir (default release/menus/rom/ipxe)
+#
+# release set:
 #   bin/undionly.kpxe        -> uponlan.xyz-undionly.kpxe  (firmware PXE stage-1)
 #   bin/ipxe.pxe             -> uponlan.xyz.kpxe           (iPXE stage-2, dhcp-boot)
 #   bin-x86_64-efi/ipxe.efi  -> uponlan.xyz.efi            (UEFI clients)
 #   bin/8086100e.rom         -> uponlan.xyz-e1000.rom      (BIOS NIC option ROM)
 #
-# Output goes to release/menus/rom/ipxe/ — the RUNTIME TFTP path: the network's
-# dhcp-boot/pxe-service answers (rom/ipxe/uponlan.xyz-*) are relative to the
-# TFTP root /config/menus, and release_menu.sh packs this dir into menus.tar.gz
-# which the container extracts to /config/menus. Do NOT also stage into
-# release/menus/ipxe/ unless you want the ROMs published as flat top-level
-# release downloads (release_menu.sh mv's that dir out of the tree on release).
+# media mode (formats: legacy, efi, iso, usb):
+#   legacy: uponlan.xyz.{kpxe,dsk,pdsk,lkrn} + uponlan.xyz-undionly.kpxe
+#   efi:    uponlan.xyz.efi, uponlan.xyz-snp.efi, uponlan.xyz-snponly.efi
+#   iso:    uponlan.xyz.iso   (genfsimg: needs lkrn + efi, built automatically)
+#   usb:    uponlan.xyz.img   (genfsimg: needs lkrn + efi, built automatically)
 #
 # Notes:
 # - ipxe-gas242-binutils.patch: binutils 2.42 rejects `.arch i386/i586` in
@@ -24,9 +29,14 @@ set -euo pipefail
 
 IPXE_VERSION="${IPXE_VERSION:-1.21.1}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT_ROM="$REPO_ROOT/release/menus/rom/ipxe"
-# Host-side path QEMU reads as the NIC's option ROM (must exist on the host).
+# Output dir. release mode defaults to the runtime TFTP path (packed into
+# menus.tar.gz); the container's Build UI overrides OUT_ROM to /config/menus/rom/ipxe.
+OUT_ROM="${OUT_ROM:-$REPO_ROOT/release/menus/rom/ipxe}"
+# Host-side path QEMU reads as the NIC's option ROM (release mode installs here).
 PXE_ROM_PATH="${PXE_ROM_PATH:-/usr/lib/ipxe/qemu/uponlan-e1000.rom}"
+# Comma-separated formats: release (default) | legacy,efi,iso,usb
+FORMATS="${1:-release}"
+
 WORK="$(mktemp -d /tmp/ipxe-build-XXXXXX)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -69,24 +79,71 @@ echo Check TFTP serving, file presence, and file ownership (--tftp-secure)
 shell
 EOF
 
-echo "[ipxe] building ROMs"
-make -j"$(nproc)" bin/undionly.kpxe bin/ipxe.pxe bin-x86_64-efi/ipxe.efi bin/8086100e.rom \
-  EMBED="$WORK/embed.ipxe" NO_WERROR=1
+# Resolve the make targets + artifact mapping from the requested formats.
+make_targets=""
+artifacts=()
+gen_iso=0 gen_usb=0
+IFS=',' read -ra FMT <<< "$FORMATS"
+for f in "${FMT[@]}"; do
+  case "$f" in
+    release)
+      make_targets="$make_targets bin/undionly.kpxe bin/ipxe.pxe bin-x86_64-efi/ipxe.efi bin/8086100e.rom"
+      artifacts+=("bin/undionly.kpxe:uponlan.xyz-undionly.kpxe")
+      artifacts+=("bin/ipxe.pxe:uponlan.xyz.kpxe")
+      artifacts+=("bin-x86_64-efi/ipxe.efi:uponlan.xyz.efi")
+      artifacts+=("bin/8086100e.rom:uponlan.xyz-e1000.rom")
+      ;;
+    legacy)
+      make_targets="$make_targets bin/ipxe.kpxe bin/ipxe.dsk bin/ipxe.pdsk bin/ipxe.lkrn bin/undionly.kpxe"
+      artifacts+=("bin/ipxe.kpxe:uponlan.xyz.kpxe")
+      artifacts+=("bin/ipxe.dsk:uponlan.xyz.dsk")
+      artifacts+=("bin/ipxe.pdsk:uponlan.xyz.pdsk")
+      artifacts+=("bin/ipxe.lkrn:uponlan.xyz.lkrn")
+      artifacts+=("bin/undionly.kpxe:uponlan.xyz-undionly.kpxe")
+      ;;
+    efi)
+      make_targets="$make_targets bin-x86_64-efi/ipxe.efi bin-x86_64-efi/snp.efi bin-x86_64-efi/snponly.efi"
+      artifacts+=("bin-x86_64-efi/ipxe.efi:uponlan.xyz.efi")
+      artifacts+=("bin-x86_64-efi/snp.efi:uponlan.xyz-snp.efi")
+      artifacts+=("bin-x86_64-efi/snponly.efi:uponlan.xyz-snponly.efi")
+      ;;
+    iso) gen_iso=1 ;;
+    usb) gen_usb=1 ;;
+    *) echo "ERROR: unknown format '$f' (expected release|legacy|efi|iso|usb)" >&2; exit 1 ;;
+  esac
+done
+
+# ISO/USB images are built by genfsimg from the lkrn + efi binaries.
+if [ "$gen_iso" = 1 ] || [ "$gen_usb" = 1 ]; then
+  make_targets="$make_targets bin/ipxe.lkrn bin-x86_64-efi/ipxe.efi"
+fi
+
+echo "[ipxe] building: $FORMATS"
+# shellcheck disable=SC2086
+make -j"$(nproc)" $make_targets EMBED="$WORK/embed.ipxe" NO_WERROR=1
 
 mkdir -p "$OUT_ROM"
-for pair in \
-  "bin/undionly.kpxe:uponlan.xyz-undionly.kpxe" \
-  "bin/ipxe.pxe:uponlan.xyz.kpxe" \
-  "bin-x86_64-efi/ipxe.efi:uponlan.xyz.efi" \
-  "bin/8086100e.rom:uponlan.xyz-e1000.rom"; do
+for pair in "${artifacts[@]}"; do
   src="${pair%%:*}"; dst="${pair##*:}"
   cp "$src" "$OUT_ROM/$dst"
 done
 
+if [ "$gen_iso" = 1 ]; then
+  echo "[ipxe] generating ISO"
+  ./util/genfsimg -o "$OUT_ROM/uponlan.xyz.iso" -s uponlan.xyz \
+    bin-x86_64-efi/ipxe.efi bin/ipxe.lkrn
+fi
+if [ "$gen_usb" = 1 ]; then
+  echo "[ipxe] generating USB image"
+  ./util/genfsimg -o "$OUT_ROM/uponlan.xyz.img" -s uponlan.xyz \
+    bin-x86_64-efi/ipxe.efi bin/ipxe.lkrn
+fi
+
 # Install the built e1000 option ROM where QEMU loads it from (the domain XML
 # emitted by buildDomainXml references this exact path), then VERIFY the
 # installed bytes match what was built - the acceptance criteria require a
-# checksum/comparison check, not just "file exists".
+# checksum/comparison check, not just "file exists". Release mode only: the
+# container's media build has no host to install into.
 install_host_rom() {
   local src="$1" dest="$PXE_ROM_PATH" dir
   dir="$(dirname "$dest")"
@@ -110,6 +167,8 @@ install_host_rom() {
   echo "[ipxe] installed + verified NIC option ROM -> $dest"
 }
 
-install_host_rom "$WORK/ipxe/src/bin/8086100e.rom"
+if [ "$FORMATS" = "release" ]; then
+  install_host_rom "$WORK/ipxe/src/bin/8086100e.rom"
+fi
 
 echo "[ipxe] done -> $OUT_ROM"

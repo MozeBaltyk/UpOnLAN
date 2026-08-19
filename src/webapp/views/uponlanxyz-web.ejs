@@ -562,55 +562,22 @@ if ($('#buildModal').length === 0) {
           <div class="modal-body">
             <div id="buildAlertArea"></div>
             <div id="buildFormBody">
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="optionEFI" name="optionEFI" checked>
-                <label class="form-check-label" for="optionEFI">Generate EFI disks</label>
-              </div>
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="optionHybrid" name="optionHybrid">
-                <label class="form-check-label" for="optionHybrid">Generate Hybrid disks</label>
-              </div>
+              <p>Select the boot media formats to build (serial-console iPXE, embedded <code>dhcp → menu.ipxe</code>):</p>
               <div class="form-check">
                 <input type="checkbox" class="form-check-input" id="optionLegacy" name="optionLegacy" checked>
-                <label class="form-check-label" for="optionLegacy">Generate Legacy disks</label>
+                <label class="form-check-label" for="optionLegacy">Legacy (BIOS) — <code>.kpxe</code>, <code>.dsk</code>, <code>.pdsk</code>, <code>.lkrn</code></label>
               </div>
               <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="optionLinux" name="optionLinux">
-                <label class="form-check-label" for="optionLinux">Generate Linux disks</label>
+                <input type="checkbox" class="form-check-input" id="optionEFI" name="optionEFI" checked>
+                <label class="form-check-label" for="optionEFI">EFI (UEFI) — <code>.efi</code>, <code>-snp.efi</code>, <code>-snponly.efi</code></label>
               </div>
               <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="optionRpi" name="optionRpi">
-                <label class="form-check-label" for="optionRpi">Generate Rpi disks</label>
+                <input type="checkbox" class="form-check-input" id="optionISO" name="optionISO">
+                <label class="form-check-label" for="optionISO">ISO — bootable CD/DVD image</label>
               </div>
               <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="optionIndex" name="optionIndex" checked>
-                <label class="form-check-label" for="optionIndex">Generate index.html</label>
-              </div>
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="optionSignatures" name="optionSignatures">
-                <label class="form-check-label" for="optionSignatures">Generate Signatures</label>
-              </div>
-              <hr>
-              <div class="form-group row">
-                <label for="siteNameInput" class="col-md-3 col-form-label text-md-right">Site Name:</label>
-                <div class="col-md-7">
-                  <input id="siteNameInput" type="text" class="form-control" placeholder="uponlan.xyz" autocomplete="off">
-                  <div class="invalid-feedback">This field is required.</div>
-                </div>
-              </div>
-              <div class="form-group row">
-                <label for="bootDomainInput" class="col-md-3 col-form-label text-md-right">Boot Domain:</label>
-                <div class="col-md-7">
-                  <input id="bootDomainInput" type="text" class="form-control" placeholder="boot.uponlan.xyz" autocomplete="off">
-                  <div class="invalid-feedback">This field is required.</div>
-                </div>
-              </div>
-              <div class="form-group row">
-                <label for="bootVersionInput" class="col-md-3 col-form-label text-md-right">Boot Version:</label>
-                <div class="col-md-7">
-                  <input id="bootVersionInput" type="text" class="form-control" placeholder="0.0.x" autocomplete="off">
-                  <div class="invalid-feedback">This field is required.</div>
-                </div>
+                <input type="checkbox" class="form-check-input" id="optionUSB" name="optionUSB">
+                <label class="form-check-label" for="optionUSB">USB — bootable USB image</label>
               </div>
             </div>
             <div id="buildProgressContainer" class="my-4 d-none">
@@ -679,45 +646,6 @@ $(document).on('click', '#cancelBuildBtn', function () {
   $('#buildForm button[type="submit"]').prop('disabled', true); // disable until response
 });
 
-// Focus input when modal fully shown
-$('#buildModal').on('shown.bs.modal', function () {
-  $('#bootVersionInput').trigger('focus');
-});
-
-// --- Version Helpers ---
-function parseSemver(ver) {
-  const match = ver.match(/^(\d+)\.(\d+)\.(\d+)(?:-([a-z]+)(?:\.(\d+))?)?$/i);
-  if (!match) return null;
-
-  return {
-    major: parseInt(match[1], 10),
-    minor: parseInt(match[2], 10),
-    patch: parseInt(match[3], 10),
-    prerelease: match[4] || '',
-    prereleaseNum: match[5] ? parseInt(match[5], 10) : 0
-  };
-}
-
-function isVersionGreater(newVersion, currentVersion) {
-  const nv = parseSemver(newVersion);
-  const cv = parseSemver(currentVersion);
-  if (!nv || !cv) return false;
-
-  for (const key of ['major', 'minor', 'patch']) {
-    if (nv[key] > cv[key]) return true;
-    if (nv[key] < cv[key]) return false;
-  }
-
-  const order = { alpha: 0, beta: 1, '': 2 }; // '' = stable
-  const nvTag = nv.prerelease;
-  const cvTag = cv.prerelease;
-
-  if (order[nvTag] > order[cvTag]) return true;
-  if (order[nvTag] < order[cvTag]) return false;
-
-  return nv.prereleaseNum > cv.prereleaseNum;
-}
-
 // --- Alert Helper ---
 function showAlert(type, message) {
   $('#buildAlertArea').html(`
@@ -732,50 +660,19 @@ function showAlert(type, message) {
   document.querySelector(`#buildAlertArea .alert-${type}`)?.scrollIntoView({ behavior: 'smooth' });
 }
 
-// --- Invalid Field Helper ---
-function markInvalid(selector, message) {
-  $(selector).addClass('is-invalid');
-  showAlert('danger', message);
-  return true; // so we can return early
-}
-
 // --- Form Handler ---
 $(document).on('submit', '#buildForm', function (e) {
   e.preventDefault();
 
-  const buildOptions = {
-    generate_disks_efi: $('#optionEFI').is(':checked'),
-    generate_disks_hybrid: $('#optionHybrid').is(':checked'),
-    generate_disks_legacy: $('#optionLegacy').is(':checked'),
-    generate_disks_linux: $('#optionLinux').is(':checked'),
-    generate_disks_rpi: $('#optionRpi').is(':checked'),
-    generate_index: $('#optionIndex').is(':checked'),
-    generate_signatures: $('#optionSignatures').is(':checked'),
-    site_name: $('#siteNameInput').val().trim(),
-    boot_domain: $('#bootDomainInput').val().trim(),
-    boot_version: $('#bootVersionInput').val().trim()
-  };
+  const formats = [];
+  if ($('#optionLegacy').is(':checked')) formats.push('legacy');
+  if ($('#optionEFI').is(':checked')) formats.push('efi');
+  if ($('#optionISO').is(':checked')) formats.push('iso');
+  if ($('#optionUSB').is(':checked')) formats.push('usb');
 
-  // Reset previous states
-  $('#siteNameInput, #bootDomainInput, #bootVersionInput').removeClass('is-invalid').removeAttr('aria-invalid');
-
-  // Validate required fields
-  if (!buildOptions.site_name) return markInvalid('#siteNameInput', 'Site Name is required.');
-  if (!buildOptions.boot_domain) return markInvalid('#bootDomainInput', 'Boot Domain is required.');
-
-  const semverRegex = /^\d+\.\d+\.\d+(-(?:alpha|beta)(\.\d+)?)?$/;
-  if (!buildOptions.boot_version) return markInvalid('#bootVersionInput', 'Boot Version is required.');
-  if (!semverRegex.test(buildOptions.boot_version)) {
-    return markInvalid(
-      '#bootVersionInput',
-      'Boot Version must follow format <strong>X.Y.Z</strong> or <strong>X.Y.Z-alpha.N</strong>/<strong>X.Y.Z-beta.N</strong>.'
-    );
-  }
-  if (!isVersionGreater(buildOptions.boot_version, current_menu_version)) {
-    return markInvalid(
-      '#bootVersionInput',
-      `Boot Version must be greater than current version <strong>${current_menu_version}</strong>.`
-    );
+  if (formats.length === 0) {
+    showAlert('danger', 'Select at least one format to build.');
+    return;
   }
 
   // Submit the build
@@ -784,7 +681,7 @@ $(document).on('submit', '#buildForm', function (e) {
   $('#buildProgressContainer').removeClass('d-none');
   $('#buildProgressBar').removeClass('bg-danger').addClass('bg-success').css('width', '0%').text('0%');
   $('#buildTaskLabel').text('Initializing...');
-  socket.emit('buildsubmit', buildOptions);
+  socket.emit('buildsubmit', { formats: formats.join(',') });
 });
 
 // Progress updates
@@ -857,7 +754,6 @@ function resetBuildModal() {
     .text('0%');
   $('#buildTaskLabel').text('');
   $('#buildAlertArea').html('');
-  $('#siteNameInput, #bootDomainInput, #bootVersionInput').removeClass('is-invalid');
 }
 
 // Empty menu

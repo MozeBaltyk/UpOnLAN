@@ -50,7 +50,12 @@ Two workflows produce the artifacts a deployment consumes.
 ./wakemeup.sh -a deploy --local           # serve release/output on :8899 and deploy the local manifest
 ```
 
-The local deployment then points `ENDPOINT_URL` at `http://host.containers.internal:8899`, so `init.sh` and the webapp consume the local mirror exactly like a remote endpoint — the menu tarball from `menu/<version>/menus.tar.gz` and the asset catalog from `assets/endpoints.yml`. On a fresh host, `ansible-playbook ansible/release_ipxe.yml` installs the build toolchain (`build-essential`, `binutils`, `liblzma-dev`, `xz-utils`, `ipxe-qemu`, `ovmf`, `qemu-system-x86`) and runs the ROM build, including installing the host BIOS option ROM to `/usr/lib/ipxe/qemu/uponlan-e1000.rom`.
+The local deployment then points `ENDPOINT_URL` at `http://host.containers.internal:8899`, so `init.sh` and the webapp consume the local mirror exactly like a remote endpoint — the menu tarball from `menu/<version>/menus.tar.gz` and the asset catalog from `assets/endpoints.yml`. On a fresh host, install the build toolchain and run the ROM build directly (no Ansible):
+
+```bash
+sudo apt-get install -y build-essential binutils liblzma-dev xz-utils ipxe-qemu ovmf qemu-system-x86
+./scripts/build_release.sh <version>   # runs build_ipxe_roms.sh (installs the host option ROM) + assets + menu
+```
 
 **Repository (GitHub) workflow** — `.github/workflows/release.yml` (manual `workflow_dispatch`):
 
@@ -67,7 +72,7 @@ A deployment pointed at `ENDPOINT_URL=https://github.com/mozebaltyk/uponlan` fet
 
 ### CLI actions
 
-`./wakemeup.sh -a <action> [--local]` supports: `build`, `deploy`, `destroy`, `redeploy`, `logs`, `connect`, `mirror-assets`, `build-runner`, `run-runner`, and `test-webapp`. `--local` applies to `deploy` and `redeploy`. The runner actions are optional and are not required for webapp menu/ROM builds.
+`./wakemeup.sh -a <action> [--local]` supports: `build`, `deploy`, `destroy`, `redeploy`, `logs`, `connect`, `mirror-assets`, and `test-webapp`. `--local` applies to `deploy` and `redeploy`.
 
 ### Test-VM provisioning (diskless PXE guest)
 

@@ -5,7 +5,6 @@ const {
   getMenuVersion, 
   logWithTimestamp, 
   errorWithTimestamp,
-  hasOrphanProcesses,
 } = require('../services/utilServices');
 const {
   upgrademenu,
@@ -32,10 +31,10 @@ module.exports = function registerMenuHandlers(socket, io) {
   socket.on('revertconfig', (filename) => revertconfig(filename, socket));
   socket.on('editgetfile', (filename, islocal) => editgetfile(filename, islocal, socket));  
   socket.on('buildsubmit', async (options) => {
-      const result = await runBuildPlaybook(options, socket);
+      const result = await runBuildPlaybook(options.formats, socket);
       if (result.success) {
           socket.emit('buildStarted', { pid: result.pid });          
-          // Wait for the playbook to finish
+          // Wait for the build to finish
           result.promise.then((finalResult) => {
               socket.emit('buildMenuResult', finalResult);
           }).catch(err => {
@@ -47,12 +46,8 @@ module.exports = function registerMenuHandlers(socket, io) {
   });
 
   socket.on('buildcancel', async () => {
-    const orphanExists = await hasOrphanProcesses();
     // cancelBuildPlaybook emits 'buildMenuResult' itself
     await cancelBuildPlaybook(socket);
-    if (orphanExists) {
-      socket.emit('error', 'Warning: Detected orphan ansible-playbook processes.');
-    }
   });
 
   socket.on('upgrademenu', (version) => { upgrademenu(version, (err, result) => {

@@ -23,7 +23,7 @@ This is more of a roadmap or wish list than a finalized feature set — but it s
 - [x] Web app displays logs and live metrics
 - [x] Test **PXE boot** with a KVM VM via the web console (serial console, BIOS/UEFI)
 - [x] Display iPXE and UpOnLAN documentation in the web app
-- [x] Build 🔄 serial-enabled iPXE ROMs and boot media (`scripts/build_ipxe_roms.sh` + Ansible)
+- [x] Build 🔄 serial-enabled iPXE ROMs and boot media (`scripts/build_ipxe_roms.sh`)
 - [x] Automated test suite: webapp Vitest (unit / integration / e2e / smoke) + release specs (`tests/specs`)
 - [ ] Release menus, assets, and Docker images
 - [ ] List **Cloud-init** assets 📝 (with a "category" column)

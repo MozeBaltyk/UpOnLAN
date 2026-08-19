@@ -45,9 +45,7 @@ Allowed Actions
 5. logs - display logs from uponlan container
 6. connect - connect to uponlan container
 7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets
-8. build-runner - build Ansible container
-9. run-runner - run Ansible container
-10. test-webapp - run webapp tests in container
+8. test-webapp - run webapp tests in container
 ```
 
 ---

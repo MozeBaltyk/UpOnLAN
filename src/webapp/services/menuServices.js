@@ -22,21 +22,19 @@ const {
   getEndpointUrls,
   logWithTimestamp,
   errorWithTimestamp,
-  startAnsiblePlaybook,
-  cancelAnsiblePlaybook,
  } = require('./utilServices');
+const { startBuild, cancelBuild } = require('./romBuildService');
 
-async function runBuildPlaybook(options, socket) {
-  // Start the playbook and get the process object, for example:
-  const result = await startAnsiblePlaybook('/ansible/build_rom.yml', options, socket, (progress) => {
+async function runBuildPlaybook(formats, socket) {
+  // Build ROMs/boot media via scripts/build_ipxe_roms.sh (no Ansible).
+  const result = await startBuild(formats, socket, (progress) => {
     socket.emit('buildProgress', progress);
   });
   return result;
 }
 
 async function cancelBuildPlaybook(socket) {
-  // cancelAnsiblePlaybook() will handle ansibleState internally
-  const result = await cancelAnsiblePlaybook();
+  const result = await cancelBuild();
   socket.emit('buildMenuResult', {
     success: result.success,
     status: result.status || (result.success ? 'success' : 'error'),

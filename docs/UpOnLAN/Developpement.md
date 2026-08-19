@@ -1,6 +1,6 @@
 ## Code Architecture & Design
 
-This documentation act as a PRD (Product Requirements Document) describing the technical design, user-facing behavior, and development guidelines for the **UpOnLAN Web Application**, which provides an interface for managing iPXE boot menus, assets, and system builds via Ansible. 
+This documentation act as a PRD (Product Requirements Document) describing the technical design, user-facing behavior, and development guidelines for the **UpOnLAN Web Application**, which provides an interface for managing iPXE boot menus, assets, and system builds.
 
 ---
 
@@ -12,11 +12,11 @@ The **UpOnLAN WebApp** allows users to:
 
 ✅ Download, update, or override assets like ISOs, kernels, and boot files
 
-✅ Build serial-enabled iPXE ROMs and boot media (via `scripts/build_ipxe_roms.sh` / Ansible)
+✅ Build serial-enabled iPXE ROMs and boot media (via `scripts/build_ipxe_roms.sh`)
 
 ✅ Create and manage a diskless KVM test VM with an interactive serial console (BIOS/UEFI)
 
-✅ Trigger builds via Ansible playbooks to generate ROMs, ISOs, or other boot artifacts
+✅ Build ROMs and boot media (Legacy/EFI/ISO/USB) from the web app
 
 ✅ Monitor build progress and system status in real-time via WebSockets
 
@@ -32,9 +32,8 @@ This projects includes several components :
 | ----------------------- | ------------------------------------------------------------------ |
 | WebApp (Node.js)        | User interface + backend server logic                              |
 | Menu & Assets Mirror    | Menus and assets as artifacts in the github project                |
-| Ansible Playbooks       | Infrastructure automation: builds, updates, system provisioning    |
 | Documentation (`/docs`) | Markdown docs rendered within the web interface                    |
-| Scripts & Workflows     | Helper tools for local testing (e.g., libvirt) + GitHub automation |
+| Scripts & Workflows     | Release/build scripts (iPXE ROMs, assets, menus) + GitHub automation |
  
 ---
 
@@ -46,7 +45,6 @@ This projects includes several components :
 tree -L 2
 .
 ├── Containerfile     # Build UpOnLAN.xyz image
-├── ansible           # Roles used by the webapp backend and Github Workflows
 ├── docs              # Markdown docs displayed in the webapp
 ├── manifests         # K8s manifests to deploy with podman kube play or on K8s platform.
 ├── release           # Default menus (menus/) and asset recipes (assets/) shipped with UpOnLAN
@@ -145,19 +143,15 @@ Ensure no user-provided paths are directly passed to `fs` methods — always san
 
 ---
 
-## Ansible integration 
+## ROM / boot-media build runner
 
-The WebApp container integrates Ansible and all dependencies to run ansible-playbook located in `/ansible`. So the WebApp act as an ansible-runner: 
+The webapp's **Build** button (Menus → ROM Files) runs `scripts/build_ipxe_roms.sh` directly — there is no Ansible. `romBuildService.js` (`/services/`) shells out to the script, which fetches the iPXE source, applies the binutils patch, enables `CONSOLE_SERIAL`, embeds the dhcp→menu chain, and `make`s the requested formats (legacy/efi/iso/usb) into `/config/menus/rom/ipxe/`.
 
-- Builds run detached using setsid and sudo to prevent blocking the Node.js event loop
-
-- Real-time progress is streamed via Socket.IO (buildProgress events)
-
-- Logs are stored in `/logs/ansible/` with timestamped filenames
-
+- Builds run detached so they never block the Node.js event loop
+- Real-time progress is streamed via Socket.IO (`buildProgress` events, parsed from the script's `[ipxe] ...` lines)
+- Logs are stored in `/logs/rom/build_*.log`
 - Only one build runs at a time; parallel executions are blocked
-
-- Cancellation is supported via `SIGTERM`
+- Cancellation is supported via `SIGTERM` on the process group
 
 ---
 

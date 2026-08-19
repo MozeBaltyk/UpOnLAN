@@ -7,19 +7,6 @@ run_release_assets() {
     bash scripts/release_assets.sh "${asset_target:-}"
 }
 
-build-runner() {
-    sudo podman build -t localhost/uponlan-ansible:latest -f ansible/Containerfile .
-}
-
-run-runner() {
-    sudo podman run -dit --name uponlan-ansible --pod uponlan \
-        -v "$(pwd)/ansible:/ansible" \
-        -v uponlan-config:/config \
-        -v uponlan-assets:/assets \
-        localhost/uponlan-ansible:latest
-    sudo podman exec -it uponlan-ansible /bin/sh
-}
-
 build() {
     sudo podman build -t localhost/uponlan:latest .
 }
@@ -123,9 +110,7 @@ print_help() {
     echo "5. logs - display logs from uponlan container"
     echo "6. connect - connect to uponlan container"
     echo "7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets"
-    echo "8. build-runner - build Ansible container"
-    echo "9. run-runner - run Ansible container"
-    echo "10. test-webapp - run webapp tests inside the container"
+    echo "8. test-webapp - run webapp tests inside the container"
     echo ""
 }
 
@@ -161,8 +146,6 @@ case $action in
     logs) echo "Action: display logs from uponlan container" ;;
     connect) echo "Action: connect to uponlan container" ;;
     mirror-assets) echo "Action: build local asset output" ;;
-    build-runner) echo "Action: build Ansible container" ;;
-    run-runner) echo "Action: run Ansible container" ;;
     test-webapp) echo "Action: run webapp tests in container" ;;
     *) echo "Invalid action: $action"; print_help; exit 1 ;;
 esac

@@ -7,7 +7,7 @@ mkdir -p \
   /logs/nginx \
   /logs/tftp \
   /logs/webapp \
-  /logs/ansible \
+  /logs/rom \
   /run \
   /var/lib/nginx/tmp/client_body \
   /var/tmp/nginx \

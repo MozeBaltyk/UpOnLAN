@@ -23,17 +23,11 @@ LABEL org.opencontainers.image.description="uponlan.xyz official docker containe
 # install awake - Wake-on-LAN helper
 RUN apk --no-cache add awake
 
-#### Add-on for ansible
+#### iPXE build toolchain (build_ipxe_roms.sh: make/gcc + genfsimg ISO/USB)
 RUN apk add --no-cache \
-  alpine-sdk \
-  python3 \
-  py3-pip \
-  ansible-core \
-  curl wget git \
-  binutils \
-  dosfstools \
-  gcc \
   build-base \
+  curl wget git \
+  dosfstools \
   syslinux \
   mtools \
   xorriso \
@@ -85,11 +79,10 @@ COPY src/init.sh /init.sh
 COPY src/start.sh /start.sh
 COPY --from=build /webapp /webapp
 
-# Ansible
-COPY ansible /ansible
-# Set sudoers rule
-RUN echo "nbxyz ALL=(root) NOPASSWD:/usr/bin/ansible-playbook /ansible/build_rom.yml *" > /etc/sudoers.d/ansible
-RUN chmod 440 /etc/sudoers.d/ansible
+# ROM / boot-media build script (the webapp's Build UI shells out to it)
+COPY scripts/build_ipxe_roms.sh /scripts/build_ipxe_roms.sh
+COPY scripts/ipxe-gas242-binutils.patch /scripts/ipxe-gas242-binutils.patch
+RUN chmod +x /scripts/build_ipxe_roms.sh
 
 #### VM console support (host libvirt socket mounted at /var/run/libvirt)
 # util-linux provides `script`, which allocates the controlling TTY `virsh console` requires.

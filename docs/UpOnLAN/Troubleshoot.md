@@ -37,7 +37,7 @@ The webapp **Monitor** tab tails Nginx, TFTP and webapp activity in real time â€
 
 ## ðŸ§± Menu build fails in the webapp
 
-The webapp runs `/ansible/build_rom.yml` itself; it does not require the optional runner container. Use `./wakemeup.sh -a logs` or the Monitor tab to inspect the webapp and build output.
+The webapp's Build button runs `scripts/build_ipxe_roms.sh` directly inside the container (no Ansible); logs land in `/logs/rom/build_*.log`. Use `./wakemeup.sh -a logs` or the Monitor tab to inspect the webapp and build output.
 
 ---
 

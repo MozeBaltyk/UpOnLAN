@@ -46,7 +46,7 @@ The release pipeline builds the four iPXE artifacts the deployment consumes (BIO
 ./scripts/build_ipxe_roms.sh
 ```
 
-Requirements: `build-essential`, `binutils` (2.42 needs `scripts/ipxe-gas242-binutils.patch` applied by the script), `liblzma-dev`/`xz-utils`, `curl`, `ipxe-qemu` (the `e1000` ROM template), and `sudo -n` for installing the host option ROM to `/usr/lib/ipxe/qemu/uponlan-e1000.rom`. `ansible-playbook ansible/release_ipxe.yml` installs these and runs the build on a fresh host.
+Requirements: `build-essential`, `binutils` (2.42 needs `scripts/ipxe-gas242-binutils.patch` applied by the script), `liblzma-dev`/`xz-utils`, `curl`, `ipxe-qemu` (the `e1000` ROM template), and `sudo -n` for installing the host option ROM to `/usr/lib/ipxe/qemu/uponlan-e1000.rom`. `scripts/build_release.sh <version>` (or the release CI workflow) installs these and runs the build on a fresh host.
 
 Artifacts land in `release/menus/rom/ipxe/`:
 - `uponlan.xyz-e1000.rom` — SeaBIOS/BIOS option ROM (installed into the guest via `<rom file=.../>`).

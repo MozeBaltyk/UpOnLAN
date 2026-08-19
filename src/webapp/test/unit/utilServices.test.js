@@ -45,6 +45,22 @@ describe('utilServices.getEndpointUrls', () => {
     const { endpoint_url } = svc.getEndpointUrls();
     expect(endpoint_url).toBe('https://github.com/mozebaltyk/uponlan');
   });
+
+  it('uses releases/download as the menu base for github', async () => {
+    fs.writeFileSync(menuFile, 'menu:\n  origin: https://github.com/mozebaltyk/uponlan\n');
+    const svc = await loadServices();
+    const { menu_download_base } = svc.getEndpointUrls();
+    expect(menu_download_base).toBe('https://github.com/mozebaltyk/uponlan/releases/download');
+  });
+
+  it('derives menu/ paths for a local (non-GitHub) mirror', async () => {
+    fs.writeFileSync(menuFile, 'menu:\n  origin: http://127.0.0.1:8899\n');
+    const svc = await loadServices();
+    const { api_url, latest_url, menu_download_base } = svc.getEndpointUrls();
+    expect(api_url).toBe('http://127.0.0.1:8899/');
+    expect(latest_url).toBe('http://127.0.0.1:8899/menu/latest');
+    expect(menu_download_base).toBe('http://127.0.0.1:8899/menu');
+  });
 });
 
 describe('utilServices.getAssetOrigin', () => {
@@ -58,6 +74,14 @@ describe('utilServices.getAssetOrigin', () => {
     fs.writeFileSync(menuFile, 'menu:\n  origin: https://example.com/foo\n');
     const svc = await loadServices();
     expect(svc.getAssetOrigin()).toBe('https://example.com/foo');
+  });
+
+  it('strips the trailing slash from a root-path origin', async () => {
+    // new URL('http://127.0.0.1:8899').toString() adds a trailing slash; the
+    // asset origin must not carry it, or callers build `origin//path`.
+    fs.writeFileSync(menuFile, 'menu:\n  origin: http://127.0.0.1:8899\n');
+    const svc = await loadServices();
+    expect(svc.getAssetOrigin()).toBe('http://127.0.0.1:8899');
   });
 });
 

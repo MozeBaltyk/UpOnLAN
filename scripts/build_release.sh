@@ -18,4 +18,4 @@ bash scripts/build_ipxe_roms.sh
 bash scripts/release_assets.sh
 bash scripts/release_menu.sh "$VERSION"
 
-echo "### build_release.sh done -> release/output/releases/download/${VERSION}/menus.tar.gz ###"
+echo "### build_release.sh done -> release/output/menu/${VERSION}/menus.tar.gz ###"

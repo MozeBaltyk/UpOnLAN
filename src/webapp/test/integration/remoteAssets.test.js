@@ -1,13 +1,13 @@
 // Verifies the Remote Assets tab data flow end-to-end using the real generated
-// asset catalog from release/output/endpoints.yml. The webapp serves that file
-// via the getlocal socket as the available remote endpoints list.
+// asset catalog from release/output/assets/endpoints.yml. The webapp serves that
+// file via the getlocal socket as the available remote endpoints list.
 import fs from 'fs';
 import path from 'path';
 import { describe, expect, it, beforeAll } from 'vitest';
 import { bootApp, once } from '../helpers/bootApp.js';
 
 const REPO_ROOT = path.join(__dirname, '..', '..', '..', '..');
-const ENDPOINTS = path.join(REPO_ROOT, 'release', 'output', 'endpoints.yml');
+const ENDPOINTS = path.join(REPO_ROOT, 'release', 'output', 'assets', 'endpoints.yml');
 
 // release/output is gitignored and only exists after ./wakemeup.sh -a mirror-assets.
 // Skip when absent (e.g. fresh CI checkout) instead of failing.
@@ -39,7 +39,7 @@ describe.skipIf(!fs.existsSync(ENDPOINTS))('remote assets from generated release
       // asset_target=harvester), so do not require any specific endpoint key.
       for (const key of keys) {
         const ep = endpoints.endpoints[key];
-        expect(ep.path, `endpoint ${key}`).toContain('/releases/download/');
+        expect(ep.path, `endpoint ${key}`).toContain('/assets/');
         expect(Array.isArray(ep.files), `endpoint ${key}`).toBe(true);
         expect(ep.files.length, `endpoint ${key}`).toBeGreaterThan(0);
       }

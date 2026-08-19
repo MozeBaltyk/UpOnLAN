@@ -38,8 +38,15 @@ fi
 if [[ -f /config/menus.tar.gz ]]; then
   echo "[uponlanxyz-init] Using staged menus.tar.gz (local test)"
 else
+  # GitHub serves release assets at /releases/download/<tag>/; the local mirror
+  # (deploy --local) splits menu/ from assets/.
+  if [[ "${ENDPOINT_URL}" == *github.com* ]]; then
+    menu_tarball_url="${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz"
+  else
+    menu_tarball_url="${ENDPOINT_URL}/menu/${MENU_VERSION}/menus.tar.gz"
+  fi
   echo "[uponlanxyz-init] Import menu from ${ENDPOINT_URL} version ${MENU_VERSION}"
-  curl -L ${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz -o /config/menus/menus.tar.gz
+  curl -L ${menu_tarball_url} -o /config/menus/menus.tar.gz
 fi
 
 # Extract menus if exists
@@ -57,7 +64,11 @@ fi
 
 # Ensure endpoints.yml exists from the asset-side release output
 if [[ ! -f /config/endpoints.yml ]]; then
-  endpoint_catalog_url="${ENDPOINT_URL}/endpoints.yml"
+  if [[ "${ENDPOINT_URL}" == *github.com* ]]; then
+    endpoint_catalog_url="${ENDPOINT_URL}/endpoints.yml"
+  else
+    endpoint_catalog_url="${ENDPOINT_URL}/assets/endpoints.yml"
+  fi
   echo "[uponlanxyz-init] Import endpoints.yml from ${endpoint_catalog_url}"
   if ! curl -fsL ${endpoint_catalog_url} -o /config/endpoints.yml; then
     echo "[uponlanxyz-init] No endpoints.yml found from asset release, creating a default one"

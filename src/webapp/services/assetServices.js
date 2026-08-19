@@ -19,7 +19,13 @@ async function dlremote(dlfiles, callback, socket) {
   const origin = asset_url.replace(/\/+$/, '');
   for (let dlfile of dlfiles) {
     const safePath = dlfile.replace(/^\/+/, '');
-    const dlpath = path.join(ASSETS_ROOT, path.dirname(safePath));
+    // The endpoints.yml path is a URL path relative to the origin. The local
+    // mirror serves assets under /assets/download/... on the origin, but the
+    // container stores them under /assets/download/... (nginx serves /assets at
+    // its root), so drop the leading "assets/" namespace when mapping to the
+    // filesystem. GitHub paths (/releases/download/...) have no such prefix.
+    const fsRel = safePath.replace(/^assets\//, '');
+    const dlpath = path.join(ASSETS_ROOT, path.dirname(fsRel));
 
     fs.mkdirSync(dlpath, { recursive: true });
 

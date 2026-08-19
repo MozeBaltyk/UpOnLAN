@@ -48,7 +48,7 @@ async function cancelBuildPlaybook(socket) {
 
 // Fetch development releases
 async function fetchDevReleases() {
-  const { api_url } = getEndpointUrls();
+  const { api_url, latest_url, menu_download_base } = getEndpointUrls();
   const options = { headers: { 'user-agent': 'node.js' } };
 
   let releases;
@@ -64,18 +64,18 @@ async function fetchDevReleases() {
     }
   } catch (err) {
     // Flat-file mirrors (deploy --local) serve /releases as an HTML directory
-    // listing, not a JSON API. Fall back to the releases/latest file that the
+    // listing, not a JSON API. Fall back to the latest-version file that the
     // release scripts write into the mirror.
-    const latest = await fetch(`${api_url}releases/latest`, options)
+    const latest = await fetch(latest_url, options)
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null);
     if (latest && latest.tag_name) {
       releases = [{
         tag_name: latest.tag_name,
-        html_url: `${api_url}releases/download/${latest.tag_name}/`,
+        html_url: `${menu_download_base}/${latest.tag_name}/`,
       }];
     } else {
-      throw new Error(`No releases found at ${api_url}. Expected a GitHub API or a mirror with a releases/latest file.`);
+      throw new Error(`No releases found at ${api_url}. Expected a GitHub API or a mirror with a latest file.`);
     }
   }
   return releases;
@@ -102,7 +102,7 @@ async function fetchNetbootReleases() {
 
 // Upgrade menu function from given Endpoint
 async function upgrademenu(version, callback, socket) {
-  const { endpoint_url } = getEndpointUrls();
+  const { endpoint_url, menu_download_base } = getEndpointUrls();
   const remote_folder = path.join(MENU_DIR, 'remote') + path.sep;
   const targetDir = MENU_DIR + path.sep;
 
@@ -120,7 +120,7 @@ async function upgrademenu(version, callback, socket) {
 
     // Download menus.tar.gz  
     const downloads = [{
-      url: `${endpoint_url}/releases/download/${version}/menus.tar.gz`,
+      url: `${menu_download_base}/${version}/menus.tar.gz`,
       path: remote_folder,
     }];
 

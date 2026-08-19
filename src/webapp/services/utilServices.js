@@ -244,7 +244,10 @@ function getAssetOrigin() {
     if (parsedUrl.hostname === 'github.com' && parsedUrl.pathname.startsWith('/netbootxyz')) {
       return 'https://github.com/netbootxyz';
     }
-    return parsedUrl.toString();
+    // No trailing slash: callers append path segments (e.g. `origin + path`),
+    // and `new URL(...).toString()` adds a trailing slash for root paths,
+    // producing a `//` double-slash.
+    return parsedUrl.toString().replace(/\/+$/, '');
   } catch (err) {
     console.error('Invalid URL in menu config:', err.message);
     return origin;
@@ -310,8 +313,9 @@ function getEndpointUrls() {
   endpoint_url = endpoint_url.replace(/\/+$/, '');
 
   // Define API and raw URLs based on endpoint_url
-  let api_url, raw_url;
-  if (endpoint_url.startsWith("https://github.com/")) {
+  let api_url, raw_url, latest_url, menu_download_base;
+  const isGitHub = endpoint_url.startsWith("https://github.com/");
+  if (isGitHub) {
     // For GitHub, construct API and raw URLs
     const match = endpoint_url.match(/github\.com\/([^\/]+)\/([^\/]+)(\/)?$/);
     if (match) {
@@ -324,20 +328,23 @@ function getEndpointUrls() {
       api_url = endpoint_url;
       raw_url = endpoint_url;
     }
+    // GitHub: menu tarball lives with the release assets.
+    latest_url = `${api_url}releases/latest`;
+    menu_download_base = `${endpoint_url}/releases/download`;
   } else {
     // For local mirrors / non-GitHub endpoints, keep a trailing slash so
     // callers can append path segments safely (e.g. `${api_url}releases`).
     api_url = `${endpoint_url}/`;
     raw_url = api_url;
+    // Local mirror splits menu/ from assets/.
+    latest_url = `${api_url}menu/latest`;
+    menu_download_base = `${endpoint_url}/menu`;
   }
-
-  // Latest release URL
-  const latest_url = `${api_url}releases/latest`;
 
   // console.log("API URL:", api_url);
   // console.log("RAW URL:", raw_url);
   // console.log("Endpoint URL:", endpoint_url);
-  return { endpoint_url, api_url, raw_url, latest_url };
+  return { endpoint_url, api_url, raw_url, latest_url, menu_download_base };
 }
 
 

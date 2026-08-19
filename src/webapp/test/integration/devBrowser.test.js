@@ -1,7 +1,7 @@
 // Regression: "Menu From Endpoint URL" (devgetbrowser) against a flat-file
 // mirror (deploy --local). The mirror serves /releases as an HTML directory
 // listing — not a GitHub JSON API — so the handler must fall back to the
-// releases/latest file instead of crashing on JSON.parse.
+// menu/latest file instead of crashing on JSON.parse.
 import http from 'http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootApp, once } from '../helpers/bootApp.js';
@@ -17,7 +17,7 @@ function startMirror() {
         // python3 -m http.server would return an HTML directory listing here.
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end('<!doctype html><title>Index of /releases</title>');
-      } else if (req.url === '/releases/latest') {
+      } else if (req.url === '/menu/latest') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end('{"tag_name":"0.0.2"}');
       } else {
@@ -45,7 +45,7 @@ afterAll(async () => {
 });
 
 describe('devgetbrowser on a flat-file mirror', () => {
-  it('falls back to releases/latest instead of crashing on the HTML listing', async () => {
+  it('falls back to menu/latest instead of crashing on the HTML listing', async () => {
     const socket = ctx.connectClient({ auth: { token: PASS } });
     await once(socket, 'connect');
 
@@ -57,7 +57,7 @@ describe('devgetbrowser on a flat-file mirror', () => {
 
     expect(releases).toHaveLength(1);
     expect(releases[0].tag_name).toBe('0.0.2');
-    expect(releases[0].html_url).toContain('/releases/download/0.0.2/');
+    expect(releases[0].html_url).toContain('/menu/0.0.2/');
     socket.close();
   });
 });

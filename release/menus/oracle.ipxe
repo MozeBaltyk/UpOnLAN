@@ -19,17 +19,17 @@ choose version || goto oracle_exit
 goto ${version}_${os_arch}
 
 :8_x86_64
-set url ${mirror_endpoint}/releases/download/oracle-8-x86_64/
+set url ${mirror_endpoint}${asset_path}oracle-8-x86_64/
 set repo https://yum.oracle.com/repo/OracleLinux/OL8/baseos/latest/x86_64
 goto boot
 
 :9_aarch64
-set url ${mirror_endpoint}/releases/download/oracle-9-arm64/
+set url ${mirror_endpoint}${asset_path}oracle-9-arm64/
 set repo https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/aarch64
 goto boot
 
 :9_x86_64
-set url ${mirror_endpoint}/releases/download/oracle-9-x86_64/
+set url ${mirror_endpoint}${asset_path}oracle-9-x86_64/
 set repo https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64
 goto boot
 

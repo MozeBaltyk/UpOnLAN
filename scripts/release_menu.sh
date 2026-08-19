@@ -32,7 +32,7 @@ if [[ $missing -ne 0 ]]; then
 fi
 
 echo -e "\n### Releasing menu version ${HARD_RELEASE} ###\n"
-release_dir="./release/output/releases/download/${HARD_RELEASE}"
+release_dir="./release/output/menu/${HARD_RELEASE}"
 mkdir -p "$release_dir"
 
 # Set Version
@@ -47,4 +47,4 @@ tar -czf "$release_dir/menus.tar.gz" -C ./release/menus --exclude=local-vars.ipx
 
 # GitHub-like releases/latest response so the webapp's local endpoint browser
 # (Menu From Endpoint URL) and dashboard resolve this version like a GitHub API.
-echo "{\"tag_name\":\"${HARD_RELEASE}\"}" > ./release/output/releases/latest
+echo "{\"tag_name\":\"${HARD_RELEASE}\"}" > ./release/output/menu/latest

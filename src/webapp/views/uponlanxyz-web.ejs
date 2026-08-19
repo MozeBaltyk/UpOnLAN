@@ -1097,23 +1097,31 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
   localtable.clear();
   remotetable.clear();
   $.each(endpoints.endpoints, function(index,value){
+    // URL path (relative to origin) → filesystem path under /assets. The local
+    // mirror serves assets at /assets/<key>/ on the origin but stores them
+    // under /assets/<key>/ (nginx serves /assets at its root), so drop the
+    // leading assets/ namespace when matching local files.
+    var fsPath = value.path.replace(/^\/assets\//, '/');
+    // Display key = last path segment (e.g. harvester-v1.7.3-x86_64), works for
+    // both /releases/download/<key>/ (GitHub) and /assets/<key>/ (local).
+    var displayKey = value.path.split('/').filter(function(s){ return s; }).pop();
     $.each(value.files, function( arrindex, file ) {
-      if (localfiles.includes(value.path + file)){
+      if (localfiles.includes(fsPath + file)){
         localtable.row.add( 
           [
             index,
-            value.path.split('download/')[1] + file,
-            '<span style="float:right;"><input type="checkbox" class="form-check-input localcheck" value="' + value.path + file + '"></span>'
+            displayKey + '/' + file,
+            '<span style="float:right;"><input type="checkbox" class="form-check-input localcheck" value="' + fsPath + file + '"></span>'
 
           ]
         );
-        localfiles.splice( localfiles.indexOf(value.path + file), 1 );
+        localfiles.splice( localfiles.indexOf(fsPath + file), 1 );
       }
       else{
         remotetable.row.add( 
           [
             index,
-            '<a href="' + remoteassetorigin + value.path + file + '" target="_blank">' + value.path.split('download/')[1] + file + '</a>',
+            '<a href="' + remoteassetorigin + value.path + file + '" target="_blank">' + displayKey + '/' + file + '</a>',
             '<span style="float:right;"><input type="checkbox" class="form-check-input remotecheck" value="' + value.path + file + '"></span>'
           ]
         );

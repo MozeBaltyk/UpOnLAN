@@ -26,17 +26,21 @@ build() {
 
 deploy() {
     if [ "${local_deploy:-0}" = "1" ]; then
-        if [ ! -f "$OUTPUT_ROOT/endpoints.yml" ]; then
-            echo "[deploy --local] Missing $OUTPUT_ROOT/endpoints.yml"
+        if [ ! -f "$OUTPUT_ROOT/assets/endpoints.yml" ]; then
+            echo "[deploy --local] Missing $OUTPUT_ROOT/assets/endpoints.yml"
             echo "[deploy --local] Run './wakemeup.sh -a mirror-assets [target]' first"
             return 1
         fi
-        if [ ! -f "$OUTPUT_ROOT/releases/download/0.0.2/menus.tar.gz" ]; then
-            echo "[deploy --local] Missing $OUTPUT_ROOT/releases/download/0.0.2/menus.tar.gz"
+        if [ ! -f "$OUTPUT_ROOT/menu/0.0.2/menus.tar.gz" ]; then
+            echo "[deploy --local] Missing $OUTPUT_ROOT/menu/0.0.2/menus.tar.gz"
             echo "[deploy --local] Build the menu artifact first with scripts/release_menu.sh 0.0.2"
             return 1
         fi
         echo "[deploy] deploying uponlan container with local menus+assets"
+        build
+        # Kill any stale local mirror server (e.g. left by a prior deploy) so
+        # the fresh one below binds port 8899 and serves the current output.
+        pkill -f "http.server 8899" 2>/dev/null || true
         python3 -m http.server 8899 --directory ./$OUTPUT_ROOT >/dev/null 2>&1 &
         sudo podman play kube ./manifests/uponlan-local.yaml
         return 0
@@ -49,7 +53,9 @@ deploy() {
 
 destroy() {
     sudo podman play kube --down ./manifests/uponlan.yaml
-    sudo podman rmi localhost/uponlan:latest
+    # Tolerate a missing image: a prior destroy/redeploy may have already
+    # removed it, and `set -e` would otherwise abort the whole action.
+    sudo podman rmi localhost/uponlan:latest 2>/dev/null || true
 }
 
 redeploy() {
@@ -75,7 +81,11 @@ network() {
 mirror-assets() {
     run_release_assets
     echo "[mirror-assets] local asset output built at ./${OUTPUT_ROOT}"
-    [ -n "${asset_target:-}" ] && echo "[mirror-assets] target: ${asset_target}"
+    # `[ -n ... ] && echo` returns non-zero under `set -e` when asset_target is
+    # empty, aborting the action — use an explicit if instead.
+    if [ -n "${asset_target:-}" ]; then
+        echo "[mirror-assets] target: ${asset_target}"
+    fi
 }
 
 test-webapp() {
@@ -114,7 +124,7 @@ print_help() {
     echo "1. build - build uponlan image"
     echo "2. deploy [--local] - deploy uponlan container; --local serves local menus/assets from release/output"
     echo "3. destroy - destroy uponlan container"
-    echo "4. redeploy - redeploy uponlan container"
+    echo "4. redeploy [--local] - redeploy uponlan container; --local serves local menus/assets from release/output"
     echo "5. logs - display logs from uponlan container"
     echo "6. connect - connect to uponlan container"
     echo "7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets"

@@ -32,9 +32,11 @@ The shipped Nginx configuration listens on plain HTTP port `8080`; it does not p
 
 ### Release artifacts
 
-`./wakemeup.sh -a mirror-assets` runs `scripts/release_assets.sh` and recreates the asset side of `release/output`, including `endpoints.yml` and `releases/download/<asset-key>/`. Set `asset_target=<os>` to build a single asset set while debugging, e.g. `asset_target=harvester ./wakemeup.sh -a mirror-assets`.
+`./wakemeup.sh -a mirror-assets` runs `scripts/release_assets.sh` and recreates the asset side of `release/output`, including `endpoints.yml` and `releases/download/<asset-key>/`. Set `asset_target=<os>` to build a single asset set, e.g. `asset_target=harvester ./wakemeup.sh -a mirror-assets`. A bare (untargeted) run wipes `release/output` and rebuilds every asset set in `release/assets/*/setting.sh`; a targeted run only wipes nothing — it builds/refreshes that one set on top of the existing mirror, so you can add asset sets incrementally (e.g. `asset_target=talos` after a full run adds only talos).
 
-`./scripts/release_menu.sh <version>` updates `release/menus/version.ipxe` and writes `release/output/releases/download/<version>/menus.tar.gz`. Build assets first, then the menu artifact, before using `deploy --local`.
+`./scripts/release_menu.sh <version>` updates `release/menus/version.ipxe` and writes `release/output/releases/download/<version>/menus.tar.gz`. It **fails fast** if the iPXE ROM artifacts (`release/menus/rom/ipxe/uponlan.xyz-undionly.kpxe`, `uponlan.xyz.kpxe`, `uponlan.xyz.efi`, `uponlan.xyz-e1000.rom`) are missing — the tarball must contain them so `init.sh` can populate the container's TFTP root.
+
+The one-command release build is `scripts/build_release.sh <version>`: it runs the ROM build (`scripts/build_ipxe_roms.sh`), the asset mirror, and then `release_menu.sh` in that order, so the menu artifact can never be built against stale/missing ROMs.
 
 ### Release workflows
 
@@ -44,11 +46,11 @@ Two workflows produce the artifacts a deployment consumes.
 
 ```bash
 ./wakemeup.sh -a mirror-assets            # asset side: endpoints.yml + releases/download/<key>/...
-./scripts/release_menu.sh 0.0.2           # menu side: releases/download/0.0.2/menus.tar.gz + releases/latest
+./scripts/build_release.sh 0.0.2          # ROMs + menu side: releases/download/0.0.2/menus.tar.gz + releases/latest
 ./wakemeup.sh -a deploy --local           # serve release/output on :8899 and deploy the local manifest
 ```
 
-The local deployment then points `ENDPOINT_URL` at `http://host.containers.internal:8899`, so `init.sh` and the webapp consume the local mirror exactly like a remote endpoint.
+The local deployment then points `ENDPOINT_URL` at `http://host.containers.internal:8899`, so `init.sh` and the webapp consume the local mirror exactly like a remote endpoint. On a fresh host, `ansible-playbook ansible/release_ipxe.yml` installs the build toolchain (`build-essential`, `binutils`, `liblzma-dev`, `xz-utils`, `ipxe-qemu`, `ovmf`, `qemu-system-x86`) and runs the ROM build, including installing the host BIOS option ROM to `/usr/lib/ipxe/qemu/uponlan-e1000.rom`.
 
 **Repository (GitHub) workflow** — `.github/workflows/release.yml` (manual `workflow_dispatch`):
 
@@ -66,3 +68,13 @@ A deployment pointed at `ENDPOINT_URL=https://github.com/mozebaltyk/uponlan` fet
 ### CLI actions
 
 `./wakemeup.sh -a <action> [--local]` supports: `build`, `deploy`, `destroy`, `redeploy`, `logs`, `connect`, `mirror-assets`, `network`, `build-runner`, `run-runner`, and `test-webapp`. `--local` applies to `deploy`. The runner actions are optional and are not required for webapp menu builds.
+
+### Test-VM provisioning (diskless PXE guest)
+
+The web console's VM tab creates a diskless KVM guest (no disk, no VGA, PTY serial on port 0) on the `uponlan` libvirt network with a BIOS/UEFI firmware selector:
+
+- **BIOS**: attaches the iPXE e1000 option ROM (`/usr/lib/ipxe/qemu/uponlan-e1000.rom`) — SeaBIOS loads it, iPXE DHCPs, and chains the serial menu.
+- **UEFI**: `<os firmware='efi'>` — libvirt picks OVMF and manages a per-guest NVRAM. OVMF PXE-boots, TFTPs `rom/ipxe/uponlan.xyz.efi` (delivered via `dhcp-boot`/option 67 matched on client arch option 93 = 7), and iPXE renders the same serial menu.
+- Destroying a UEFI guest removes its NVRAM (`virsh undefine --nvram`); without this, re-creating the VM is blocked by a stale NVRAM file.
+
+The network's dnsmasq intentionally has **no `pxe-service`/`pxe-prompt` lines**: dnsmasq's PXE processing (enabled only by those) injects option 60 `PXEClient` + option 43 into every offer, which makes EDK2/OVMF abort with `PXE-E21: Remote boot cancelled` before any TFTP. Boot files are advertised solely via `dhcp-boot` tags (`ipxe-bios`/`ipxe-efi` on option 175, `uefi-fw` on option 93).

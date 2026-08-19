@@ -12,6 +12,23 @@ Choose output for the target:
 - **UEFI:** select EFI disks for UEFI boot files; choose the appropriate EFI variant for the environment.
 - **ISO or USB:** select Hybrid disks only when you need bootable ISO or USB image media. Hybrid output requires both Legacy and EFI selections.
 
+## UpOnLAN release ROM build
+
+The release pipeline builds the four iPXE artifacts the deployment consumes (BIOS option ROM, BIOS kpxe/undionly, and EFI):
+
+```bash
+./scripts/build_ipxe_roms.sh
+```
+
+Requirements: `build-essential`, `binutils` (2.42 needs `scripts/ipxe-gas242-binutils.patch` applied by the script), `liblzma-dev`/`xz-utils`, `curl`, `ipxe-qemu` (the `e1000` ROM template), and `sudo -n` for installing the host option ROM to `/usr/lib/ipxe/qemu/uponlan-e1000.rom`. `ansible-playbook ansible/release_ipxe.yml` installs these and runs the build on a fresh host.
+
+Artifacts land in `release/menus/rom/ipxe/`:
+- `uponlan.xyz-e1000.rom` — SeaBIOS/BIOS option ROM (installed into the guest via `<rom file=.../>`).
+- `uponlan.xyz-undionly.kpxe` / `uponlan.xyz.kpxe` — legacy BIOS PXE binaries (unused by the test-VM flow, kept for general netboot).
+- `uponlan.xyz.efi` — UEFI PXE binary served to OVMF guests over TFTP.
+
+The embedded script (`scripts/build_ipxe_roms.sh` → `embed.ipxe`) gives the binaries a serial console (`CONSOLE_SERIAL`) and a default flow: DHCP → `menu.ipxe` → `boot.cfg` → menu, with distinct recovery paths for DHCP failure, menu failure, and boot-config failure. `release_menu.sh` refuses to package the menu tarball if any of the four artifacts are missing.
+
 ## Build in the webapp
 
 1. Open **Menus**, expand **ROM Files**, and select **Build**.

@@ -6,8 +6,7 @@ const { spawn } = require('child_process');
 // Test VM the Console tab manages (overridable, e.g. VM_NAME=pxetest).
 const VM_NAME = process.env.VM_NAME || 'uponlan-client';
 // Host network the VM boots PXE from. If it does not exist on the host, the
-// webapp defines it from buildNetworkXml() (same config as
-// scripts/create_kvm_test_network.sh).
+// webapp defines it from buildNetworkXml().
 const VM_NETWORK = process.env.VM_NETWORK || 'uponlan';
 // Host IP that serves the iPXE ROMs (nginx in the container, published on the
 // host). Used in the network's dhcp-boot answer; empty falls back to the DHCP
@@ -125,9 +124,8 @@ function buildDomainXml(name, network, firmware) {
 `;
 }
 
-// Same NAT+PXE network the host script scripts/create_kvm_test_network.sh
-// defines for pxe_type=uponlan: dnsmasq advertises the container-served
-// iPXE ROMs to the guest.
+// NAT+PXE network: dnsmasq advertises the container-served iPXE ROMs to the
+// guest.
 function buildNetworkXml(name, bootServerIp) {
   const bootIp = bootServerIp ? `,,${bootServerIp}` : '';
   return `<network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
@@ -189,8 +187,7 @@ module.exports = function registerVmHandlers(socket) {
 
   // Provision the test VM from a Node-generated domain XML. No bash script:
   // define + start via the whitelisted virsh subcommands only. If the boot
-  // network does not exist on the host it is defined first (same config as
-  // scripts/create_kvm_test_network.sh).
+  // network does not exist on the host it is defined first.
   socket.on('vm:create', async (firmware) => {
     const fw = normalizeFirmware(firmware);
     const state = await getVmState();

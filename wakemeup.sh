@@ -73,11 +73,6 @@ connect() {
     sudo podman exec -it $(sudo podman ps --filter ancestor=localhost/uponlan:latest --format "{{.ID}}") /bin/sh
 }
 
-network() {
-    sudo chmod +x ./scripts/display_networks_info.sh
-    ./scripts/display_networks_info.sh
-}
-
 mirror-assets() {
     run_release_assets
     echo "[mirror-assets] local asset output built at ./${OUTPUT_ROOT}"
@@ -128,10 +123,9 @@ print_help() {
     echo "5. logs - display logs from uponlan container"
     echo "6. connect - connect to uponlan container"
     echo "7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets"
-    echo "8. network - check kvm/podman networks info"
-    echo "9. build-runner - build Ansible container"
-    echo "10. run-runner - run Ansible container"
-    echo "11. test-webapp - run webapp tests inside the container"
+    echo "8. build-runner - build Ansible container"
+    echo "9. run-runner - run Ansible container"
+    echo "10. test-webapp - run webapp tests inside the container"
     echo ""
 }
 
@@ -167,7 +161,6 @@ case $action in
     logs) echo "Action: display logs from uponlan container" ;;
     connect) echo "Action: connect to uponlan container" ;;
     mirror-assets) echo "Action: build local asset output" ;;
-    network) echo "Action: check kvm/podman networks info" ;;
     build-runner) echo "Action: build Ansible container" ;;
     run-runner) echo "Action: run Ansible container" ;;
     test-webapp) echo "Action: run webapp tests in container" ;;

@@ -6,7 +6,7 @@ Quick checks and fixes for the most common problems. All container operations go
 
 ## 🚧 Webapp unreachable
 
-1. Is the container running? `./wakemeup.sh -a network` shows pod and container status.
+1. Is the container running? `./wakemeup.sh -a logs` shows pod and container status.
 2. Still down → `./wakemeup.sh -a logs` and look for a crash on startup.
 3. Restart with `./wakemeup.sh -a redeploy` (rebuilds and re-creates the container).
 

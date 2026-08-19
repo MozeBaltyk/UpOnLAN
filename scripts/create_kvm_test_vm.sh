@@ -49,6 +49,7 @@ else
     --vcpus=2 \
     --os-variant=rhl8.0 \
     --disk path=/var/lib/libvirt/images/${vmname}.qcow2,size=40 \
+    --serial pty --console pty,target_type=serial \
     --noautoconsole \
     "${boot_args[@]}"
     echo -e "\n\n- Test VM created. Please check the console in Virt-Manager.\n"

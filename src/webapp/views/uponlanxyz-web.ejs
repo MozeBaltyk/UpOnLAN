@@ -1460,3 +1460,108 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
     }
   });
 });
+
+//// Render VM Console (serial console via xterm.js) ////
+let vmTerm = null;
+
+// Size the terminal to fill its container. xterm.js otherwise defaults to
+// 80x24, which leaves most of the card empty (the "half console" look).
+// Cell metrics come from the renderer once it has painted; fall back to a
+// rough estimate before that (re-fitted on the next animation frame).
+function fitVmConsole() {
+  if (!vmTerm) return;
+  const el = document.getElementById('vm-console');
+  if (!el) return;
+  const renderer = vmTerm._core && vmTerm._core._renderService;
+  const dims = renderer && renderer.dimensions;
+  const cellW = (dims && dims.css.cell.width) || 8;
+  const cellH = (dims && dims.css.cell.height) || 16;
+  const cols = Math.max(2, Math.floor(el.clientWidth / cellW));
+  const rows = Math.max(1, Math.floor(el.clientHeight / cellH));
+  try { vmTerm.resize(cols, rows); } catch (e) {}
+}
+window.addEventListener('resize', fitVmConsole);
+
+// Module-level socket listeners (registered once, like the other pages).
+socket.on('vm:status', function(data) {
+  let note = '';
+  if (data.hasConsole === false) note = ' (no pty serial console configured)';
+  if (data.state === 'not found') note = ' (VM not defined on host)';
+  $('#vm-state').text(data.name + ': ' + data.state + note);
+  if (data.error) showToast(data.error, 'danger');
+});
+socket.on('vm:action:result', function(res) {
+  if (res.ok && res.action === 'on') {
+    // VM booted — reconnect the serial console (stale session is force-replaced).
+    setTimeout(function() { socket.emit('vm:console:start'); }, 2000);
+  } else if (res.ok && res.action === 'off') {
+    socket.emit('vm:console:stop');
+  } else if (!res.ok) {
+    showToast(res.message, 'danger');
+  }
+});
+socket.on('vm:console:data', function(data) {
+  if (vmTerm) vmTerm.write(data);
+});
+socket.on('vm:console:close', function() {
+  if (vmTerm) vmTerm.write('\r\n[console detached]\r\n');
+});
+
+function renderconsole() {
+  $('#pagecontent').empty();
+  $('#pagecontent').append(`
+    <div class="card">
+      <div class="card-header">VM Console</div>
+      <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+          <button class="btn btn-success btn-sm mr-2" onclick="vmPower('on')">Power On</button>
+          <button class="btn btn-danger btn-sm mr-2" onclick="vmPower('off')">Power Off</button>
+          <select id="vm-firmware" class="form-control form-control-sm mr-2" style="width:auto;display:inline-block;" title="Firmware for the created VM">
+            <option value="bios">BIOS</option>
+            <option value="efi">UEFI</option>
+          </select>
+          <button class="btn btn-outline-success btn-sm mr-2" onclick="vmCreate()">Create VM</button>
+          <button class="btn btn-outline-danger btn-sm mr-2" onclick="vmDestroy()">Destroy VM</button>
+          <span id="vm-state" class="text-muted ml-2"></span>
+        </div>
+        <div id="vm-console" style="height:72vh; min-height:420px; background:#000;"></div>
+        <div class="text-muted mt-2 small">
+          Serial console of the test VM. Interact with the iPXE menu via keyboard
+          (arrow keys / numbers / Enter). Text only — no graphical output.
+        </div>
+      </div>
+    </div>
+  `);
+
+  // Re-attach cleanly if the page was rendered before.
+  socket.emit('vm:console:stop');
+  socket.emit('vm:status');
+
+  if (vmTerm) vmTerm.dispose();
+  vmTerm = new Terminal({
+    cursorBlink: true,
+    fontSize: 13,
+    theme: { background: '#000', foreground: '#e0e0e0' },
+  });
+  vmTerm.open(document.getElementById('vm-console'));
+  vmTerm.onData(function(data) {
+    socket.emit('vm:console:input', data);
+  });
+  // Cell metrics aren't available until the first paint; fit then (and on resize).
+  requestAnimationFrame(function() { fitVmConsole(); });
+  socket.emit('vm:console:start');
+}
+
+function vmPower(action) {
+  socket.emit('vm:power', action);
+}
+
+function vmCreate() {
+  socket.emit('vm:create', document.getElementById('vm-firmware').value);
+}
+
+function vmDestroy() {
+  if (confirm('Permanently remove the test VM? This cannot be undone.')) {
+    socket.emit('vm:destroy');
+  }
+}

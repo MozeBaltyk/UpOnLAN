@@ -76,18 +76,21 @@ cat <<EOF > /etc/libvirt/qemu/networks/${network_name}.xml
   <dnsmasq:options>
     <!-- Disable re-use of the DHCP servername and filename fields -->
     <dnsmasq:option value='dhcp-no-override'/>
-    <!-- PXE discovery control (vendor option) -->
-    <dnsmasq:option value='dhcp-option=vendor:PXEClient,6,2b'/>
     <!-- Detect iPXE requests -->
     <dnsmasq:option value='dhcp-match=set:ipxe-bios,175,33'/>
     <dnsmasq:option value='dhcp-match=set:ipxe-efi,175,36'/>
-    <!-- PXE services for initial boot (not iPXE) -->
-    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,X86PC,PXE,rom/ipxe/${pxe_type}.xyz-undionly.kpxe'/>
-    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,BC_EFI,PXE,rom/ipxe/${pxe_type}.xyz.efi'/>
-    <dnsmasq:option value='pxe-service=tag:!ipxe-ok,X86-64_EFI,PXE,rom/ipxe/${pxe_type}.xyz.efi'/>
+    <!-- UEFI/OVMF firmware matches option 93 (arch 7 = x86-64 UEFI); without
+         this dhcp-boot it gets no option-67 bootfile and loops on DHCP -->
+    <dnsmasq:option value='dhcp-match=set:uefi-fw,93,7'/>
+    <dnsmasq:option value='dhcp-boot=tag:uefi-fw,rom/ipxe/${pxe_type}.xyz.efi,,${tftp_server_ip}'/>
+    <dnsmasq:option value='dhcp-option=tag:uefi-fw,67,rom/ipxe/${pxe_type}.xyz.efi'/>
+    <!-- NOTE: no pxe-service/pxe-prompt lines — dnsmasq's PXE processing
+         (triggered only by those) injects option 60 "PXEClient" + option 43
+         into every offer, which makes EDK2/OVMF abort with PXE-E21 before any
+         TFTP. dhcp-boot tags cover every client: UEFI firmware and iPXE. -->
     <!-- iPXE services for initial boot -->
-    <dnsmasq:option value='dhcp-boot=tag:ipxe-bios,rom/ipxe/${pxe_type}.xyz.kpxe,,${tftp_server_ip};'/>
-    <dnsmasq:option value='dhcp-boot=tag:ipxe-efi,rom/ipxe/${pxe_type}.xyz.efi,,${tftp_server_ip};'/>
+    <dnsmasq:option value='dhcp-boot=tag:ipxe-bios,rom/ipxe/${pxe_type}.xyz.kpxe,,${tftp_server_ip}'/>
+    <dnsmasq:option value='dhcp-boot=tag:ipxe-efi,rom/ipxe/${pxe_type}.xyz.efi,,${tftp_server_ip}'/>
   </dnsmasq:options>
 </network>
 EOF

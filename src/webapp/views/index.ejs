@@ -31,6 +31,7 @@
     <link rel="stylesheet" href="<%= baseurl %>public/vendor/css/docs.css">
     <link rel="stylesheet" href="<%= baseurl %>public/vendor/css/menus.css">
     <link rel="stylesheet" href="<%= baseurl %>public/vendor/css/dark-theme.css">
+    <link rel="stylesheet" href="<%= baseurl %>public/vendor/css/xterm.css">
     <style>
       /* Toast stack (Bootstrap 4 toasts, fixed top-right) */
       #toast-container {
@@ -73,6 +74,9 @@
           <li class="nav-item" id="navwol">
             <div class="nav-link" style="cursor:pointer;" onclick="navTo('renderwol','navwol')">Wake On LAN</div>
           </li>
+          <li class="nav-item" id="navconsole">
+            <div class="nav-link" style="cursor:pointer;" onclick="navTo('renderconsole','navconsole')">Console</div>
+          </li>
           <li class="nav-item" id="navdoc">
             <div class="nav-link" style="cursor:pointer;" onclick="navTo('renderdoc','navdoc')">Docs</div>
           </li>
@@ -105,6 +109,7 @@
     <script src="<%= baseurl %>public/vendor/js/chart.umd.js"></script>
     <script src="<%= baseurl %>public/vendor/js/luxon.min.js"></script>
     <script src="<%= baseurl %>public/vendor/js/chartjs-adapter-luxon.umd.min.js"></script>
+    <script src="<%= baseurl %>public/vendor/js/xterm.js"></script>
     <!-- Our JavaScript -->
     <script src="<%= baseurl %>uponlanxyz-web.js"></script>
   </body>

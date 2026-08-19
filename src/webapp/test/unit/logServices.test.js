@@ -28,4 +28,19 @@ describe('logServices', () => {
     fs.writeFileSync(path.join(logRoot, 'webapp', 'webapp.log'), 'hello from webapp\n');
     expect(logServices.getWebLog()).toBe('hello from webapp\n');
   });
+
+  it('returns a friendly message when no ROM build logs exist', () => {
+    expect(logServices.getRomBuildLog()).toBe('No ROM build logs yet.');
+  });
+
+  it('returns the most recent ROM build log with its filename', () => {
+    const romDir = path.join(logRoot, 'rom');
+    fs.mkdirSync(romDir, { recursive: true });
+    fs.writeFileSync(path.join(romDir, 'build_2026-08-19T13-08-06-725Z.log'), 'first build\n');
+    fs.writeFileSync(path.join(romDir, 'build_2026-08-19T13-28-10-557Z.log'), 'second build\n');
+    const log = logServices.getRomBuildLog();
+    expect(log).toContain('build_2026-08-19T13-28-10-557Z.log');
+    expect(log).toContain('second build');
+    expect(log).not.toContain('first build');
+  });
 });

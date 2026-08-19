@@ -233,6 +233,9 @@ socket.on('renderdash', function(response){
                 <li class="nav-item">\
                   <a class="nav-link log-tab" id="nginx-error-tab" data-toggle="tab" href="#nginx-error-log" role="tab" aria-controls="nginx-error-log" aria-selected="false">Nginx Error Logs</a>\
                 </li>\
+                <li class="nav-item">\
+                  <a class="nav-link log-tab" id="rom-build-tab" data-toggle="tab" href="#rom-build-log" role="tab" aria-controls="rom-build-log" aria-selected="false">ROM Build Log</a>\
+                </li>\
               </ul>\
             </div>\
             <div class="card-body d-flex flex-column log-content">\
@@ -248,6 +251,9 @@ socket.on('renderdash', function(response){
                 </div>\
                 <div class="tab-pane fade h-100" id="nginx-error-log" role="tabpanel" aria-labelledby="nginx-error-tab">\
                   <div id="nginx-error-log-content" class="h-100">Click tab to load logs...</div>\
+                </div>\
+                <div class="tab-pane fade h-100" id="rom-build-log" role="tabpanel" aria-labelledby="rom-build-tab">\
+                  <div id="rom-build-log-content" class="h-100">Click tab to load logs...</div>\
                 </div>\
               </div>\
             </div>\
@@ -280,6 +286,7 @@ socket.on('renderdash', function(response){
   renderLog('#tftp-tab', '#tftplog-content', 'gettftplog', 'rendertftplog');
   renderLog('#nginx-access-tab', '#nginx-access-log-content', 'getnginxaccesslog', 'rendernginxaccesslog');
   renderLog('#nginx-error-tab', '#nginx-error-log-content', 'getnginxerrorlog', 'rendernginxerrorlog');
+  renderLog('#rom-build-tab', '#rom-build-log-content', 'getrombuildlog', 'renderrombuildlog');
   // show the webapp logs tab by default
   $('#webapp-tab').trigger('click');
 

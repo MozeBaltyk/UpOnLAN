@@ -41,6 +41,15 @@ jobs:
     - name: Set release tag
       run: echo "release_tag=${{ steps.get_version.outputs.TAG_VERSION }}" >> $GITHUB_ENV
 
+    - name: Install iPXE build dependencies
+      run: sudo apt-get update && sudo apt-get install -y build-essential binutils liblzma-dev xz-utils curl
+
+    # release_menu.sh refuses to pack menus.tar.gz without the rom/ipxe
+    # artifacts, so the ROM build MUST run first (build ordering is enforced
+    # by release_menu.sh's artifact validation as well).
+    - name: Build iPXE ROMs
+      run: ./scripts/build_ipxe_roms.sh
+
     - name: Build Menu release
       run: |
         echo "Building release for version ${{ steps.get_version.outputs.TAG_VERSION }}"

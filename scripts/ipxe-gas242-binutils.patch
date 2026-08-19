@@ -1,0 +1,252 @@
+diff -ru ./arch/x86/core/patch_cf.S ../../ipxe/src/arch/x86/core/patch_cf.S
+--- ./arch/x86/core/patch_cf.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/core/patch_cf.S	2026-08-18 11:28:14.508384460 +0200
+@@ -23,8 +23,9 @@
+ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
+ 
+ 	.text
+-	.arch i386
+ 	.code16
++	.code16
++	.arch i386
+ 
+ /****************************************************************************
+  * Set/clear CF on the stack as appropriate, assumes stack is as it should
+diff -ru ./arch/x86/core/stack.S ../../ipxe/src/arch/x86/core/stack.S
+--- ./arch/x86/core/stack.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/core/stack.S	2026-08-18 11:28:52.588466171 +0200
+@@ -1,5 +1,6 @@
+ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
+ 
++	.code32
+ 	.arch i386
+ 
+ #ifdef __x86_64__
+diff -ru ./arch/x86/core/stack16.S ../../ipxe/src/arch/x86/core/stack16.S
+--- ./arch/x86/core/stack16.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/core/stack16.S	2026-08-18 11:28:52.591259878 +0200
+@@ -1,5 +1,6 @@
+ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
+ 
++	.code32
+ 	.arch i386
+ 
+ /****************************************************************************
+diff -ru ./arch/x86/drivers/net/undiisr.S ../../ipxe/src/arch/x86/drivers/net/undiisr.S
+--- ./arch/x86/drivers/net/undiisr.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/drivers/net/undiisr.S	2026-08-18 11:28:14.742329405 +0200
+@@ -11,8 +11,8 @@
+ #define PIC2_ICR 0xa0
+ 	
+ 	.text
+-	.arch i386
+ 	.code16
++	.arch i386
+ 
+ 	.section ".text16", "ax", @progbits
+ 	.globl undiisr
+diff -ru ./arch/x86/interface/pcbios/e820mangler.S ../../ipxe/src/arch/x86/interface/pcbios/e820mangler.S
+--- ./arch/x86/interface/pcbios/e820mangler.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/interface/pcbios/e820mangler.S	2026-08-18 11:28:14.421069368 +0200
+@@ -24,8 +24,8 @@
+ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
+ 
+ 	.text
+-	.arch i386
+ 	.code16
++	.arch i386
+ 
+ #define SMAP 0x534d4150
+ 
+diff -ru ./arch/x86/interface/pxe/pxe_entry.S ../../ipxe/src/arch/x86/interface/pxe/pxe_entry.S
+--- ./arch/x86/interface/pxe/pxe_entry.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/interface/pxe/pxe_entry.S	2026-08-18 11:28:29.928590603 +0200
+@@ -26,6 +26,7 @@
+ 
+ #include <librm.h>
+ 
++	.code16
+ 	.arch i386
+ 
+ /****************************************************************************
+diff -ru ./arch/x86/prefix/bootpart.S ../../ipxe/src/arch/x86/prefix/bootpart.S
+--- ./arch/x86/prefix/bootpart.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/bootpart.S	2026-08-18 11:28:29.925797709 +0200
+@@ -6,6 +6,7 @@
+ #define STACK_SIZE	0x2000
+ 	
+ 	.text
++	.code16
+ 	.arch i386
+ 	.section ".prefix", "awx", @progbits
+ 	.code16
+diff -ru ./arch/x86/prefix/dskprefix.S ../../ipxe/src/arch/x86/prefix/dskprefix.S
+--- ./arch/x86/prefix/dskprefix.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/dskprefix.S	2026-08-18 11:28:29.927796407 +0200
+@@ -25,6 +25,7 @@
+ .equ	SYSSEG, 0x1000			/* system loaded at SYSSEG<<4 */
+ 
+ 	.org	0
++	.code16
+ 	.arch i386
+ 	.text
+ 	.section ".prefix", "ax", @progbits
+diff -ru ./arch/x86/prefix/exeprefix.S ../../ipxe/src/arch/x86/prefix/exeprefix.S
+--- ./arch/x86/prefix/exeprefix.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/exeprefix.S	2026-08-18 11:28:29.927043860 +0200
+@@ -37,6 +37,7 @@
+ #define PSP_CMDLINE_START 0x81
+ 
+ 	.text
++	.code16
+ 	.arch i386
+ 	.org 0
+ 	.code16
+diff -ru ./arch/x86/prefix/hdprefix.S ../../ipxe/src/arch/x86/prefix/hdprefix.S
+--- ./arch/x86/prefix/hdprefix.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/hdprefix.S	2026-08-18 11:28:14.563298809 +0200
+@@ -3,6 +3,7 @@
+ #include <librm.h>
+ 
+ 	.text
++	.code16
+ 	.arch i386
+ 	.section ".prefix", "awx", @progbits
+ 	.code16
+diff -ru ./arch/x86/prefix/libprefix.S ../../ipxe/src/arch/x86/prefix/libprefix.S
+--- ./arch/x86/prefix/libprefix.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/libprefix.S	2026-08-18 11:28:29.928174830 +0200
+@@ -26,6 +26,7 @@
+ 
+ #include <librm.h>
+ 
++	.code16
+ 	.arch i386
+ 
+ /* Image compression enabled */
+diff -ru ./arch/x86/prefix/lkrnprefix.S ../../ipxe/src/arch/x86/prefix/lkrnprefix.S
+--- ./arch/x86/prefix/lkrnprefix.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/lkrnprefix.S	2026-08-18 11:28:14.666687065 +0200
+@@ -5,8 +5,8 @@
+ #define BZI_LOAD_HIGH_ADDR 0x100000
+ 
+ 	.text
+-	.arch i386
+ 	.code16
++	.arch i386
+ 	.section ".prefix", "ax", @progbits
+ 	.globl	_lkrn_start
+ _lkrn_start:
+diff -ru ./arch/x86/prefix/mbr.S ../../ipxe/src/arch/x86/prefix/mbr.S
+--- ./arch/x86/prefix/mbr.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/mbr.S	2026-08-18 11:28:29.925901485 +0200
+@@ -1,6 +1,7 @@
+ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
+ 
+ 	.text
++	.code16
+ 	.arch i386
+ 	.section ".prefix", "awx", @progbits
+ 	.code16
+diff -ru ./arch/x86/prefix/mromprefix.S ../../ipxe/src/arch/x86/prefix/mromprefix.S
+--- ./arch/x86/prefix/mromprefix.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/mromprefix.S	2026-08-18 11:28:14.473888136 +0200
+@@ -42,8 +42,8 @@
+ #include "pciromprefix.S"
+ 
+ 	.text
+-	.arch i386
+ 	.code16
++	.arch i386
+ 
+ /* Obtain access to payload by exposing the expansion ROM BAR at the
+  * address currently used by a suitably large memory BAR on the same
+diff -ru ./arch/x86/prefix/nbiprefix.S ../../ipxe/src/arch/x86/prefix/nbiprefix.S
+--- ./arch/x86/prefix/nbiprefix.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/nbiprefix.S	2026-08-18 11:28:14.635543301 +0200
+@@ -3,8 +3,8 @@
+ #include <librm.h>
+ 
+ 	.text
+-	.arch i386
+ 	.code16
++	.arch i386
+ 	.section ".prefix", "ax", @progbits
+ 	.org 0
+ 
+diff -ru ./arch/x86/prefix/nullprefix.S ../../ipxe/src/arch/x86/prefix/nullprefix.S
+--- ./arch/x86/prefix/nullprefix.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/nullprefix.S	2026-08-18 11:28:29.926138135 +0200
+@@ -2,6 +2,7 @@
+ 
+ 	.org	0
+ 	.text
++	.code16
+ 	.arch i386
+ 
+ 	.section ".prefix", "ax", @progbits
+diff -ru ./arch/x86/prefix/pxeprefix.S ../../ipxe/src/arch/x86/prefix/pxeprefix.S
+--- ./arch/x86/prefix/pxeprefix.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/pxeprefix.S	2026-08-18 11:28:29.927176115 +0200
+@@ -12,6 +12,7 @@
+ #define PXE_HACK_EB54			0x0001
+ 
+ 	.text
++	.code16
+ 	.arch i386
+ 	.org 0
+ 	.code16
+diff -ru ./arch/x86/prefix/unlzma.S ../../ipxe/src/arch/x86/prefix/unlzma.S
+--- ./arch/x86/prefix/unlzma.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/unlzma.S	2026-08-18 11:28:58.597492395 +0200
+@@ -44,6 +44,7 @@
+  */
+ 
+ 	.text
++	.code32
+ 	.arch i586
+ 	.section ".prefix.lib", "ax", @progbits
+ 
+diff -ru ./arch/x86/prefix/usbdisk.S ../../ipxe/src/arch/x86/prefix/usbdisk.S
+--- ./arch/x86/prefix/usbdisk.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/prefix/usbdisk.S	2026-08-18 11:28:29.925340157 +0200
+@@ -3,6 +3,7 @@
+ #include <config/console.h>
+ 
+ 	.text
++	.code16
+ 	.arch i386
+ 	.section ".prefix", "awx", @progbits
+ 	.code16
+diff -ru ./arch/x86/transitions/liba20.S ../../ipxe/src/arch/x86/transitions/liba20.S
+--- ./arch/x86/transitions/liba20.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/transitions/liba20.S	2026-08-18 11:28:29.924927816 +0200
+@@ -24,6 +24,7 @@
+ 
+ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
+ 
++	.code16
+ 	.arch i386
+ 
+ /****************************************************************************
+diff -ru ./arch/x86/transitions/libkir.S ../../ipxe/src/arch/x86/transitions/libkir.S
+--- ./arch/x86/transitions/libkir.S	2020-12-31 22:03:10.000000000 +0100
++++ ../../ipxe/src/arch/x86/transitions/libkir.S	2026-08-18 11:28:29.924649866 +0200
+@@ -32,6 +32,7 @@
+ #define BOCHSBP xchgw %bx, %bx
+ 
+ 	.text
++	.code16
+ 	.arch i386
+ 	.section ".text16", "awx", @progbits
+ 	.code16
+Binary files ./bin/3c503.o and ../../ipxe/src/bin/3c503.o differ
+Binary files ./bin/3c509-eisa.o and ../../ipxe/src/bin/3c509-eisa.o differ
+Binary files ./bin/3c509.o and ../../ipxe/src/bin/3c509.o differ
+Binary files ./bin/3c515.o and ../../ipxe/src/bin/3c515.o differ
+Binary files ./bin/3c529.o and ../../ipxe/src/bin/3c529.o differ
+Binary files ./bin/3c595.o and ../../ipxe/src/bin/3c595.o differ
+Binary files ./bin/3c5x9.o and ../../ipxe/src/bin/3c5x9.o differ
+Binary files ./bin/3c90x.o and ../../ipxe/src/bin/3c90x.o differ
+Binary files ./bin/8086100e.rom and ../../ipxe/src/bin/8086100e.rom differ
+Binary files ./bin/8086100e.rom.tmp and ../../ipxe/src/bin/8086100e.rom.tmp differ

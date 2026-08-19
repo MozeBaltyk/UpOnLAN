@@ -1,1 +1,30 @@
 ---
+# Build and install the custom iPXE ROMs via scripts/build_ipxe_roms.sh.
+#
+# This is the implementation of the previously-empty release_ipxe role:
+# nothing used to generate the release/menus/rom/ipxe artifacts or the host
+# option ROM that buildDomainXml references. Run with:
+#
+#   ansible-playbook ansible/release_ipxe.yml
+#
+# It must run BEFORE scripts/release_menu.sh (which refuses to pack menus.tar.gz
+# without the rom/ipxe artifacts this role produces).
+
+- name: Install host packages required to build iPXE ROMs
+  ansible.builtin.apt:
+    name:
+      - build-essential      # gcc 13 / make
+      - binutils             # 2.42 on Ubuntu 24.04 (patch applied by the build script)
+      - liblzma-dev          # zbin ROM compression
+      - xz-utils             # lzma CLI used by the build
+      - curl
+      - ipxe-qemu            # provides /usr/lib/ipxe/qemu/ (option ROM install path)
+      - ovmf                 # UEFI/OVMF firmware for UEFI PXE guests
+      - qemu-system-x86      # emulator referenced by buildDomainXml
+    state: present
+    update_cache: true
+
+- name: Run the iPXE ROM build (fetch v1.21.1, apply binutils-2.42 patch, build serial+dhcp-first ROMs, install + verify the host option ROM)
+  ansible.builtin.shell: bash scripts/build_ipxe_roms.sh
+  args:
+    chdir: "{{ playbook_dir }}/.."

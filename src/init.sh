@@ -49,7 +49,10 @@ else
   echo "[uponlanxyz-init] Extracting menus.tar.gz"
   tar -xzf /config/menus/menus.tar.gz -C /config/menus/remote
   rm -f /config/menus/menus.tar.gz
-  cp /config/menus/remote/* /config/menus/
+  # -r is required: the tarball contains the rom/ipxe/ directory and a plain
+  # `cp` silently omits directories, leaving the TFTP root without the iPXE
+  # ROMs the network advertises (UEFI/firmware-PXE boot then fails).
+  cp -r /config/menus/remote/* /config/menus/
 fi
 
 # Ensure endpoints.yml exists from the asset-side release output

@@ -61,4 +61,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build image (build-only smoke)
-        run: docker build -t uponlan:ci .
+        run: docker build -f Containerfile -t uponlan:ci .

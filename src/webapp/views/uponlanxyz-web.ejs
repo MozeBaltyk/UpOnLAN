@@ -1182,11 +1182,26 @@ function prettyLabel(key) {
   return key.replace(/-/g, ' ');
 }
 
-// Stable, collision-free id for a folder collapse target (key may be `UpOnLAN`,
+// Stable, collision-free id for a folder collapse target (key may be `UpOnLAN.xyz`,
 // `iPXE`, …). Folders are keyed by their path so nested folders stay unique.
 function folderId(pathPrefix, key) {
   const slug = (pathPrefix + key).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   return 'doc-folder-' + (slug || 'root');
+}
+
+// Explicit per-entry icons, keyed by the prettified label; anything not listed
+// falls back to a folder/file glyph.
+const TOC_ICONS = {
+  'UpOnLAN.xyz': '🏠', 'iPXE': '🥾', 'Networks': '🌐',
+  'Getting Started': '🏁', 'PXE Basics': '📡', 'Assets': '📦',
+  'Overview': '📖', 'DHCP': '🔌',
+  'Quick Start': '⚡', 'Menu Scripting': '📝', 'ROM Build': '💿',
+  'Development': '🧱', 'Deployment': '🚀', 'Operations': '🔄',
+  'CI': '🔧', 'Troubleshoot': '🐛', 'Contribute': '🤝',
+};
+
+function iconFor(label, isFolder) {
+  return TOC_ICONS[label] || (isFolder ? '📁' : '📄');
 }
 
 function renderTree(tree, level = 0, pathPrefix = '') {
@@ -1196,18 +1211,19 @@ function renderTree(tree, level = 0, pathPrefix = '') {
   for (const key of keys) {
     const node = tree[key];
     const label = prettyLabel(key);
+    const icon = iconFor(label, !node.__file);
     const pad = 12 + level * 16; // indent nested entries under their folder
 
     if (node.__file) {
       html += `<div class="bd-toc-item">
-        <a href="#" class="bd-toc-link doc-link" data-doc="${node.__file}" style="padding-left:${pad}px;">${label}</a>
+        <a href="#" class="bd-toc-link doc-link" data-doc="${node.__file}" style="padding-left:${pad}px;">${icon} ${label}</a>
       </div>`;
     } else {
       // Folder: a collapsible group header (accordion, like the menu editor).
       const id = folderId(pathPrefix, key);
       html += `<div class="bd-toc-item">
         <button type="button" class="btn btn-link btn-block text-left bd-toc-link font-weight-bold text-secondary" style="padding-left:${pad}px;" data-toggle="collapse" data-target="#${id}" aria-expanded="true" aria-controls="${id}">
-          📁 ${label}
+          ${icon} ${label}
         </button>
         <div class="collapse show" id="${id}">
           ${renderTree(node, level + 1, pathPrefix + key + '/')}
@@ -1306,8 +1322,10 @@ socket.on('docs:get:response', function({ filename, content }) {
 
 // Internal doc links: [foo](path/to/foo.md) navigate through the viewer.
 // The server strips leading ../ and appends .md if missing; we just decode
-// %20-style encoding and drop any #anchor before emitting.
-$('#doc-viewer').on('click', 'a', function(e) {
+// %20-style encoding and drop any #anchor before emitting. Delegated on
+// document because #doc-viewer is created lazily (first docs:list response),
+// so binding it at load time would attach to nothing.
+$(document).on('click', '#doc-viewer a', function(e) {
   const href = $(this).attr('href');
   if (href && href.split('#')[0].endsWith('.md')) {
     e.preventDefault();

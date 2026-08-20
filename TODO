@@ -1,6 +1,6 @@
 # UpOnLAN — Operational Plan / Backlog
 
-Ordered by priority. One branch per phase, merged back to `main` when done.
+Ordered by priority. All remaining phases land on the `dev` branch, merged to `main` when complete.
 
 ## Phase 0 — Ship & unblock ✅ (done)
 
@@ -10,31 +10,31 @@ Ordered by priority. One branch per phase, merged back to `main` when done.
 - [x] Housekeeping — commit the `notes` deletion + this TODO.
 - [x] Oracle decision → removed entirely (menu + assets + endpoints); menu `0.1.2`, webapp `1.0.2`.
 
-## Phase 1 — Release pipeline hardening → `feat/release-hardening` ✅ (done)
+## Phase 1 — Release pipeline hardening ✅ (done, on `dev`)
 
 - [x] **ghcr login documented** — the package is private by default, so `podman login ghcr.io` is a documented prerequisite (can't flip visibility from the CLI token).
 - [x] **Tag-triggered image** — `image.yml` builds on `push: tags: 'v*'` (version from the tag). The menu stays manual because its version lives in `version.ipxe`, decoupled from git tags.
 - [x] **`assets.yml` per-OS target** — a `target` input; a targeted run merges its `endpoints.yml` into the existing catalog instead of overwriting it.
 - [x] **Dropped the stale committed `release/assets/endpoints.yml`** — netboot-era and never consumed; the generated `release/output/assets/endpoints.yml` is the single catalog.
 
-## Phase 2 — Menu/asset content → `feat/asset-content`
+## Phase 2 — Menu/asset content → `dev`
 
 - [ ] **Rocky Linux local recipe** — last entry still booting `download.rockylinux.org` directly (`release/assets/rockylinux/setting.sh`).
 - [ ] **Cloud-init assets** — with a "category" column in the Assets tab.
 
-## Phase 3 — Webapp features → `feat/webapp-features`
+## Phase 3 — Webapp features → `dev`
 
 - [ ] **Console: multi-host KVM** — add a KVM host entry + connect to remote hosts over SSH (key-based), not just local `qemu:///system`.
 - [ ] **Console: attach disks** — allow disks on the test VM so PXE can run a real install, not just a diskless boot.
 - [ ] **Wake-on-LAN** — show host status/IP + add a scheduler.
 
-## Phase 4 — Platform hardening → `feat/platform-hardening`
+## Phase 4 — Platform hardening → `dev`
 
 - [ ] **HTTPS** — TLS termination (reverse proxy or in-nginx certs) for webapp + asset serving (plain HTTP 8080/3000 today).
 - [ ] **Kubernetes** — promote the chart's Pod → Deployment (replicas 1); rework node-local `hostPort` TFTP + `hostPath` libvirt socket.
 - [ ] **Update Node.js** — the container pins an older runtime.
 
-## Phase 5 — Polish → `chore/polish`
+## Phase 5 — Polish → `dev`
 
 - [ ] **Prose brand sweep** — "UpOnLAN" → "UpOnLAN.xyz" in body text (titles/folder already done).
 - [ ] **Docs** — ghcr login note + any remaining release/deploy gaps.

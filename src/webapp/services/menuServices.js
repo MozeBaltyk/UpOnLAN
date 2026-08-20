@@ -335,7 +335,7 @@ async function getromfiles() {
   const romDir = path.resolve(MENU_DIR, 'rom/ipxe');
   // Make sure all destination directories exist
   await fsp.mkdir(romDir, { recursive: true });
-  const list_rom_files = await listFiles(romDir, ['efi', 'kpxe', 'dsk', 'pdsk', 'iso', 'img']);
+  const list_rom_files = await listFiles(romDir, ['efi', 'kpxe', 'dsk', 'pdsk', 'lkrn', 'iso', 'img', 'rom']);
   return { list_rom_files };
 }
 
@@ -351,7 +351,7 @@ async function getremoteromfiles() {
   const remoteDir = path.resolve(MENU_DIR, 'remote');
   // Make sure all destination directories exist
   await fsp.mkdir(remoteDir, { recursive: true });
-  const list_rom_files = await listFiles(remoteDir, ['efi', 'kpxe', 'dsk', 'pdsk', 'iso', 'img']);
+  const list_rom_files = await listFiles(remoteDir, ['efi', 'kpxe', 'dsk', 'pdsk', 'lkrn', 'iso', 'img', 'rom']);
   return { list_rom_files };
 }
 

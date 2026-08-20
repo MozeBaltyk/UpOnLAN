@@ -13,6 +13,9 @@ class DeployLocalSpecs(TempDirTestCase):
         # deploy renders the Helm chart and pipes it to `podman play kube -`;
         # sudo is stubbed so the play is a no-op, and helm is stubbed here too.
         self.stub('bin/helm', '#!/bin/bash\nexit 0\n', exe=True)
+        # Preflight runs `ss` to check host ports; stub it so the spec doesn't
+        # depend on the real host's port state.
+        self.stub('bin/ss', '#!/bin/bash\nexit 0\n', exe=True)
         self.stub('release/menus/version.ipxe', '#!ipxe\nset menu_version 0.1.0\n')
 
     def test_requires_assets_endpoints(self):

@@ -29,6 +29,59 @@ resolve_deploy_knobs() {
     fi
 }
 
+# Print the resolved deployment context (what will be deployed).
+show_context() {
+    echo "== deployment context =="
+    echo "  image:    ${UPONLAN_IMAGE_REPO}:${UPONLAN_IMAGE_TAG} (${UPONLAN_PULL_POLICY})"
+    echo "  endpoint: ${ENDPOINT_URL}"
+    echo "  menu:     ${MENU_VERSION:-latest}"
+    echo "  ports:    8080/tcp 3000/tcp 69/udp"
+    echo "  libvirt:  /var/run/libvirt/libvirt-sock"
+    for v in asset_target IPXE_VERSION PXE_ROM_PATH; do
+        [ -n "${!v:-}" ] && echo "  env ${v}=${!v}"
+    done
+    echo ""
+}
+
+# Return 0 if the host port is already bound (TCP or UDP).
+port_in_use() {
+    local port="$1" proto="$2"
+    case "$proto" in
+        tcp) ss -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[.:]${port}$" && return 0 ;;
+        udp) ss -lun 2>/dev/null | awk '{print $4}' | grep -qE "[.:]${port}$" && return 0 ;;
+    esac
+    return 1
+}
+
+# Preflight checks. Hard failures return non-zero; soft issues warn only.
+preflight() {
+    local fail=0
+    command -v podman >/dev/null || { echo "ERROR: 'podman' not found." >&2; fail=1; }
+    command -v helm   >/dev/null || { echo "ERROR: 'helm' not found (needed to render the chart)." >&2; fail=1; }
+    if [ "${UPONLAN_IMAGE_REPO}" = "ghcr.io/mozebaltyk/uponlan" ] \
+       && ! sudo podman login --get-login ghcr.io >/dev/null 2>&1; then
+        echo "WARN: not logged in to ghcr.io — run 'podman login ghcr.io' if the package is private." >&2
+    fi
+    for pair in "8080 tcp" "3000 tcp" "69 udp"; do
+        set -- $pair
+        if port_in_use "$1" "$2"; then
+            echo "ERROR: port $1/$2 already in use (a pod may be running — use 'redeploy')." >&2
+            fail=1
+        fi
+    done
+    [ -S /var/run/libvirt/libvirt-sock ] \
+        || echo "WARN: /var/run/libvirt/libvirt-sock not found — the VM console tab will not work." >&2
+    return $fail
+}
+
+# Show context + run preflight without deploying anything.
+preview() {
+    resolve_deploy_knobs
+    show_context
+    preflight || return 1
+    echo "preview OK — nothing deployed."
+}
+
 # Render the Helm chart and feed it to podman play kube (KUBEFILE|-).
 kube_play() {
     resolve_deploy_knobs
@@ -46,6 +99,9 @@ build() {
 }
 
 deploy() {
+    resolve_deploy_knobs
+    show_context
+    preflight || return 1
     if [ "${local_deploy:-0}" = "1" ]; then
         if [ ! -f "$OUTPUT_ROOT/assets/endpoints.yml" ]; then
             echo "[deploy --local] Missing $OUTPUT_ROOT/assets/endpoints.yml"
@@ -146,6 +202,7 @@ print_help() {
     echo "6. connect - connect to uponlan container"
     echo "7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets"
     echo "8. test-webapp - run webapp tests inside the container"
+    echo "9. preview - show deployment context and run preflight checks (no deploy)"
     echo ""
 }
 
@@ -187,6 +244,7 @@ case $action in
     connect) echo "Action: connect to uponlan container" ;;
     mirror-assets) echo "Action: build local asset output" ;;
     test-webapp) echo "Action: run webapp tests in container" ;;
+    preview) echo "Action: show deployment context + preflight" ;;
     *) echo "Invalid action: $action"; print_help; exit 1 ;;
 esac
 

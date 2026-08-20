@@ -50,6 +50,14 @@ Allowed Actions
 8. test-webapp - run webapp tests in container
 ```
 
+* 3 types of deployments:
+
+```bash
+./wakemeup.sh -a deploy               # ghcr image + GitHub assets (no build)
+./wakemeup.sh -a deploy --build       # local build + GitHub assets
+./wakemeup.sh -a deploy --local       # local build + local assets
+```
+
 ---
 
 ## Local release and tests

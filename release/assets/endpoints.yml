@@ -1,22 +1,4 @@
 endpoints:
-  oracle-9-x86_64:
-    path: /releases/download/oracle-9-x86_64/
-    files:
-    - vmlinuz
-    - initrd
-    - squashfs.img
-    os: oracle
-    version: '9'
-    arch: x86_64
-  oracle-9-aarch64:
-    path: /releases/download/oracle-9-aarch64/
-    files:
-    - vmlinuz
-    - initrd
-    - squashfs.img
-    os: oracle
-    version: '9'
-    arch: aarch64
   harvester:
     path: /releases/download/harvester/
     files:

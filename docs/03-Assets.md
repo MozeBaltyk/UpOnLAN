@@ -51,7 +51,7 @@ This drives the two `BUILD_TYPE`s in `release/assets/`:
 | `BUILD_TYPE`     | When to use                                      | Example                                             |
 | ---------------- | ------------------------------------------------ | --------------------------------------------------- |
 | `direct_file`    | The vendor already publishes kernel/initrd files | `talos` (GitHub releases)                           |
-| `iso_extraction` | The vendor ships only an ISO — extract from it   | `oracle9` (the `mirrors.kernel.org` DVD) |
+| `iso_extraction` | The vendor ships only an ISO — extract from it   | unused (Oracle was the only consumer, removed) |
 
 > ⚠️ **GitHub release-asset cap — 2 GB.** Release assets are limited to 2 GB, so an `iso_extraction` recipe must remove the downloaded DVD after extracting it. `release/assets/build.sh` does this automatically (it deletes the `*.iso` once `initrd`/`vmlinuz`/`squashfs.img` are out) — shipping the ISO makes `assets.yml` fail with `size must be less than 2147483648`.
 
@@ -84,7 +84,7 @@ The full boot URL is `${mirror_endpoint}${asset_path}<key>/<file>`. On GitHub th
 
 The consequence: **the `<key>` and file names in a menu must match an endpoint's `<key>` + `files`** in `endpoints.yml`. If they drift, the boot fails even though the assets are fully mirrored.
 
-> ⚠️ Current state of the shipped menus: `talos.ipxe`, `harvester.ipxe`, `oracle.ipxe`, `proxmox.ipxe` (PBS/PMG/VE), and `ubuntu.ipxe` (subiquity) all use the endpoint layout above (`${mirror_endpoint}${asset_path}<key>/`) and have mirrored recipes under `release/assets/`. The remaining non-local entries boot straight from a vendor mirror, not Netboot.xyz: `rockylinux.ipxe` uses `${rockylinux_mirror}` (download.rockylinux.org) and `ubuntu.ipxe`'s legacy `d-i` installer uses `${ubuntu_mirror}` (archive.ubuntu.com). `boot.cfg`'s `${live_endpoint}` is now unused.
+> ⚠️ Current state of the shipped menus: `talos.ipxe`, `harvester.ipxe`, `proxmox.ipxe` (PBS/PMG/VE), and `ubuntu.ipxe` (subiquity) all use the endpoint layout above (`${mirror_endpoint}${asset_path}<key>/`) and have mirrored recipes under `release/assets/`. The remaining non-local entries boot straight from a vendor mirror, not Netboot.xyz: `rockylinux.ipxe` uses `${rockylinux_mirror}` (download.rockylinux.org) and `ubuntu.ipxe`'s legacy `d-i` installer uses `${ubuntu_mirror}` (archive.ubuntu.com). `boot.cfg`'s `${live_endpoint}` is now unused.
 
 ---
 
@@ -94,14 +94,13 @@ An **endpoint** is one entry in `endpoints.yml` that points an iPXE menu (and th
 
 ```yaml
 endpoints:
-  oracle-9-x86_64:                     # unique key == release tag == directory
-    path: /assets/oracle-9-x86_64/     # files are served under <origin><path>
+  talos-v1.13.8-x86_64:                # unique key == release tag == directory
+    path: /assets/talos-v1.13.8-x86_64/ # files are served under <origin><path>
     files:
     - vmlinuz                          # kernel
     - initrd                           # initramfs
-    - squashfs.img                     # rootfs (if the OS uses one)
-    os: oracle                         # shown in the Assets tab
-    version: '9'
+    os: talos                          # shown in the Assets tab
+    version: v1.13.8
     arch: x86_64
 ```
 
@@ -109,7 +108,7 @@ endpoints:
 
 To add a new endpoint:
 
-1. **Create a build recipe** at `release/assets/<os>/setting.sh`. The script is sourced by `release/assets/build.sh` and must export `OS`, `VERSION`, `ARCHS`, `BUILD_TYPE`, and `EXTRACTS` (`URL|output_file` lines, one per file, with `REPLACE_ARCH` for per-arch URLs). See `release/assets/talos/setting.sh` for `direct_file` (download prebuilt artifacts) and `release/assets/oracle9/setting.sh` for `iso_extraction` (pull kernel/initrd/rootfs out of an ISO).
+1. **Create a build recipe** at `release/assets/<os>/setting.sh`. The script is sourced by `release/assets/build.sh` and must export `OS`, `VERSION`, `ARCHS`, `BUILD_TYPE`, and `EXTRACTS` (`URL|output_file` lines, one per file, with `REPLACE_ARCH` for per-arch URLs). See `release/assets/talos/setting.sh` for a `direct_file` recipe (download prebuilt artifacts).
 2. **Run `scripts/release_assets.sh [<os>]`** — it executes the recipe and appends the generated entry to `release/output/assets/endpoints.yml` (the file `init.sh` serves to the webapp).
 3. **Keep `release/assets/endpoints.yml` in sync** — the committed file is the reference catalog; mirror the generated entry there so the Assets tab is correct before the pipeline runs.
 

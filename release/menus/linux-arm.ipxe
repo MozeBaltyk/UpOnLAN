@@ -5,7 +5,6 @@ goto ${menu} ||
 :linux_menu
 menu Linux Installers - Current Arch [ ${arch} ]
 item --gap Popular Linux Operating Systems:
-item oracle ${space} Oracle Linux
 item rockylinux ${space} Rocky Linux
 item talos ${space} Talos Linux
 item ubuntu ${space} Ubuntu

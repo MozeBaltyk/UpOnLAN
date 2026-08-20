@@ -6,7 +6,6 @@ goto ${menu} ||
 menu Linux Installers - Current Arch [ ${arch} ]
 item --gap Linux Distros:
 item harvester ${space} Harvester
-item oracle ${space} Oracle Linux
 item proxmox ${space} Proxmox
 item rockylinux ${space} Rocky Linux
 item talos ${space} Talos Linux

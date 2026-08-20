@@ -31,7 +31,9 @@ As prerequisites:
 
 * A `podman engine` installed.
 
-* A KVM install with `virt-manager`, Not mandatory but good to have for testing purpose 
+* A libvirt installed.
+
+* helm command
 
 ```bash
 Usage: ./wakemeup.sh -a <action> [--local]
@@ -67,7 +69,7 @@ Release artifacts come in two layers, split under `release/output/`:
 
 `mirror-assets` builds the asset layer of `release/output/`.
 `scripts/release_menu.sh <version>` builds the menu layer into `release/output/`.
-`deploy --local` does not build anything. It stages config from the already prepared `release/output/` and deploys through `manifests/uponlan-local.yaml`.
+`deploy --local` does not build the release artifacts. It serves the already prepared `release/output/` on `:8899` and deploys the Helm chart with `--local`.
 `test-webapp` runs the webapp test suite inside the container.
 ```bash
 asset_target=harvester ./wakemeup.sh -a mirror-assets

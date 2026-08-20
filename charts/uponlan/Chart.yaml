@@ -1,0 +1,6 @@
+apiVersion: v2
+name: uponlan
+description: UpOnLAN.xyz — iPXE menu/asset server, webapp, and Wake-on-LAN
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

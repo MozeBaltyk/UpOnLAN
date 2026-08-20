@@ -7,6 +7,38 @@ run_release_assets() {
     bash scripts/release_assets.sh "${asset_target:-}"
 }
 
+# Deployment chart + knob defaults. --released switches to the GitHub image;
+# --local switches the endpoint to the local mirror and pins the menu version.
+CHART="charts/uponlan"
+UPONLAN_IMAGE_REPO="localhost/uponlan"
+UPONLAN_IMAGE_TAG="latest"
+UPONLAN_PULL_POLICY="Never"
+ENDPOINT_URL="https://github.com/mozebaltyk/uponlan"
+MENU_VERSION=""
+
+resolve_deploy_knobs() {
+    if [ "${released:-0}" = "1" ]; then
+        UPONLAN_IMAGE_REPO="ghcr.io/mozebaltyk/uponlan"
+        UPONLAN_PULL_POLICY="IfNotPresent"
+    fi
+    if [ "${local_deploy:-0}" = "1" ]; then
+        ENDPOINT_URL="http://host.containers.internal:8899"
+        MENU_VERSION="$(sed -n 's/^set menu_version //p' release/menus/version.ipxe)"
+    fi
+}
+
+# Render the Helm chart and feed it to podman play kube (KUBEFILE|-).
+kube_play() {
+    resolve_deploy_knobs
+    helm template uponlan "$CHART" \
+        --set image.repository="$UPONLAN_IMAGE_REPO" \
+        --set image.tag="$UPONLAN_IMAGE_TAG" \
+        --set image.pullPolicy="$UPONLAN_PULL_POLICY" \
+        --set endpoint="$ENDPOINT_URL" \
+        --set menuVersion="$MENU_VERSION" \
+        | sudo podman play kube "$@"
+}
+
 build() {
     sudo podman build -t localhost/uponlan:latest .
 }
@@ -25,22 +57,22 @@ deploy() {
             return 1
         fi
         echo "[deploy] deploying uponlan container with local menus+assets"
-        build
         # Kill any stale local mirror server (e.g. left by a prior deploy) so
         # the fresh one below binds port 8899 and serves the current output.
         pkill -f "http.server 8899" 2>/dev/null || true
         python3 -m http.server 8899 --directory ./$OUTPUT_ROOT >/dev/null 2>&1 &
-        sudo podman play kube ./manifests/uponlan-local.yaml
-        return 0
     else
         echo "[deploy] deploying uponlan container with remote menus+assets"
-        build
-        sudo podman play kube ./manifests/uponlan.yaml
     fi
+    # --released deploys the published image, so skip the local build.
+    if [ "${released:-0}" != "1" ]; then
+        build
+    fi
+    kube_play
 }
 
 destroy() {
-    sudo podman play kube --down ./manifests/uponlan.yaml
+    kube_play --down
     # Tolerate a missing image: a prior destroy/redeploy may have already
     # removed it, and `set -e` would otherwise abort the whole action.
     sudo podman rmi localhost/uponlan:latest 2>/dev/null || true
@@ -100,14 +132,14 @@ exec_cmd() {
 
 print_help() {
     echo ""
-    echo "Usage: ./wakemeup.sh -a <action> [--local]"
+    echo "Usage: ./wakemeup.sh -a <action> [--local] [--released]"
     echo ""
     echo "Allowed Actions"
     echo "---------------"
     echo "1. build - build uponlan image"
-    echo "2. deploy [--local] - deploy uponlan container; --local serves local menus/assets from release/output"
+    echo "2. deploy [--local] [--released] - deploy uponlan container; --local serves local menus/assets from release/output; --released deploys the GitHub-published image (no local build)"
     echo "3. destroy - destroy uponlan container"
-    echo "4. redeploy [--local] - redeploy uponlan container; --local serves local menus/assets from release/output"
+    echo "4. redeploy [--local] [--released] - redeploy uponlan container"
     echo "5. logs - display logs from uponlan container"
     echo "6. connect - connect to uponlan container"
     echo "7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets"
@@ -117,6 +149,7 @@ print_help() {
 
 action=""
 local_deploy=0
+released=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -a)
@@ -125,6 +158,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --local)
             local_deploy=1
+            shift
+            ;;
+        --released)
+            released=1
             shift
             ;;
         *)

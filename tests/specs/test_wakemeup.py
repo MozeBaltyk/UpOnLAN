@@ -10,6 +10,9 @@ class DeployLocalSpecs(TempDirTestCase):
         self.copy('wakemeup.sh')
         self.stub('bin/sudo', STUB_SUDO, exe=True)
         self.stub('bin/python3', STUB_PYTHON3, exe=True)
+        # deploy renders the Helm chart and pipes it to `podman play kube -`;
+        # sudo is stubbed so the play is a no-op, and helm is stubbed here too.
+        self.stub('bin/helm', '#!/bin/bash\nexit 0\n', exe=True)
         self.stub('release/menus/version.ipxe', '#!ipxe\nset menu_version 0.1.0\n')
 
     def test_requires_assets_endpoints(self):
@@ -28,6 +31,14 @@ class DeployLocalSpecs(TempDirTestCase):
         self.stub('release/output/assets/endpoints.yml', 'endpoints: {}\n')
         self.stub('release/output/menu/0.1.0/menus.tar.gz', 'menu')
         proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'deploy', '--local')
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_released_flag_is_accepted(self):
+        # --released skips the local build and deploys the published image; with
+        # sudo/helm stubbed the whole path should still complete.
+        self.stub('release/output/assets/endpoints.yml', 'endpoints: {}\n')
+        self.stub('release/output/menu/0.1.0/menus.tar.gz', 'menu')
+        proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'deploy', '--local', '--released')
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
 

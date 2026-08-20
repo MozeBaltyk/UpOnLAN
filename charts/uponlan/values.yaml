@@ -1,0 +1,26 @@
+## Image. `localhost/uponlan:latest` is the locally-built image (podman/podman
+## build); to use the GitHub-published image set:
+##   image.repository=ghcr.io/mozebaltyk/uponlan  and  image.pullPolicy=IfNotPresent
+image:
+  repository: localhost/uponlan
+  tag: latest
+  pullPolicy: Never
+
+## Menu/asset origin. Defaults to GitHub; deploy --local sets the local mirror.
+endpoint: https://github.com/mozebaltyk/uponlan
+
+## Menu version. Empty on GitHub means init.sh resolves releases/latest. The
+## local mirror has no "latest" tarball (menu/latest is a JSON file), so a
+## specific version is required there.
+menuVersion: ""
+
+## Bound host ports. 69/udp (TFTP) is privileged.
+nginxPort: 8080
+webAppPort: 3000
+tftpdOpts: "--tftp-single-port"
+
+## Host libvirt socket mount. Node-local: the webapp's VM console shells out to
+## `virsh` on the same host's qemu:///system. Disable on a real K8s cluster.
+libvirt:
+  enabled: true
+  socketPath: /var/run/libvirt/libvirt-sock

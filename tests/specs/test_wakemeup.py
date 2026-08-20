@@ -44,6 +44,12 @@ class DeployLocalSpecs(TempDirTestCase):
         proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'deploy', '--local', '--build')
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
+    def test_kube_play_feeds_stdin(self):
+        # podman play kube must read the rendered chart from stdin ('-'): without
+        # it the manifest is discarded and play kube fails with "accepts 1 arg".
+        src = (self.tmp / 'wakemeup.sh').read_text()
+        self.assertIn('podman play kube "$@" -', src)
+
 
 class MirrorAssetsSpecs(TempDirTestCase):
     """mirror-assets forwards asset_target=<os> to release_assets.sh."""

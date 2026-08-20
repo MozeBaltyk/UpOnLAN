@@ -20,7 +20,7 @@
 - **`--build`** — builds `localhost/uponlan:latest` and deploys it against GitHub assets (local development).
 - **`--local`** — builds locally and serves `release/output` on `:8899`; requires `release/output/assets/endpoints.yml` and `release/output/menu/0.1.0/menus.tar.gz` (build them with `./wakemeup.sh -a mirror-assets` + `./scripts/release_menu.sh 0.1.0`); pins `MENU_VERSION` from `release/menus/version.ipxe`.
 
-`./wakemeup.sh -a preview` prints the resolved context (image / endpoint / menu version / ports) and runs preflight checks — host ports free, `podman` + `helm` present, ghcr login, and the libvirt socket — without deploying anything. `deploy` runs the same checks and aborts on a hard failure (e.g. a port already bound).
+`./wakemeup.sh -a preview` prints the resolved context (image / endpoint / menu version / ports) and runs preflight checks — host ports free, `podman` + `helm` present, ghcr login, and the libvirt socket — without deploying anything. `deploy` runs the same checks and aborts on a hard failure (missing `podman`/`helm`); a port already in use only warns, since `deploy` is idempotent (`--replace` recreates the running pod).
 
 ### Security and network exposure
 

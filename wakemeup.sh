@@ -73,7 +73,7 @@ preflight() {
     for pair in "8080 tcp" "3000 tcp" "69 udp"; do
         set -- $pair
         if port_in_use "$1" "$2"; then
-            echo -e "${C_YELLOW}WARN: port $1/$2 in use — uponlan may already be deployed (use 'redeploy' to replace it).${C_RESET}" >&2
+            echo -e "${C_YELLOW}WARN: port $1/$2 in use — uponlan may already be deployed (deploy will replace it).${C_RESET}" >&2
         fi
     done
     [ -S /var/run/libvirt/libvirt-sock ] \
@@ -86,7 +86,7 @@ preview() {
     resolve_deploy_knobs
     show_context
     preflight || return 1
-    echo -e "${C_GREEN}preview OK — nothing deployed.${C_RESET}"
+    echo -e "${C_GREEN}preview OK — no deploy performed.${C_RESET}"
 }
 
 # Render the Helm chart and feed it to podman play kube (KUBEFILE|-).
@@ -98,7 +98,7 @@ kube_play() {
         --set image.pullPolicy="$UPONLAN_PULL_POLICY" \
         --set endpoint="$ENDPOINT_URL" \
         --set menuVersion="$MENU_VERSION" \
-        | sudo podman play kube "$@"
+        | sudo podman play kube "$@" -
 }
 
 build() {
@@ -133,7 +133,9 @@ deploy() {
     if [ "${build:-0}" = "1" ] || [ "${local_deploy:-0}" = "1" ]; then
         build
     fi
-    kube_play
+    # --replace makes deploy idempotent: it recreates a running pod instead of
+    # failing on the bound ports.
+    kube_play --replace
 }
 
 destroy() {

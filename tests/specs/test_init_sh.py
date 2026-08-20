@@ -16,8 +16,9 @@ class InitShUrlSpecs(unittest.TestCase):
         self.assertIn('${ENDPOINT_URL}/menu/${MENU_VERSION}/menus.tar.gz', self.init_sh)
 
     def test_endpoints_yml_urls(self):
-        # GitHub: endpoints.yml at the repo root.
-        self.assertIn('${ENDPOINT_URL}/endpoints.yml', self.init_sh)
+        # GitHub: endpoints.yml published as a release asset on the 'assets' tag.
+        self.assertIn('${ENDPOINT_URL}/releases/download/assets/endpoints.yml', self.init_sh)
+        self.assertNotIn('${ENDPOINT_URL}/endpoints.yml"', self.init_sh)
         # Local mirror: assets/ namespace.
         self.assertIn('${ENDPOINT_URL}/assets/endpoints.yml', self.init_sh)
 

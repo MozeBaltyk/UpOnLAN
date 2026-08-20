@@ -30,7 +30,7 @@ STUB_CURL = textwrap.dedent(
 STUB_SUDO = '#!/bin/bash\nexit 0\n'
 STUB_PYTHON3 = '#!/bin/bash\nexit 0\n'
 
-# Fixtures release_menu.sh requires (the iPXE ROM artifacts it fail-fasts on).
+# Fixtures for the iPXE ROM artifacts release_menu.sh bundles when present.
 ROM_ARTIFACTS = (
     'uponlan.xyz-undionly.kpxe',
     'uponlan.xyz.kpxe',
@@ -97,6 +97,6 @@ class TempDirTestCase(unittest.TestCase):
         )
 
     def stub_rom_artifacts(self):
-        """Create the non-empty rom/ipxe artifacts release_menu.sh requires."""
+        """Create the non-empty rom/ipxe artifacts release_menu.sh bundles when present."""
         for f in ROM_ARTIFACTS:
             write_file(self.tmp / 'release' / 'menus' / 'rom' / 'ipxe' / f, 'rom')

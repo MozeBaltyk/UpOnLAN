@@ -1,0 +1,56 @@
+name: assets
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release_assets:
+    name: Build + release asset bundles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install asset build deps (yq + 7z for ISO extraction)
+        run: |
+          sudo apt-get update && sudo apt-get install -y p7zip-full
+          sudo wget -qO /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.44.2/yq_linux_amd64"
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Build asset bundles (github layout)
+        run: MIRROR_LAYOUT=github bash scripts/release_assets.sh
+
+      # Each bundle becomes its own GitHub release whose tag is the endpoint key
+      # (proxmox-ve-8.4-1-x86_64 -> /releases/download/<key>/vmlinuz). Releases
+      # are marked prerelease so they never shadow the menu's `releases/latest`.
+      - name: Release each bundle under its own key tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          dl=release/output/assets/releases/download
+          for dir in "$dl"/*/; do
+            key="$(basename "$dir")"
+            mapfile -t files < <(find "$dir" -maxdepth 1 -type f)
+            if gh release view "$key" >/dev/null 2>&1; then
+              gh release upload "$key" "${files[@]}" --clobber
+            else
+              gh release create "$key" --prerelease --title "$key" "${files[@]}"
+            fi
+          done
+
+      - name: Publish the asset catalog (endpoints.yml) on the 'assets' tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cat release/output/assets/endpoints.yml
+          if gh release view assets >/dev/null 2>&1; then
+            gh release upload assets release/output/assets/endpoints.yml --clobber
+          else
+            gh release create assets --prerelease --title "Asset catalog" \
+              --notes "endpoints.yml listing every asset bundle." \
+              release/output/assets/endpoints.yml
+          fi

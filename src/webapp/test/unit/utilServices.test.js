@@ -85,6 +85,19 @@ describe('utilServices.getAssetOrigin', () => {
   });
 });
 
+describe('utilServices.isMenuVersionTag', () => {
+  it('accepts semver tags and rejects asset-bundle keys', async () => {
+    const svc = await loadServices();
+    expect(svc.isMenuVersionTag('0.0.2')).toBe(true);
+    expect(svc.isMenuVersionTag('v1.2.3')).toBe(true);
+    expect(svc.isMenuVersionTag('ubuntu-plucky-x86_64')).toBe(false);
+    expect(svc.isMenuVersionTag('talos-v1.13.8-x86_64')).toBe(false);
+    expect(svc.isMenuVersionTag('proxmox-ve-8.4-1-x86_64')).toBe(false);
+    expect(svc.isMenuVersionTag('assets')).toBe(false);
+    expect(svc.isMenuVersionTag('')).toBe(false);
+  });
+});
+
 describe('utilServices.isValidUrl', () => {
   it('accepts well-formed URLs and rejects garbage', async () => {
     const svc = await loadServices();

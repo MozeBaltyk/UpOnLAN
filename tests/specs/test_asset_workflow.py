@@ -84,6 +84,14 @@ class ReleaseAssetsWorkflowSpecs(TempDirTestCase):
         self.assertTrue((assets / 'harvester-v1.7.3-x86_64').exists(), 'targeted run must not wipe other bundles')
         self.assertTrue((assets / 'talos-v1.13.8-x86_64').exists())
 
+    def test_github_layout_passthrough(self):
+        # assets.yml relies on release_assets.sh forwarding MIRROR_LAYOUT=github
+        # to build.sh (per-bundle /releases/download/<key>/ layout).
+        self.run_cmd('bash', 'scripts/release_assets.sh', env={'MIRROR_LAYOUT': 'github'})
+        assets = self.tmp / 'release' / 'output' / 'assets'
+        self.assertTrue((assets / 'releases' / 'download' / 'harvester-v1.7.3-x86_64' / 'vmlinuz').is_file())
+        self.assertIn('path: /releases/download/harvester-v1.7.3-x86_64/', (assets / 'endpoints.yml').read_text())
+
     def test_untargeted_run_resets_stale_bundles(self):
         self.run_cmd('bash', 'scripts/release_assets.sh', 'harvester')
         self.run_cmd('bash', 'scripts/release_assets.sh', 'talos')

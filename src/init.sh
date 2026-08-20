@@ -65,7 +65,9 @@ fi
 # Ensure endpoints.yml exists from the asset-side release output
 if [[ ! -f /config/endpoints.yml ]]; then
   if [[ "${ENDPOINT_URL}" == *github.com* ]]; then
-    endpoint_catalog_url="${ENDPOINT_URL}/endpoints.yml"
+    # The asset catalog is published by assets.yml as a release asset on the
+    # stable 'assets' tag (prerelease, so it never shadows the menu's latest).
+    endpoint_catalog_url="${ENDPOINT_URL}/releases/download/assets/endpoints.yml"
   else
     endpoint_catalog_url="${ENDPOINT_URL}/assets/endpoints.yml"
   fi

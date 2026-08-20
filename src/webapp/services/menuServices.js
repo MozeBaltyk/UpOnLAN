@@ -20,6 +20,7 @@ const {
   getLocalNginx,
   getMenuVersion,
   getEndpointUrls,
+  isMenuVersionTag,
   logWithTimestamp,
   errorWithTimestamp,
  } = require('./utilServices');
@@ -76,6 +77,9 @@ async function fetchDevReleases() {
       throw new Error(`No releases found at ${api_url}. Expected a GitHub API or a mirror with a latest file.`);
     }
   }
+  // Asset bundles are published as their own GitHub releases (tag
+  // <os>-<version>-<arch>); drop them so only menu versions are listed.
+  releases = releases.filter((r) => isMenuVersionTag(r.tag_name));
   return releases;
 }
 

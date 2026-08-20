@@ -3,6 +3,8 @@ set -e
 
 mirror_root="release/output/assets"
 target="${1:-}"
+# local (default, /assets/<key>/) vs github (/releases/download/<key>/) layout.
+mirror_layout="${MIRROR_LAYOUT:-local}"
 
 # A full (untargeted) run resets the asset mirror; a targeted run adds/refreshes
 # just that asset set on top of what is already there. The menu release lives in
@@ -19,7 +21,7 @@ for i in $(ls release/assets/*/setting.sh); do
     fi
     echo "Processing $os"
     cd ./release/assets
-    NO_RESUME=1 OUTPUT_DIR=../output/assets MIRROR_LAYOUT=local ./build.sh "$os"
+    NO_RESUME=1 OUTPUT_DIR=../output/assets MIRROR_LAYOUT="$mirror_layout" ./build.sh "$os"
     cd -
 done
 

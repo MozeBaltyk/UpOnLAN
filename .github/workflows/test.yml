@@ -2,15 +2,11 @@ name: tests
 
 on:
   push:
-    paths:
-      - 'src/webapp/**'
   pull_request:
-    paths:
-      - 'src/webapp/**'
   workflow_dispatch:
 
 jobs:
-  test:
+  webapp:
     name: webapp test layers
     runs-on: ubuntu-latest
     defaults:
@@ -38,3 +34,31 @@ jobs:
 
       - name: Smoke tests
         run: npm run test:smoke
+
+  specs:
+    name: release-flow specs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run specs
+        run: ./tests/specs/run.sh
+
+  shell:
+    name: shell syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash -n on all shell scripts
+        run: |
+          for f in scripts/*.sh src/*.sh wakemeup.sh; do bash -n "$f"; done
+
+  container:
+    name: container build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image (build-only smoke)
+        run: docker build -t uponlan:ci .

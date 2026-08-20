@@ -38,6 +38,13 @@ function isValidUrl(urlString) {
   }
 }
 
+// Menu releases use a bare semver tag (0.0.2); asset bundles get one release per
+// OS key (proxmox-ve-8.4-1-x86_64). Both share the GitHub releases namespace, so
+// menu-version listings must ignore non-semver tags.
+function isMenuVersionTag(tag) {
+  return /^v?\d+\.\d+\.\d+$/.test(String(tag || ''));
+}
+
 function getMenuData() {
   const menuPath = path.join(CONFIG_ROOT, 'menu.yml');
   if (!fs.existsSync(menuPath)) return { version: 'none', origin: 'none' };
@@ -274,6 +281,7 @@ module.exports = {
   getAssetOrigin,
   getLocalNginx,
   isValidUrl,
+  isMenuVersionTag,
   getEndpointUrls,
   deleteAllFilesInDir,
   deleteFiles,

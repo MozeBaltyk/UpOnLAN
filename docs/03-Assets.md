@@ -46,14 +46,17 @@ UpOnLAN mirrors boot files for the same reason [netboot.xyz](https://netboot.xyz
 - **iPXE doesn't boot ISOs directly.** A multi-gigabyte ISO can't be pulled into memory by a bootloader; you have to extract the small pieces and chain them.
 - **The initramfs usually can't speak HTTPS.** The pre-boot environment ships without CA certificates (or a working `wget`/`curl`) in most distros, and GitHub Releases are HTTPS endpoints that 302-redirect to S3. So an initrd often needs patching before it can pull a rootfs over the network.
 
-This drives the two `BUILD_TYPE`s in `release/assets/`:
+This drives the asset shapes in `release/assets/` (all `direct_file` except the now-unused `iso_extraction`):
 
-| `BUILD_TYPE`     | When to use                                      | Example                                             |
-| ---------------- | ------------------------------------------------ | --------------------------------------------------- |
-| `direct_file`    | The vendor already publishes kernel/initrd files | `talos` (GitHub releases)                           |
-| `iso_extraction` | The vendor ships only an ISO — extract from it   | unused (Oracle was the only consumer, removed) |
+| Shape | `BUILD_TYPE` | What it fetches | Examples |
+| --- | --- | --- | --- |
+| **Boot files** | `direct_file` | small prebuilt kernel + initrd (iPXE-ready) | `talos`, `ubuntu`, `harvester` |
+| **Disk ISO** | `direct_file` | the full installer ISO (re-hosted by netboot.xyz) plus the boot kernel/initrd | `proxmox` (`proxmox.iso`) |
+| **ISO extraction** | `iso_extraction` | pull kernel/initrd/rootfs out of a vendor DVD | unused (Oracle was the only consumer, removed) |
 
-> ⚠️ **GitHub release-asset cap — 2 GB.** Release assets are limited to 2 GB, so an `iso_extraction` recipe must remove the downloaded DVD after extracting it. `release/assets/build.sh` does this automatically (it deletes the `*.iso` once `initrd`/`vmlinuz`/`squashfs.img` are out) — shipping the ISO makes `assets.yml` fail with `size must be less than 2147483648`.
+The **disk-ISO** case (`proxmox`) is still `direct_file`: it downloads the whole installer image as one file (the menu boots `proxmox.iso` directly) instead of a small kernel/initrd. Proxmox publishes no stable directly-downloadable netboot initrd, so the recipe mirrors the ISO plus the boot files from `netbootxyz/asset-mirror`.
+
+> ⚠️ **GitHub release-asset cap — 2 GB.** Release assets are limited to 2 GB. An `iso_extraction` recipe must delete the downloaded DVD after extracting it (`release/assets/build.sh` does this) — that is what made Oracle's ~10 GB image fail. A disk-ISO `direct_file` (proxmox) works only while its ISO stays under 2 GB, so watch it as Proxmox releases grow.
 
 netboot.xyz hosts its extracted files in `netbootxyz/asset-mirror` and documents the whole pipeline in `netbootxyz/build-pipelines` (a thorough write-up of the why and how: the 2 GB release-asset limit, the 302→S3 redirect, and the per-distro initrd patches for casper/live-boot/miso/dracut). UpOnLAN applies the same pattern locally through `release/assets/<os>/setting.sh` and `scripts/release_assets.sh`.
 

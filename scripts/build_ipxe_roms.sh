@@ -59,7 +59,7 @@ tar -xzf "$WORK/ipxe.tar.gz" -C "$WORK/ipxe" --strip-components=1
 cd "$WORK/ipxe/src"
 
 echo "[ipxe] applying binutils-2.42 patch"
-patch -p1 -f < "$REPO_ROOT/scripts/ipxe-gas242-binutils.patch"
+patch -p1 -f < "$REPO_ROOT/scripts/sources/ipxe-gas242-binutils.patch"
 
 # config/local/console.h is written per-phase below: CONSOLE_SERIAL for BIOS
 # (SeaBIOS has no serial console), empty for UEFI (OVMF already writes serial —
@@ -162,12 +162,12 @@ done
 
 if [ "$gen_iso" = 1 ]; then
   echo "[ipxe] generating ISO"
-  "$REPO_ROOT/scripts/genfsimg" -o "$OUT_ROM/uponlan.xyz.iso" \
+  "$REPO_ROOT/scripts/sources/genfsimg" -o "$OUT_ROM/uponlan.xyz.iso" \
     bin-x86_64-efi/ipxe.efi bin/ipxe.lkrn
 fi
 if [ "$gen_usb" = 1 ]; then
   echo "[ipxe] generating USB image"
-  "$REPO_ROOT/scripts/genfsimg" -o "$OUT_ROM/uponlan.xyz.img" \
+  "$REPO_ROOT/scripts/sources/genfsimg" -o "$OUT_ROM/uponlan.xyz.img" \
     bin-x86_64-efi/ipxe.efi bin/ipxe.lkrn
 fi
 

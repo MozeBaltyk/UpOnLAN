@@ -61,14 +61,14 @@ class RomBuildFormatsSpecs(TempDirTestCase):
     def setUp(self):
         super().setUp()
         self.copy('scripts/build_ipxe_roms.sh')
-        self.copy('scripts/ipxe-gas242-binutils.patch')
+        self.copy('scripts/sources/ipxe-gas242-binutils.patch')
         self.stub('bin/curl', '#!/bin/bash\nexit 0\n', exe=True)  # fetch is not exercised
         self.stub('bin/tar', STUB_TAR, exe=True)
         self.stub('bin/patch', STUB_NOOP, exe=True)
         self.stub('bin/gcc', STUB_NOOP, exe=True)
         self.stub('bin/lzma', STUB_NOOP, exe=True)
         self.stub('bin/make', STUB_MAKE, exe=True)
-        self.stub('scripts/genfsimg', STUB_GENFSIMG, exe=True)
+        self.stub('scripts/sources/genfsimg', STUB_GENFSIMG, exe=True)
 
     def _run(self, formats):
         self.make_log = self.tmp / 'make.log'

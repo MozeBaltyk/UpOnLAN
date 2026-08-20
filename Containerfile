@@ -75,8 +75,8 @@ COPY --from=build /webapp /webapp
 
 # ROM / boot-media build script (the webapp's Build UI shells out to it)
 COPY scripts/build_ipxe_roms.sh /scripts/build_ipxe_roms.sh
-COPY scripts/ipxe-gas242-binutils.patch /scripts/ipxe-gas242-binutils.patch
-COPY scripts/genfsimg /scripts/genfsimg
+COPY scripts/sources/ipxe-gas242-binutils.patch /scripts/ipxe-gas242-binutils.patch
+COPY scripts/sources/genfsimg /scripts/genfsimg
 RUN chmod +x /scripts/build_ipxe_roms.sh /scripts/genfsimg
 
 #### VM console support (host libvirt socket mounted at /var/run/libvirt)

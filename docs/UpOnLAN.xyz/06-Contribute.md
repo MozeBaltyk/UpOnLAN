@@ -28,7 +28,7 @@ This is more of a roadmap or wish list than a finalized feature set — but it s
 - [x] Release menus, assets, and container images (`.github/workflows/{image,release,assets}.yml`)
 - [ ] List **Cloud-init** assets 📝 (with a "category" column)
 - [ ] Provide a fully local UpOnLAN menu (endpoint-layout assets for every entry):
-  - [x] Harvester, Oracle Linux 8/9, Talos Linux, Proxmox (PBS/PMG/VE), Ubuntu (subiquity)
+  - [x] Harvester, Oracle Linux 9, Talos Linux, Proxmox (PBS/PMG/VE), Ubuntu (subiquity)
   - [ ] Rocky Linux (still boots `download.rockylinux.org` directly; no local recipe)
 - [x] Build and publish 🔁 UpOnLAN container images via CI pipeline (`ghcr.io/mozebaltyk/uponlan`)
 - [x] Provide a 🌐 **Wake-On-LAN** service with web GUI:

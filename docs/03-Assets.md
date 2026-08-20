@@ -51,7 +51,7 @@ This drives the two `BUILD_TYPE`s in `release/assets/`:
 | `BUILD_TYPE`     | When to use                                      | Example                                             |
 | ---------------- | ------------------------------------------------ | --------------------------------------------------- |
 | `direct_file`    | The vendor already publishes kernel/initrd files | `talos` (GitHub releases)                           |
-| `iso_extraction` | The vendor ships only an ISO — extract from it   | `oracle8` / `oracle9` (the `mirrors.kernel.org` DVD) |
+| `iso_extraction` | The vendor ships only an ISO — extract from it   | `oracle9` (the `mirrors.kernel.org` DVD) |
 
 > ⚠️ **GitHub release-asset cap — 2 GB.** Release assets are limited to 2 GB, so an `iso_extraction` recipe must remove the downloaded DVD after extracting it. `release/assets/build.sh` does this automatically (it deletes the `*.iso` once `initrd`/`vmlinuz`/`squashfs.img` are out) — shipping the ISO makes `assets.yml` fail with `size must be less than 2147483648`.
 

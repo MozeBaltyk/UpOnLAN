@@ -111,8 +111,7 @@ endpoints:
 To add a new endpoint:
 
 1. **Create a build recipe** at `release/assets/<os>/setting.sh`. The script is sourced by `release/assets/build.sh` and must export `OS`, `VERSION`, `ARCHS`, `BUILD_TYPE`, and `EXTRACTS` (`URL|output_file` lines, one per file, with `REPLACE_ARCH` for per-arch URLs). See `release/assets/talos/setting.sh` for a `direct_file` recipe (download prebuilt artifacts).
-2. **Run `scripts/release_assets.sh [<os>]`** — it executes the recipe and appends the generated entry to `release/output/assets/endpoints.yml` (the file `init.sh` serves to the webapp).
-3. **Keep `release/assets/endpoints.yml` in sync** — the committed file is the reference catalog; mirror the generated entry there so the Assets tab is correct before the pipeline runs.
+2. **Run `scripts/release_assets.sh [<os>]`** — it executes the recipe and writes the generated entry to `release/output/assets/endpoints.yml` (the catalog `init.sh` fetches and serves to the webapp).
 
 The generated endpoint key is `${OS}-${VERSION}-${GENERIC_ARCH}` (`amd64` → `x86_64`, `aarch64` → `arm64`), so one multi-arch OS produces one endpoint per architecture.
 

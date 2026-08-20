@@ -3,6 +3,7 @@
 ### Requirements
 
 - A Podman engine and permission to run the `sudo podman` commands used by `wakemeup.sh`.
+- For the default deploy (pulls `ghcr.io/mozebaltyk/uponlan`): a `podman login ghcr.io` session — the package is private by default. Use `--build`/`--local` to build locally instead.
 - Host ports `8080/TCP`, `3000/TCP`, and `69/UDP` available. Port 69 is privileged and must not be occupied by another TFTP service.
 - For `deploy --local`, Python 3 plus prepared `release/output` artifacts.
 

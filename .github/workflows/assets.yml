@@ -2,6 +2,11 @@ name: assets
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'OS recipe to release (e.g. talos) — leave empty for the full mirror'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -20,7 +25,7 @@ jobs:
           sudo chmod +x /usr/local/bin/yq
 
       - name: Build asset bundles (github layout)
-        run: MIRROR_LAYOUT=github bash scripts/release_assets.sh
+        run: MIRROR_LAYOUT=github bash scripts/release_assets.sh "${{ inputs.target }}"
 
       # Each bundle becomes its own GitHub release whose tag is the endpoint key
       # (proxmox-ve-8.4-1-x86_64 -> /releases/download/<key>/vmlinuz). Releases
@@ -46,6 +51,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # A targeted run regenerates endpoints.yml with only that bundle, so
+          # merge it into the existing catalog instead of overwriting it.
+          if [ -n "${{ inputs.target }}" ] \
+             && gh release download assets --pattern endpoints.yml --dir /tmp/cat >/dev/null 2>&1; then
+            yq eval-all 'select(fileIndex == 0) *+ select(fileIndex == 1)' \
+              /tmp/cat/endpoints.yml release/output/assets/endpoints.yml > /tmp/cat/merged.yml
+            mv /tmp/cat/merged.yml release/output/assets/endpoints.yml
+          fi
           cat release/output/assets/endpoints.yml
           if gh release view assets >/dev/null 2>&1; then
             gh release upload assets release/output/assets/endpoints.yml --clobber

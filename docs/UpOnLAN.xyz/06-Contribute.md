@@ -8,7 +8,7 @@ There are several areas where you can contribute to this project:
 - 🧪 Write or improve tests (Vitest pyramid in `src/webapp/test/` — see Development → Testing)
 - 📚 Improve documentation to help iPXE gain popularity
 - 🧪 Experiment with and provide feedback about **UpOnLAN.xyz**
-- 🐳 Enhance the delivery: containers, CI/CD pipelines, Docker Hub releases, etc.
+- 🐳 Enhance the delivery: containers, CI/CD pipelines, GHCR image releases, etc.
 - 🔧 Develop backend functionalities like building ISOs or handling iPXE
 
 ---

@@ -10,12 +10,12 @@ Ordered by priority. One branch per phase, merged back to `main` when done.
 - [x] Housekeeping — commit the `notes` deletion + this TODO.
 - [x] Oracle decision → removed entirely (menu + assets + endpoints); menu `0.1.2`, webapp `1.0.2`.
 
-## Phase 1 — Release pipeline hardening → `feat/release-hardening`
+## Phase 1 — Release pipeline hardening → `feat/release-hardening` ✅ (done)
 
-- [ ] **ghcr visibility** — make `ghcr.io/mozebaltyk/uponlan` public, or document `podman login ghcr.io` as a deploy prerequisite.
-- [ ] **Tag-triggered releases** — `image.yml`/`release.yml` on `push: tags: 'v*'` instead of manual `workflow_dispatch`.
-- [ ] **`assets.yml` per-OS target** — a `target` input to release one bundle without the full multi-GB mirror.
-- [ ] **Drop the stale committed `release/assets/endpoints.yml`** — netboot-era `releases/download/` catalog; the pipeline reads the generated one.
+- [x] **ghcr login documented** — the package is private by default, so `podman login ghcr.io` is a documented prerequisite (can't flip visibility from the CLI token).
+- [x] **Tag-triggered image** — `image.yml` builds on `push: tags: 'v*'` (version from the tag). The menu stays manual because its version lives in `version.ipxe`, decoupled from git tags.
+- [x] **`assets.yml` per-OS target** — a `target` input; a targeted run merges its `endpoints.yml` into the existing catalog instead of overwriting it.
+- [x] **Dropped the stale committed `release/assets/endpoints.yml`** — netboot-era and never consumed; the generated `release/output/assets/endpoints.yml` is the single catalog.
 
 ## Phase 2 — Menu/asset content → `feat/asset-content`
 

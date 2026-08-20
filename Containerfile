@@ -73,11 +73,13 @@ COPY src/init.sh /init.sh
 COPY src/start.sh /start.sh
 COPY --from=build /webapp /webapp
 
-# ROM / boot-media build script (the webapp's Build UI shells out to it)
+# ROM / boot-media build script (the webapp's Build UI shells out to it).
+# build_ipxe_roms.sh resolves $REPO_ROOT/scripts/… relative to its own location:
+# in the image it lives at /scripts/, so keep the sources/ layout under /scripts/.
 COPY scripts/build_ipxe_roms.sh /scripts/build_ipxe_roms.sh
-COPY scripts/sources/ipxe-gas242-binutils.patch /scripts/ipxe-gas242-binutils.patch
-COPY scripts/sources/genfsimg /scripts/genfsimg
-RUN chmod +x /scripts/build_ipxe_roms.sh /scripts/genfsimg
+COPY scripts/sources/ipxe-gas242-binutils.patch /scripts/sources/ipxe-gas242-binutils.patch
+COPY scripts/sources/genfsimg /scripts/sources/genfsimg
+RUN chmod +x /scripts/build_ipxe_roms.sh /scripts/sources/genfsimg
 
 #### VM console support (host libvirt socket mounted at /var/run/libvirt)
 # util-linux provides `script`, which allocates the controlling TTY `virsh console` requires.

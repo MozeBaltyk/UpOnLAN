@@ -17,7 +17,7 @@ class MenuPathSpecs(unittest.TestCase):
         self.assertIn('set asset_path /releases/download/', cfg)
 
     def test_menu_entries_use_asset_path_var(self):
-        for f in ('talos.ipxe', 'harvester.ipxe'):
+        for f in ('talos.ipxe', 'harvester.ipxe', 'rockylinux.ipxe'):
             content = (self.menus / f).read_text()
             self.assertIn('${mirror_endpoint}${asset_path}', content, f'{f} must use the asset_path var')
             self.assertNotIn('${mirror_endpoint}/releases/download/', content, f'{f} hardcodes the GitHub path')

@@ -21,6 +21,9 @@ isset ${osversion} || choose osversion || goto linux_menu
 echo ${cls}
 set dir ${rockylinux_base_dir}/${osversion}/BaseOS/${os_arch}/os
 set repo ${rockylinux_mirror}/${dir}
+# Boot files come from our mirrored bundle (rocky-<ver>-<arch> in endpoints.yml);
+# packages still come from the Rocky repo via inst.repo.
+set url ${mirror_endpoint}${asset_path}rocky-${osversion}-${arch}/
 goto boottype
 
 :boottype
@@ -57,8 +60,8 @@ goto boottype
 
 :bootos_images
 imgfree
-kernel ${rockylinux_mirror}/${dir}/images/pxeboot/vmlinuz inst.repo=${repo} ${install_mode} ${params} ${ipparam} initrd=initrd.magic ${cmdline}
-initrd ${rockylinux_mirror}/${dir}/images/pxeboot/initrd.img
+kernel ${url}vmlinuz inst.repo=${repo} ${install_mode} ${params} ${ipparam} initrd=initrd.magic ${cmdline}
+initrd ${url}initrd
 echo
 echo MD5sums:
 md5sum vmlinuz initrd.img

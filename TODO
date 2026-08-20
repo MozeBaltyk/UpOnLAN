@@ -19,7 +19,7 @@ Ordered by priority. All remaining phases land on the `dev` branch, merged to `m
 
 ## Phase 2 — Menu/asset content → `dev`
 
-- [ ] **Rocky Linux local recipe** — last entry still booting `download.rockylinux.org` directly (`release/assets/rockylinux/setting.sh`).
+- [x] **Rocky Linux local recipe** — `rocky8`/`rocky9` `direct_file` recipes; `rockylinux.ipxe` now boots `${mirror_endpoint}${asset_path}rocky-<ver>-<arch>/` (kernel+initrd re-hosted, `inst.repo` stays on the Rocky mirror).
 - [ ] **Cloud-init assets** — with a "category" column in the Assets tab.
 
 ## Phase 3 — Webapp features → `dev`

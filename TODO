@@ -1,0 +1,40 @@
+# UpOnLAN — Operational Plan / Backlog
+
+Ordered by priority. Each phase is unblocked by the one before it.
+
+## Phase 0 — Ship & unblock (now)
+
+- [ ] **Merge `feat/helm-chart` → `main`** — release pipeline, Helm chart, idempotent deploy + preflight. Open the PR.
+- [ ] **Fix the asset-release 2 GB bug.** Oracle `iso_extraction` downloads the 4 GB DVD and never removes it (`release/assets/build.sh` has `# rm -f "${build_dir}"/*.iso` commented out), so `assets.yml` uploads `OracleLinux-R8-U6-x86_64-dvd.iso` → `size must be less than 2147483648`. Fix: un-comment the ISO cleanup so only `initrd`/`vmlinuz`/`squashfs.img` ship.
+- [ ] **Confirm the three release runs** — `image` ✓, `release` ✓; re-run `assets` after the fix above.
+- [ ] **Housekeeping** — commit the `notes` deletion + this TODO.
+
+## Phase 1 — Release pipeline hardening
+
+- [ ] **ghcr visibility** — make `ghcr.io/mozebaltyk/uponlan` public, or document `podman login ghcr.io` as a deploy prerequisite.
+- [ ] **Tag-triggered releases** — `image.yml`/`release.yml` on `push: tags: 'v*'` instead of only manual `workflow_dispatch`.
+- [ ] **`assets.yml` per-OS target** — add a `target` input so one bundle can be released without the full multi-GB mirror.
+- [ ] **Drop the stale `release/assets/endpoints.yml`** — it's still the netboot-era `releases/download/` catalog; the pipeline reads the generated one.
+
+## Phase 2 — Menu/asset content
+
+- [ ] **Rocky Linux local recipe** — last entry still booting `download.rockylinux.org` directly (no `release/assets/rockylinux/setting.sh`).
+- [ ] **Cloud-init assets** — with a "category" column in the Assets tab.
+- [ ] **Decide: keep Oracle?** Not needed once Phase 0 fixes the ISO cleanup (initrd/vmlinuz/install.img are all <2 GB) — but Oracle is the only distro that requires full-DVD extraction, so it's the natural candidate to drop if you want to simplify.
+
+## Phase 3 — Webapp features
+
+- [ ] **Console: multi-host KVM** — add a KVM host entry + connect to remote hosts over SSH (key-based), instead of only the local `qemu:///system`.
+- [ ] **Console: attach disks** — allow disks on the test VM so PXE can run a real install, not just a diskless boot.
+- [ ] **Wake-on-LAN** — show host status/IP + add a scheduler (the wishlist still lists these).
+
+## Phase 4 — Platform hardening
+
+- [ ] **HTTPS** — TLS termination (reverse proxy or in-nginx certs) for the webapp + asset serving (currently plain HTTP on 8080/3000).
+- [ ] **Kubernetes** — promote the chart's Pod → Deployment (replicas 1); rework the node-local bits (`hostPort` TFTP/69 and `hostPath` libvirt socket) that a real cluster can't do today.
+- [ ] **Update Node.js** — the container pins an older runtime.
+
+## Phase 5 — Polish
+
+- [ ] **Prose brand sweep** — "UpOnLAN" → "UpOnLAN.xyz" in body text (titles/folder are already done).
+- [ ] **Docs** — ghcr login note, idempotent `deploy` + `preview`, and the Kubernetes migration path.

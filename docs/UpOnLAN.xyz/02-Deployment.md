@@ -76,7 +76,7 @@ Two conventions keep the decoupled releases from colliding:
 
 A deployment pointed at `ENDPOINT_URL=https://github.com/mozebaltyk/uponlan` fetches the menu tarball from `${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz` and the asset catalog from `${ENDPOINT_URL}/releases/download/assets/endpoints.yml` (`init.sh` switches on whether the endpoint is a GitHub URL — `releases/download/` for GitHub, `menu/` + `assets/` for a local mirror).
 
-The full CI setup — test pipeline plus the three release workflows and their conventions — is documented in [CI pipelines](UpOnLAN/04-CI.md).
+The full CI setup — test pipeline plus the three release workflows and their conventions — is documented in [CI pipelines](UpOnLAN.xyz/04-CI.md).
 
 ### CLI actions
 

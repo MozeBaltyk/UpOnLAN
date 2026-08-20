@@ -47,17 +47,17 @@ The webapp's Build button runs `scripts/build_ipxe_roms.sh` directly inside the 
 
 - **Image too old** — the tests must be baked in at build time (npm is purged from the image afterwards). Rebuild first: `./wakemeup.sh -a build`, then `redeploy`.
 
-Full test documentation: [Development → Testing](UpOnLAN/01-Development.md#-testing).
+Full test documentation: [Development → Testing](UpOnLAN.xyz/01-Development.md#-testing).
 
 ---
 
 ## 📦 Data and recovery
 
-The shipped manifests use ephemeral `emptyDir` storage for `/config`, `/assets`, `/menu`, and `/logs`. Pod replacement or `./wakemeup.sh -a destroy` does not preserve this data. See [Operations](UpOnLAN/03-Operations.md) for backup and recovery steps.
+The shipped manifests use ephemeral `emptyDir` storage for `/config`, `/assets`, `/menu`, and `/logs`. Pod replacement or `./wakemeup.sh -a destroy` does not preserve this data. See [Operations](UpOnLAN.xyz/03-Operations.md) for backup and recovery steps.
 
 ---
 
 ## ❓ Still stuck
 
-- [Contribute](UpOnLAN/06-Contribute.md) — how to report issues
+- [Contribute](UpOnLAN.xyz/06-Contribute.md) — how to report issues
 - [iPXE Quick Start](iPXE/01-Quick-Start.md) — boot environment basics

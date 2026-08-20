@@ -183,7 +183,7 @@ npm run test:smoke         # smoke only
 ./wakemeup.sh -a test-webapp    # prompts for a layer, default = all
 ```
 
-In CI, `.github/workflows/test.yml` runs the four webapp layers on every push/PR, plus the release-flow specs (`tests/specs`), a `bash -n` shell-lint job over `scripts/*.sh`/`src/*.sh`/`wakemeup.sh`, and a container build smoke. The release workflows are covered in [CI pipelines](UpOnLAN/04-CI.md).
+In CI, `.github/workflows/test.yml` runs the four webapp layers on every push/PR, plus the release-flow specs (`tests/specs`), a `bash -n` shell-lint job over `scripts/*.sh`/`src/*.sh`/`wakemeup.sh`, and a container build smoke. The release workflows are covered in [CI pipelines](UpOnLAN.xyz/04-CI.md).
 
 ### Testability notes
 

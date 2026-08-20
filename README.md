@@ -1,6 +1,6 @@
 # UpOnLAN.xyz
 
-**[Features](#features) • [Getting Started](docs/01-Getting-Started.md) • [PXE Basics](docs/02-PXE-Basics.md) • [Overview & netboot.xyz](docs/03-UpOnLAN-Overview.md) • [Assets](docs/04-Assets.md) • [ROM builds](docs/iPXE/03-ROM-Build.md) • [Deployment](docs/UpOnLAN/02-Deployment.md) • [CI](docs/UpOnLAN/04-CI.md) • [Operations](docs/UpOnLAN/03-Operations.md)**
+**[Features](#features) • [Getting Started](docs/01-Getting-Started.md) • [PXE Basics](docs/02-PXE-Basics.md) • [Overview & netboot.xyz](docs/UpOnLAN.xyz/00-Overview.md) • [Assets](docs/03-Assets.md) • [ROM builds](docs/iPXE/03-ROM-Build.md) • [Deployment](docs/UpOnLAN.xyz/02-Deployment.md) • [CI](docs/UpOnLAN.xyz/04-CI.md) • [Operations](docs/UpOnLAN.xyz/03-Operations.md)**
 
 This project is a cold fork of Netboot.xyz with the goal of unifying and simplifying the upstream into an all-in-one solution. Its main purpose is to provide an editor for iPXE menus, build the boot mediums and serve them on the fly. Additional features include Wake-on-LAN, PXE menu testing and installation, and documentation in the webapp for developing custom PXE menus. 
     
@@ -76,9 +76,9 @@ asset_target=harvester ./wakemeup.sh -a mirror-assets
 Use `asset_target` to build just one asset set while debugging.
 
 `release/output/assets/endpoints.yml` is the asset catalog consumed separately from `menus.tar.gz`.
-`release/output/` is the single local release layout. Its GitHub counterpart is decoupled: the menu ships as `<version>` releases and asset bundles as `<key>` releases (see [Deployment](docs/UpOnLAN/02-Deployment.md)).
+`release/output/` is the single local release layout. Its GitHub counterpart is decoupled: the menu ships as `<version>` releases and asset bundles as `<key>` releases (see [Deployment](docs/UpOnLAN.xyz/02-Deployment.md)).
 
-See [Deployment](docs/UpOnLAN/02-Deployment.md) for remote and local deployment, ports, security, and release artifacts. See [Operations](docs/UpOnLAN/03-Operations.md) for logs, recovery, backup, and destructive-operation behavior.
+See [Deployment](docs/UpOnLAN.xyz/02-Deployment.md) for remote and local deployment, ports, security, and release artifacts. See [Operations](docs/UpOnLAN.xyz/03-Operations.md) for logs, recovery, backup, and destructive-operation behavior.
 
 ## Custom iPXE ROM/media builds
 

@@ -27,7 +27,7 @@ UpOnLAN started as a **cold fork of [netboot.xyz](https://netboot.xyz)** — it 
 | **Origin** | Boot against their hosted endpoint (`github.com/netbootxyz`) | You own and run the endpoint |
 | **Extras** | Boot media, menu releases | Diskless KVM test VM + serial console, Wake-on-LAN, ROM builder, docs, live logs/metrics |
 
-The shared core is the iPXE menu plus the *"extract and re-host assets, because vendors don't ship them iPXE-ready"* model — detailed in [Assets](04-Assets.md).
+The shared core is the iPXE menu plus the *"extract and re-host assets, because vendors don't ship them iPXE-ready"* model — detailed in [Assets](03-Assets.md).
 
 ---
 

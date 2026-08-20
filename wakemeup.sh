@@ -7,19 +7,21 @@ run_release_assets() {
     bash scripts/release_assets.sh "${asset_target:-}"
 }
 
-# Deployment chart + knob defaults. --released switches to the GitHub image;
-# --local switches the endpoint to the local mirror and pins the menu version.
+# Deployment chart + knob defaults. The default deploy pulls the published
+# ghcr image; --build (or --local) builds the local image instead, and --local
+# also switches the endpoint to the local mirror + pins the menu version.
 CHART="charts/uponlan"
-UPONLAN_IMAGE_REPO="localhost/uponlan"
+UPONLAN_IMAGE_REPO="ghcr.io/mozebaltyk/uponlan"
 UPONLAN_IMAGE_TAG="latest"
-UPONLAN_PULL_POLICY="Never"
+UPONLAN_PULL_POLICY="IfNotPresent"
 ENDPOINT_URL="https://github.com/mozebaltyk/uponlan"
 MENU_VERSION=""
 
 resolve_deploy_knobs() {
-    if [ "${released:-0}" = "1" ]; then
-        UPONLAN_IMAGE_REPO="ghcr.io/mozebaltyk/uponlan"
-        UPONLAN_PULL_POLICY="IfNotPresent"
+    # --build / --local use the locally-built image; otherwise pull from ghcr.
+    if [ "${build:-0}" = "1" ] || [ "${local_deploy:-0}" = "1" ]; then
+        UPONLAN_IMAGE_REPO="localhost/uponlan"
+        UPONLAN_PULL_POLICY="Never"
     fi
     if [ "${local_deploy:-0}" = "1" ]; then
         ENDPOINT_URL="http://host.containers.internal:8899"
@@ -64,8 +66,8 @@ deploy() {
     else
         echo "[deploy] deploying uponlan container with remote menus+assets"
     fi
-    # --released deploys the published image, so skip the local build.
-    if [ "${released:-0}" != "1" ]; then
+    # Build the local image only for --build / --local; the default pulls ghcr.
+    if [ "${build:-0}" = "1" ] || [ "${local_deploy:-0}" = "1" ]; then
         build
     fi
     kube_play
@@ -132,14 +134,14 @@ exec_cmd() {
 
 print_help() {
     echo ""
-    echo "Usage: ./wakemeup.sh -a <action> [--local] [--released]"
+    echo "Usage: ./wakemeup.sh -a <action> [--local] [--build]"
     echo ""
     echo "Allowed Actions"
     echo "---------------"
     echo "1. build - build uponlan image"
-    echo "2. deploy [--local] [--released] - deploy uponlan container; --local serves local menus/assets from release/output; --released deploys the GitHub-published image (no local build)"
+    echo "2. deploy [--local] [--build] - deploy uponlan container; default pulls the GitHub-published image; --build builds the local image; --local serves local menus/assets from release/output"
     echo "3. destroy - destroy uponlan container"
-    echo "4. redeploy [--local] [--released] - redeploy uponlan container"
+    echo "4. redeploy [--local] [--build] - redeploy uponlan container"
     echo "5. logs - display logs from uponlan container"
     echo "6. connect - connect to uponlan container"
     echo "7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets"
@@ -149,7 +151,7 @@ print_help() {
 
 action=""
 local_deploy=0
-released=0
+build=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -a)
@@ -160,8 +162,8 @@ while [[ $# -gt 0 ]]; do
             local_deploy=1
             shift
             ;;
-        --released)
-            released=1
+        --build)
+            build=1
             shift
             ;;
         *)

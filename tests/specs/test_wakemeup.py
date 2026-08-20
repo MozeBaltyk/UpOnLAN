@@ -33,12 +33,12 @@ class DeployLocalSpecs(TempDirTestCase):
         proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'deploy', '--local')
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
-    def test_released_flag_is_accepted(self):
-        # --released skips the local build and deploys the published image; with
-        # sudo/helm stubbed the whole path should still complete.
+    def test_build_flag_is_accepted(self):
+        # --build (with --local) builds the local image and serves local assets;
+        # with sudo/helm stubbed the whole path should still complete.
         self.stub('release/output/assets/endpoints.yml', 'endpoints: {}\n')
         self.stub('release/output/menu/0.1.0/menus.tar.gz', 'menu')
-        proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'deploy', '--local', '--released')
+        proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'deploy', '--local', '--build')
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
 

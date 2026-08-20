@@ -1,10 +1,9 @@
-## Image. `localhost/uponlan:latest` is the locally-built image (podman/podman
-## build); to use the GitHub-published image set:
-##   image.repository=ghcr.io/mozebaltyk/uponlan  and  image.pullPolicy=IfNotPresent
+## Image. Defaults to the published ghcr image; for local development set:
+##   image.repository=localhost/uponlan  and  image.pullPolicy=Never
 image:
-  repository: localhost/uponlan
+  repository: ghcr.io/mozebaltyk/uponlan
   tag: latest
-  pullPolicy: Never
+  pullPolicy: IfNotPresent
 
 ## Menu/asset origin. Defaults to GitHub; deploy --local sets the local mirror.
 endpoint: https://github.com/mozebaltyk/uponlan

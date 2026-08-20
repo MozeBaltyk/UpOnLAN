@@ -11,14 +11,14 @@
 `wakemeup.sh` renders the Helm chart (`charts/uponlan/`) and pipes it to `podman play kube -`. Three modes:
 
 ```bash
-./wakemeup.sh -a deploy               # build localhost/uponlan:latest + remote (GitHub) menus/assets
-./wakemeup.sh -a deploy --released    # pull ghcr.io/.../uponlan:latest + remote (GitHub), no local build
+./wakemeup.sh -a deploy               # pull ghcr.io/.../uponlan:latest + remote (GitHub), no build
+./wakemeup.sh -a deploy --build       # build localhost/uponlan:latest + remote (GitHub)
 ./wakemeup.sh -a deploy --local       # build locally + serve release/output on :8899
 ```
 
-- **default** — builds `localhost/uponlan:latest`; `MENU_VERSION` is left empty so `init.sh` resolves `releases/latest` on GitHub.
-- **`--released`** — skips `podman build` and deploys the published `ghcr.io/mozebaltyk/uponlan:latest` (a pull, not a build). Combine with `--local` to serve local assets from a released image.
-- **`--local`** — requires `release/output/assets/endpoints.yml` and `release/output/menu/0.1.0/menus.tar.gz` (build them with `./wakemeup.sh -a mirror-assets` + `./scripts/release_menu.sh 0.1.0`); sets the endpoint to `http://host.containers.internal:8899` and pins `MENU_VERSION` from `release/menus/version.ipxe`.
+- **default** — pulls `ghcr.io/mozebaltyk/uponlan:latest`; `MENU_VERSION` is left empty so `init.sh` resolves `releases/latest` on GitHub.
+- **`--build`** — builds `localhost/uponlan:latest` and deploys it against GitHub assets (local development).
+- **`--local`** — builds locally and serves `release/output` on `:8899`; requires `release/output/assets/endpoints.yml` and `release/output/menu/0.1.0/menus.tar.gz` (build them with `./wakemeup.sh -a mirror-assets` + `./scripts/release_menu.sh 0.1.0`); pins `MENU_VERSION` from `release/menus/version.ipxe`.
 
 ### Security and network exposure
 

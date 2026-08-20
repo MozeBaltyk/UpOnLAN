@@ -8,19 +8,19 @@
 
 ### Deploy modes
 
-```bash
-./wakemeup.sh -a deploy
-```
-
-The default deployment builds `localhost/uponlan:latest` and starts `manifests/uponlan.yaml`. It obtains menus and assets from the configured remote endpoint.
+`wakemeup.sh` renders the Helm chart (`charts/uponlan/`) and pipes it to `podman play kube -`. Three modes:
 
 ```bash
-./wakemeup.sh -a mirror-assets
-./scripts/release_menu.sh 0.1.0
-./wakemeup.sh -a deploy --local
+./wakemeup.sh -a deploy               # pull ghcr.io/.../uponlan:latest + remote (GitHub), no build
+./wakemeup.sh -a deploy --build       # build localhost/uponlan:latest + remote (GitHub)
+./wakemeup.sh -a deploy --local       # build locally + serve release/output on :8899
 ```
 
-Local deployment serves `release/output` with `python3 -m http.server` on port `8899` and starts `manifests/uponlan-local.yaml`. It requires `release/output/assets/endpoints.yml` and `release/output/menu/0.1.0/menus.tar.gz`; it does not build either artifact.
+- **default** — pulls `ghcr.io/mozebaltyk/uponlan:latest`; `MENU_VERSION` is left empty so `init.sh` resolves `releases/latest` on GitHub.
+- **`--build`** — builds `localhost/uponlan:latest` and deploys it against GitHub assets (local development).
+- **`--local`** — builds locally and serves `release/output` on `:8899`; requires `release/output/assets/endpoints.yml` and `release/output/menu/0.1.0/menus.tar.gz` (build them with `./wakemeup.sh -a mirror-assets` + `./scripts/release_menu.sh 0.1.0`); pins `MENU_VERSION` from `release/menus/version.ipxe`.
+
+`./wakemeup.sh -a preview` prints the resolved context (image / endpoint / menu version / ports) and runs preflight checks — host ports free, `podman` + `helm` present, ghcr login, and the libvirt socket — without deploying anything. `deploy` runs the same checks and aborts on a hard failure (missing `podman`/`helm`); a port already in use only warns, since `deploy` is idempotent (`--replace` recreates the running pod).
 
 ### Security and network exposure
 

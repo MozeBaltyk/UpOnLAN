@@ -1,0 +1,73 @@
+# Pod kind on purpose: `podman play kube` flattens a Deployment to a pod but
+# renames it (`uponlan` -> `uponlan-pod`), which breaks `--replace`/`--down`
+# lifecycle matching. Keep a Pod here so podman manages it by the stable name
+# `uponlan`. For a real K8s cluster, wrap this spec in a Deployment (replicas: 1)
+# — the container/env/volume content is unchanged; only the top-level kind +
+# selector/template wrapper differ.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: uponlan
+  labels:
+    app.kubernetes.io/name: uponlan
+spec:
+  containers:
+    - name: webapp
+      image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      env:
+        - name: MENU_VERSION
+          value: "{{ .Values.menuVersion }}"
+        - name: ENDPOINT_URL
+          value: "{{ .Values.endpoint }}"
+        - name: NGINX_PORT
+          value: "{{ .Values.nginxPort }}"
+        - name: WEB_APP_PORT
+          value: "{{ .Values.webAppPort }}"
+        - name: TFTPD_OPTS
+          value: "{{ .Values.tftpdOpts }}"
+      volumeMounts:
+        - name: uponlan-config
+          mountPath: /config
+        - name: uponlan-assets
+          mountPath: /assets
+        - name: uponlan-menu
+          mountPath: /menu
+        - name: uponlan-logs
+          mountPath: /logs
+        {{- if .Values.libvirt.enabled }}
+        - name: libvirt-sock
+          mountPath: /var/run/libvirt/libvirt-sock
+        {{- end }}
+      ports:
+        - name: nginx
+          containerPort: {{ .Values.nginxPort }}
+          hostPort: {{ .Values.nginxPort }}
+        - name: webapp
+          containerPort: {{ .Values.webAppPort }}
+          hostPort: {{ .Values.webAppPort }}
+        - name: tftp
+          containerPort: 69
+          protocol: UDP
+          hostPort: 69
+  volumes:
+    # `emptyDir.path` is a podman extension (host-dir-backed emptyDir) so
+    # config/assets/menu/logs survive a `play kube --replace`. On a real K8s
+    # cluster replace these with hostPath or a PVC (emptyDir has no path field).
+    - name: uponlan-config
+      emptyDir:
+        path: ./config
+    - name: uponlan-assets
+      emptyDir:
+        path: ./assets
+    - name: uponlan-menu
+      emptyDir:
+        path: ./menu
+    - name: uponlan-logs
+      emptyDir:
+        path: ./logs
+    {{- if .Values.libvirt.enabled }}
+    - name: libvirt-sock
+      hostPath:
+        path: {{ .Values.libvirt.socketPath }}
+    {{- end }}

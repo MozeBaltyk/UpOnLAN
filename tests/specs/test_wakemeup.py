@@ -10,6 +10,12 @@ class DeployLocalSpecs(TempDirTestCase):
         self.copy('wakemeup.sh')
         self.stub('bin/sudo', STUB_SUDO, exe=True)
         self.stub('bin/python3', STUB_PYTHON3, exe=True)
+        # deploy renders the Helm chart and pipes it to `podman play kube -`;
+        # sudo is stubbed so the play is a no-op, and helm is stubbed here too.
+        self.stub('bin/helm', '#!/bin/bash\nexit 0\n', exe=True)
+        # Preflight runs `ss` to check host ports; stub it so the spec doesn't
+        # depend on the real host's port state.
+        self.stub('bin/ss', '#!/bin/bash\nexit 0\n', exe=True)
         self.stub('release/menus/version.ipxe', '#!ipxe\nset menu_version 0.1.0\n')
 
     def test_requires_assets_endpoints(self):
@@ -29,6 +35,20 @@ class DeployLocalSpecs(TempDirTestCase):
         self.stub('release/output/menu/0.1.0/menus.tar.gz', 'menu')
         proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'deploy', '--local')
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_build_flag_is_accepted(self):
+        # --build (with --local) builds the local image and serves local assets;
+        # with sudo/helm stubbed the whole path should still complete.
+        self.stub('release/output/assets/endpoints.yml', 'endpoints: {}\n')
+        self.stub('release/output/menu/0.1.0/menus.tar.gz', 'menu')
+        proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'deploy', '--local', '--build')
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_kube_play_feeds_stdin(self):
+        # podman play kube must read the rendered chart from stdin ('-'): without
+        # it the manifest is discarded and play kube fails with "accepts 1 arg".
+        src = (self.tmp / 'wakemeup.sh').read_text()
+        self.assertIn('podman play kube "$@" -', src)
 
 
 class MirrorAssetsSpecs(TempDirTestCase):

@@ -6,9 +6,9 @@ format-parsing + build orchestration against the stubs.
 """
 from tests.specs.helpers import TempDirTestCase
 
-# Stub `tar`: parse `-C <dir>` and create `<dir>/src/{config/local,util}` so the
-# script's `cd <dir>/src` + `mkdir -p config/local` succeed, and drop a genfsimg
-# stub under util/ (the script calls `./util/genfsimg`, a relative path, not PATH).
+# Stub `tar`: parse `-C <dir>` and create `<dir>/src` so the script's
+# `cd <dir>/src` succeeds. The build's genfsimg is the vendored
+# scripts/genfsimg (stubbed separately in setUp), not an iPXE util/ path.
 STUB_TAR = '''\
 #!/bin/bash
 dir=""
@@ -17,20 +17,7 @@ for a in "$@"; do
   [ "$prev" = "-C" ] && dir="$a"
   prev="$a"
 done
-mkdir -p "$dir/src/config/local" "$dir/src/util"
-cat > "$dir/src/util/genfsimg" <<'GEN'
-#!/bin/bash
-out=""
-prev=""
-for a in "$@"; do
-  [ "$prev" = "-o" ] && out="$a"
-  prev="$a"
-done
-mkdir -p "$(dirname "$out")"
-printf 'iso' > "$out"
-exit 0
-GEN
-chmod +x "$dir/src/util/genfsimg"
+mkdir -p "$dir/src"
 exit 0
 '''
 
@@ -74,13 +61,14 @@ class RomBuildFormatsSpecs(TempDirTestCase):
     def setUp(self):
         super().setUp()
         self.copy('scripts/build_ipxe_roms.sh')
-        self.copy('scripts/ipxe-gas242-binutils.patch')
+        self.copy('scripts/sources/ipxe-gas242-binutils.patch')
         self.stub('bin/curl', '#!/bin/bash\nexit 0\n', exe=True)  # fetch is not exercised
         self.stub('bin/tar', STUB_TAR, exe=True)
         self.stub('bin/patch', STUB_NOOP, exe=True)
         self.stub('bin/gcc', STUB_NOOP, exe=True)
         self.stub('bin/lzma', STUB_NOOP, exe=True)
         self.stub('bin/make', STUB_MAKE, exe=True)
+        self.stub('scripts/sources/genfsimg', STUB_GENFSIMG, exe=True)
 
     def _run(self, formats):
         self.make_log = self.tmp / 'make.log'

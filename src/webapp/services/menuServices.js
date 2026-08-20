@@ -138,9 +138,10 @@ async function upgrademenu(version, callback, socket) {
     const origin = endpoint_url;
     await fsp.writeFile(MENU_CONFIG, yaml.dump({ menu: { origin, version } }));
 
-    //  layermenu using Promise wrapper
-    await layermenu(socket, null);
+    // Disable sigs BEFORE layermenu emits renderconfig (same ordering as
+    // createipxe/saveconfig/revertconfig, so the client reads post-write boot.cfg).
     await disablesigs();
+    await layermenu(socket, null);
     logWithTimestamp(`Menu upgraded to version ${version} from ${endpoint_url}`);
     callback(null, 'success');
   } catch (err) {
@@ -196,8 +197,8 @@ async function upgrademenunetboot(version, callback, socket) {
     const displayVersion = isCommitSha ? 'Development' : version;
     await fsp.writeFile(MENU_CONFIG, yaml.dump({ menu: { origin, version: displayVersion } }));
   
-    await layermenu(socket, null);
     await disablesigs();
+    await layermenu(socket, null);
 
     logWithTimestamp(`Menu upgraded to version ${version} from ${origin}`);
     callback(null, 'success');
@@ -397,8 +398,10 @@ async function createipxe(filename, socket) {
 
   try {
     await fsp.writeFile(filePath, '#!ipxe');
-    await layermenu(socket, filename);
+    // Disable sigs BEFORE layermenu emits renderconfig, so a client that reacts
+    // to renderconfig always reads the post-write boot.cfg (no race).
     await disablesigs();
+    await layermenu(socket, filename);
   } catch (err) {
     errorWithTimestamp('Failed to create iPXE file:', err);
     socket.emit('error', 'Failed to create iPXE file: ' + err.message);
@@ -416,8 +419,8 @@ async function saveconfig(filename, text, socket) {
   }
   try {
     await fsp.writeFile(filePath, text);
-    await layermenu(socket, filename);
     await disablesigs();
+    await layermenu(socket, filename);
   } catch (err) {
     errorWithTimestamp('Failed to save iPXE file:', err);
     socket.emit('error', 'Failed to save iPXE file: ' + err.message);
@@ -436,8 +439,8 @@ async function revertconfig(filename, socket) {
   }
   try {
     await fsp.unlink(filePath);
-    await layermenu(socket, null);
     await disablesigs();
+    await layermenu(socket, null);
     logWithTimestamp(`${filename} reverted to remote version`);
   } catch (err) {
     errorWithTimestamp('Failed to revert iPXE file:', err);

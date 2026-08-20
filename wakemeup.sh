@@ -1,6 +1,14 @@
 #!/bin/bash
 set -eu
 
+# Colourise output when running in a terminal (NO_COLOR=1 disables it).
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+    C_RESET='\033[0m'; C_BOLD='\033[1m'
+    C_RED='\033[31m'; C_YELLOW='\033[33m'; C_GREEN='\033[32m'; C_CYAN='\033[36m'
+else
+    C_RESET=''; C_BOLD=''; C_RED=''; C_YELLOW=''; C_GREEN=''; C_CYAN=''
+fi
+
 OUTPUT_ROOT="release/output"
 
 run_release_assets() {
@@ -31,14 +39,14 @@ resolve_deploy_knobs() {
 
 # Print the resolved deployment context (what will be deployed).
 show_context() {
-    echo "== deployment context =="
-    echo "  image:    ${UPONLAN_IMAGE_REPO}:${UPONLAN_IMAGE_TAG} (${UPONLAN_PULL_POLICY})"
-    echo "  endpoint: ${ENDPOINT_URL}"
-    echo "  menu:     ${MENU_VERSION:-latest}"
-    echo "  ports:    8080/tcp 3000/tcp 69/udp"
-    echo "  libvirt:  /var/run/libvirt/libvirt-sock"
+    echo -e "${C_BOLD}${C_CYAN}== deployment context ==${C_RESET}"
+    echo -e "  ${C_BOLD}image:${C_RESET}    ${UPONLAN_IMAGE_REPO}:${UPONLAN_IMAGE_TAG} (${UPONLAN_PULL_POLICY})"
+    echo -e "  ${C_BOLD}endpoint:${C_RESET} ${ENDPOINT_URL}"
+    echo -e "  ${C_BOLD}menu:${C_RESET}     ${MENU_VERSION:-latest}"
+    echo -e "  ${C_BOLD}ports:${C_RESET}    8080/tcp 3000/tcp 69/udp"
+    echo -e "  ${C_BOLD}libvirt:${C_RESET}  /var/run/libvirt/libvirt-sock"
     for v in asset_target IPXE_VERSION PXE_ROM_PATH; do
-        [ -n "${!v:-}" ] && echo "  env ${v}=${!v}"
+        [ -n "${!v:-}" ] && echo -e "  ${C_BOLD}env ${v}${C_RESET}=${!v}"
     done
     echo ""
 }
@@ -56,21 +64,20 @@ port_in_use() {
 # Preflight checks. Hard failures return non-zero; soft issues warn only.
 preflight() {
     local fail=0
-    command -v podman >/dev/null || { echo "ERROR: 'podman' not found." >&2; fail=1; }
-    command -v helm   >/dev/null || { echo "ERROR: 'helm' not found (needed to render the chart)." >&2; fail=1; }
+    command -v podman >/dev/null || { echo -e "${C_RED}ERROR: 'podman' not found.${C_RESET}" >&2; fail=1; }
+    command -v helm   >/dev/null || { echo -e "${C_RED}ERROR: 'helm' not found (needed to render the chart).${C_RESET}" >&2; fail=1; }
     if [ "${UPONLAN_IMAGE_REPO}" = "ghcr.io/mozebaltyk/uponlan" ] \
        && ! sudo podman login --get-login ghcr.io >/dev/null 2>&1; then
-        echo "WARN: not logged in to ghcr.io — run 'podman login ghcr.io' if the package is private." >&2
+        echo -e "${C_YELLOW}WARN: not logged in to ghcr.io — run 'podman login ghcr.io' if the package is private.${C_RESET}" >&2
     fi
     for pair in "8080 tcp" "3000 tcp" "69 udp"; do
         set -- $pair
         if port_in_use "$1" "$2"; then
-            echo "ERROR: port $1/$2 already in use (a pod may be running — use 'redeploy')." >&2
-            fail=1
+            echo -e "${C_YELLOW}WARN: port $1/$2 in use — uponlan may already be deployed (use 'redeploy' to replace it).${C_RESET}" >&2
         fi
     done
     [ -S /var/run/libvirt/libvirt-sock ] \
-        || echo "WARN: /var/run/libvirt/libvirt-sock not found — the VM console tab will not work." >&2
+        || echo -e "${C_YELLOW}WARN: /var/run/libvirt/libvirt-sock not found — the VM console tab will not work.${C_RESET}" >&2
     return $fail
 }
 
@@ -79,7 +86,7 @@ preview() {
     resolve_deploy_knobs
     show_context
     preflight || return 1
-    echo "preview OK — nothing deployed."
+    echo -e "${C_GREEN}preview OK — nothing deployed.${C_RESET}"
 }
 
 # Render the Helm chart and feed it to podman play kube (KUBEFILE|-).

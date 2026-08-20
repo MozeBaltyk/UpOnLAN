@@ -90,6 +90,35 @@ The consequence: **the `<key>` and file names in a menu must match an endpoint's
 
 ---
 
+## ☁️ Cloud-init seeds as assets
+
+[cloud-init](https://cloudinit.readthedocs.io/) does post-boot provisioning — hostname, users/SSH keys, network, packages, run-commands — and it's independent of *how* the machine booted, so it composes cleanly with PXE: PXE delivers the kernel + initrd, cloud-init configures the OS that comes up.
+
+The bridge is cloud-init's **NoCloud** datasource, which fetches its seed over HTTP from a URL passed on the **kernel command line**:
+
+```ipxe
+ds=nocloud;s=http://<server>/<path>/
+```
+
+cloud-init then GETs `<path>/user-data` and `<path>/meta-data`. A seed is therefore just two files the guest pulls over HTTP *at boot time* — exactly like a kernel or initrd — which is why it belongs in the asset model rather than as a separate mechanism:
+
+- **Same transport** — served from the same `${mirror_endpoint}` origin the menu already uses.
+- **Versioned** — a specific `user-data` per deployment, not "whatever is on the host today".
+- **Mirrorable** — `--local` / *Pull Selected* copies it into `/assets/` for offline booting; `ds=nocloud;s=…` must resolve from the guest's network on first boot.
+
+The menu references it like any other bundle:
+
+```ipxe
+kernel ${url}vmlinuz ds=nocloud;s=${mirror_endpoint}${asset_path}<key>/ …
+initrd ${url}initrd
+```
+
+So a cloud-init seed is a `direct_file` asset whose `files` are `user-data` + `meta-data` instead of `vmlinuz`/`initrd`; its only real difference is that the guest consumes it mid-boot rather than as a menu entry — the "category" to surface in the Assets tab.
+
+> ⚠️ Planned, not implemented — tracked in the TODO under *Cloud-init assets*.
+
+---
+
 ## ➕ Adding a New Endpoint
 
 An **endpoint** is one entry in `endpoints.yml` that points an iPXE menu (and the Assets tab in the webapp) at a bootable bundle. The key is unique and doubles as the release tag/directory the files are served from:

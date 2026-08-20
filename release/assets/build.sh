@@ -100,8 +100,9 @@ iso_extraction() {
     fi
   done <<< "${EXTRACTS}"
   chmod 755 "${build_dir}"/*
-  # clean up ISO files
-  # rm -f "${build_dir}"/*.iso
+  # Remove the downloaded ISO: only the extracted kernel/initrd/rootfs ship,
+  # and GitHub caps release assets at 2 GB (the DVD ISO is ~4 GB).
+  rm -f "${build_dir}"/*.iso
 }
 
 endpoints(){

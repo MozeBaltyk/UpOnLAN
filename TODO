@@ -25,7 +25,7 @@ Ordered by priority. All remaining phases land on the `dev` branch, merged to `m
 ## Phase 3 — Webapp features → `dev`
 
 - [ ] **Console: multi-host KVM** — add a KVM host entry + connect to remote hosts over SSH (key-based), not just local `qemu:///system`.
-- [ ] **Console: attach disks** — allow disks on the test VM so PXE can run a real install, not just a diskless boot.
+- [x] **Console: attach disks** — Create VM takes a disk size (GiB); a qcow2 volume is created in the libvirt `default` pool and attached as `vda` (0 = diskless). `vm:destroy` cleans it up.
 - [ ] **Wake-on-LAN** — show host status/IP + add a scheduler.
 
 ## Phase 4 — Platform hardening → `dev`

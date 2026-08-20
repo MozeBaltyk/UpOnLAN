@@ -611,13 +611,13 @@ if ($('#vmFirmwareModal').length === 0) {
       <div class="modal-dialog" role="document">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="vmFirmwareModalLabel">Create VM — firmware</h5>
+            <h5 class="modal-title" id="vmFirmwareModalLabel">Create VM</h5>
             <button type="button" class="close" data-dismiss="modal" aria-label="Close">
               <span>&times;</span>
             </button>
           </div>
           <div class="modal-body">
-            <p>Select the firmware for the new diskless VM:</p>
+            <p>Select the firmware and (optionally) a disk for the new VM:</p>
             <button type="button" class="btn btn-outline-dark btn-block text-left mb-2" data-firmware="bios">
               <strong>BIOS</strong><br>
               <small>Legacy boot via the e1000 iPXE option ROM.</small>
@@ -626,6 +626,11 @@ if ($('#vmFirmwareModal').length === 0) {
               <strong>UEFI</strong><br>
               <small>OVMF boot via the iPXE EFI binary.</small>
             </button>
+            <div class="form-group mt-3 mb-0">
+              <label for="vmDiskSize">Disk size (GiB, 0 = diskless)</label>
+              <input type="number" id="vmDiskSize" class="form-control" min="0" step="1" value="0">
+              <small class="form-text text-muted">Attach a qcow2 disk so a PXE install has somewhere to install to.</small>
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -637,8 +642,9 @@ if ($('#vmFirmwareModal').length === 0) {
 }
 
 $(document).on('click', '#vmFirmwareModal [data-firmware]', function () {
+  const disk = Math.max(0, parseInt($('#vmDiskSize').val(), 10) || 0);
   $('#vmFirmwareModal').modal('hide');
-  socket.emit('vm:create', $(this).data('firmware'));
+  socket.emit('vm:create', { firmware: $(this).data('firmware'), disk });
 });
 
 // Show modal on Build button click

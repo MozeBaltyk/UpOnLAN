@@ -81,6 +81,19 @@ describe('vmHandlers.buildDomainXml (UEFI)', () => {
   });
 });
 
+describe('vmHandlers.buildDomainXml (with disk)', () => {
+  const xml = vmHandlers.buildDomainXml('uponlan-client', 'uponlan', 'bios', '/var/lib/libvirt/images/uponlan-client.qcow2');
+
+  it('attaches the qcow2 as a virtio disk', () => {
+    expect(xml).toContain("<disk type='file' device='disk'>");
+    expect(xml).toContain("<driver name='qemu' type='qcow2'/>");
+    expect(xml).toContain("<source file='/var/lib/libvirt/images/uponlan-client.qcow2'/>");
+    expect(xml).toContain("<target dev='vda' bus='virtio'/>");
+    expect(xml).toContain("<boot dev='network'/>");
+    expect(xml).toContain("<console type='pty'>");
+  });
+});
+
 describe('vmHandlers.buildNetworkXml', () => {
   const net = vmHandlers.buildNetworkXml('uponlan', '192.168.1.50');
 

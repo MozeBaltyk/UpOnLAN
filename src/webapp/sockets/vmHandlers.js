@@ -80,7 +80,7 @@ async function getVmHasConsole() {
 //   loads the bootloader the DHCP answer advertises (rom/ipxe/uponlan.xyz.efi),
 //   so no PCI option ROM is attached. `<os firmware='efi'>` makes libvirt
 //   pick OVMF and manage the NVRAM automatically.
-function buildDomainXml(name, network, firmware) {
+function buildDomainXml(name, network, firmware, diskPath) {
   const fw = normalizeFirmware(firmware);
   const osTag = fw === 'efi' ? "<os firmware='efi'>" : '<os>';
   const nic = fw === 'efi'
@@ -93,6 +93,14 @@ function buildDomainXml(name, network, firmware) {
       <model type='e1000'/>
       <rom file='${PXE_ROM}'/>
     </interface>`;
+  // Optional: attach a qcow2 disk so a PXE install has somewhere to write to.
+  const disk = diskPath
+    ? `<disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='${diskPath}'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>`
+    : '';
   return `<domain type='kvm'>
   <name>${name}</name>
   <memory unit='KiB'>2097152</memory>
@@ -112,6 +120,7 @@ function buildDomainXml(name, network, firmware) {
   <devices>
     <emulator>/usr/bin/qemu-system-x86_64</emulator>
     ${nic}
+    ${disk}
     <serial type='pty'>
       <target type='isa-serial' port='0'>
         <model name='isa-serial'/>
@@ -213,8 +222,10 @@ module.exports = function registerVmHandlers(socket) {
   // Provision the test VM from a Node-generated domain XML. No bash script:
   // define + start via the whitelisted virsh subcommands only. If the boot
   // network does not exist on the host it is defined first.
-  socket.on('vm:create', async (firmware) => {
-    const fw = normalizeFirmware(firmware);
+  socket.on('vm:create', async (payload) => {
+    const opts = typeof payload === 'string' ? { firmware: payload } : (payload || {});
+    const fw = normalizeFirmware(opts.firmware);
+    const diskSize = Math.max(0, Number(opts.disk) || 0);
     const state = await getVmState();
     if (state !== 'not found') {
       socket.emit('vm:action:result', { action: 'create', ok: false, message: `VM '${VM_NAME}' already exists (${state})` });
@@ -241,9 +252,25 @@ module.exports = function registerVmHandlers(socket) {
         try { fs.unlinkSync(netXmlPath); } catch { /* already gone */ }
       }
     }
+    // Create the requested disk as a qcow2 volume (diskless when size = 0).
+    const volName = `${VM_NAME}.qcow2`;
+    let diskPath = null;
+    if (diskSize > 0) {
+      const created = await runVirsh(['vol-create-as', 'default', volName, '--format', 'qcow2', `${diskSize}G`]);
+      if (!created.ok) {
+        socket.emit('vm:action:result', { action: 'create', ok: false, message: `disk create failed: ${created.err}` });
+        return;
+      }
+      const pathRes = await runVirsh(['vol-path', '--pool', 'default', volName]);
+      diskPath = pathRes.ok ? pathRes.out : null;
+      if (!diskPath) {
+        socket.emit('vm:action:result', { action: 'create', ok: false, message: `disk path lookup failed: ${pathRes.err}` });
+        return;
+      }
+    }
     const xmlPath = `/tmp/uponlan-${VM_NAME}.xml`;
     try {
-      fs.writeFileSync(xmlPath, buildDomainXml(VM_NAME, VM_NETWORK, fw));
+      fs.writeFileSync(xmlPath, buildDomainXml(VM_NAME, VM_NETWORK, fw, diskPath));
       const res = await runVirsh(['define', xmlPath]);
       if (!res.ok) {
         socket.emit('vm:action:result', { action: 'create', ok: false, message: `virsh define failed: ${res.err}` });
@@ -254,7 +281,7 @@ module.exports = function registerVmHandlers(socket) {
         action: 'create',
         ok: boot.ok,
         message: boot.ok
-          ? `VM '${VM_NAME}' (${fw} firmware) created${netCreated ? ` (network '${VM_NETWORK}' recreated)` : ''} and booting (network PXE) — console will show the menu shortly`
+          ? `VM '${VM_NAME}' (${fw} firmware${diskSize > 0 ? `, ${diskSize}G disk` : ', diskless'}) created${netCreated ? ` (network '${VM_NETWORK}' recreated)` : ''} and booting (network PXE) — console will show the menu shortly`
           : `VM defined but start failed: ${boot.err}`,
       });
     } catch (e) {
@@ -280,6 +307,9 @@ module.exports = function registerVmHandlers(socket) {
     const res = await runVirsh(['undefine', '--nvram', VM_NAME]);
     let msg = res.ok ? `VM '${VM_NAME}' destroyed` : `virsh undefine failed: ${res.err}`;
     if (res.ok) {
+      // Best-effort disk cleanup — a diskless VM has no volume, so vol-delete
+      // reports "not found" and we ignore it.
+      await runVirsh(['vol-delete', '--pool', 'default', `${VM_NAME}.qcow2`]);
       // Tear the boot network down too (user request). Best-effort: other
       // guests may still be attached, then net-destroy reports it.
       const nd = await runVirsh(['net-destroy', VM_NETWORK]);

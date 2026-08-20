@@ -56,7 +56,7 @@ Use these when you want to test without guessing:
 
 ```bash
 ./wakemeup.sh -a mirror-assets
-./scripts/release_menu.sh 0.0.2
+./scripts/release_menu.sh 0.1.0
 ./wakemeup.sh -a deploy --local
 ./wakemeup.sh -a test-webapp
 ```

@@ -11,11 +11,13 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-VERSION="${1:-$(jq -r '.version' src/webapp/package.json)}"
-echo "### build_release.sh: version ${VERSION} ###"
+# The menu version lives in release/menus/version.ipxe, independent of the
+# webapp version (src/webapp/package.json). An explicit arg overrides it.
+MENU_VERSION="${1:-$(sed -n 's/^set menu_version //p' release/menus/version.ipxe)}"
+echo "### build_release.sh: menu version ${MENU_VERSION} ###"
 
 bash scripts/build_ipxe_roms.sh
 bash scripts/release_assets.sh
-bash scripts/release_menu.sh "$VERSION"
+bash scripts/release_menu.sh "$MENU_VERSION"
 
-echo "### build_release.sh done -> release/output/menu/${VERSION}/menus.tar.gz ###"
+echo "### build_release.sh done -> release/output/menu/${MENU_VERSION}/menus.tar.gz ###"

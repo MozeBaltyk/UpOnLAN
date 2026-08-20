@@ -54,7 +54,7 @@ class BuildReleaseSpecs(unittest.TestCase):
         self.assertLess(pos_assets, pos_menu)
 
     def test_reports_menu_layout_path(self):
-        self.assertIn('release/output/menu/${VERSION}/menus.tar.gz', self.script)
+        self.assertIn('release/output/menu/${MENU_VERSION}/menus.tar.gz', self.script)
         self.assertNotIn('release/output/releases/download', self.script)
 
 

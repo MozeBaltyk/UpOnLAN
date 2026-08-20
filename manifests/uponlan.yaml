@@ -9,7 +9,7 @@ spec:
       image: localhost/uponlan:latest
       env:
         - name: MENU_VERSION
-          value: "0.0.2"
+          value: "0.1.0"
         - name: ENDPOINT_URL
           value: "https://github.com/mozebaltyk/uponlan"
         - name: NGINX_PORT # need to match with containerPort and hostPort

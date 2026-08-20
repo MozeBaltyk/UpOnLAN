@@ -16,11 +16,11 @@ The default deployment builds `localhost/uponlan:latest` and starts `manifests/u
 
 ```bash
 ./wakemeup.sh -a mirror-assets
-./scripts/release_menu.sh 0.0.2
+./scripts/release_menu.sh 0.1.0
 ./wakemeup.sh -a deploy --local
 ```
 
-Local deployment serves `release/output` with `python3 -m http.server` on port `8899` and starts `manifests/uponlan-local.yaml`. It requires `release/output/assets/endpoints.yml` and `release/output/menu/0.0.2/menus.tar.gz`; it does not build either artifact.
+Local deployment serves `release/output` with `python3 -m http.server` on port `8899` and starts `manifests/uponlan-local.yaml`. It requires `release/output/assets/endpoints.yml` and `release/output/menu/0.1.0/menus.tar.gz`; it does not build either artifact.
 
 ### Security and network exposure
 
@@ -52,7 +52,7 @@ The release is split across **three independent, manually-triggered workflows** 
 
 ```bash
 ./wakemeup.sh -a mirror-assets            # asset layer: release/output/assets/{endpoints.yml,<key>/...}
-./scripts/build_release.sh 0.0.2          # ROMs + menu layer: release/output/menu/{latest,0.0.2/menus.tar.gz}
+./scripts/build_release.sh 0.1.0          # ROMs + menu layer: release/output/menu/{latest,0.1.0/menus.tar.gz}
 ./wakemeup.sh -a deploy --local           # serve release/output on :8899 and deploy the local manifest
 ```
 

@@ -9,7 +9,7 @@ spec:
       image: localhost/uponlan:latest
       env:
         - name: MENU_VERSION
-          value: "0.0.2"
+          value: "0.1.0"
         - name: ENDPOINT_URL
           value: "http://host.containers.internal:8899"
         - name: NGINX_PORT

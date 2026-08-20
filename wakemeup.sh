@@ -18,9 +18,10 @@ deploy() {
             echo "[deploy --local] Run './wakemeup.sh -a mirror-assets [target]' first"
             return 1
         fi
-        if [ ! -f "$OUTPUT_ROOT/menu/0.0.2/menus.tar.gz" ]; then
-            echo "[deploy --local] Missing $OUTPUT_ROOT/menu/0.0.2/menus.tar.gz"
-            echo "[deploy --local] Build the menu artifact first with scripts/release_menu.sh 0.0.2"
+        MENU_VER="$(sed -n 's/^set menu_version //p' release/menus/version.ipxe)"
+        if [ ! -f "$OUTPUT_ROOT/menu/${MENU_VER}/menus.tar.gz" ]; then
+            echo "[deploy --local] Missing $OUTPUT_ROOT/menu/${MENU_VER}/menus.tar.gz"
+            echo "[deploy --local] Build the menu artifact first with scripts/release_menu.sh ${MENU_VER}"
             return 1
         fi
         echo "[deploy] deploying uponlan container with local menus+assets"

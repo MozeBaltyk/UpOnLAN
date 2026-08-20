@@ -10,9 +10,10 @@ class DeployLocalSpecs(TempDirTestCase):
         self.copy('wakemeup.sh')
         self.stub('bin/sudo', STUB_SUDO, exe=True)
         self.stub('bin/python3', STUB_PYTHON3, exe=True)
+        self.stub('release/menus/version.ipxe', '#!ipxe\nset menu_version 0.1.0\n')
 
     def test_requires_assets_endpoints(self):
-        self.stub('release/output/menu/0.0.2/menus.tar.gz', 'menu')
+        self.stub('release/output/menu/0.1.0/menus.tar.gz', 'menu')
         proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'deploy', '--local', check=False)
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn('assets/endpoints.yml', proc.stdout + proc.stderr)
@@ -21,11 +22,11 @@ class DeployLocalSpecs(TempDirTestCase):
         self.stub('release/output/assets/endpoints.yml', 'endpoints: {}\n')
         proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'deploy', '--local', check=False)
         self.assertNotEqual(proc.returncode, 0)
-        self.assertIn('menu/0.0.2/menus.tar.gz', proc.stdout + proc.stderr)
+        self.assertIn('menu/0.1.0/menus.tar.gz', proc.stdout + proc.stderr)
 
     def test_deploys_when_both_present(self):
         self.stub('release/output/assets/endpoints.yml', 'endpoints: {}\n')
-        self.stub('release/output/menu/0.0.2/menus.tar.gz', 'menu')
+        self.stub('release/output/menu/0.1.0/menus.tar.gz', 'menu')
         proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'deploy', '--local')
         self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 

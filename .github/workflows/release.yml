@@ -15,9 +15,9 @@ jobs:
         with:
           ref: main
 
-      - name: Get version
+      - name: Get menu version
         id: version
-        run: echo "tag=$(jq -r '.version' src/webapp/package.json)" >> "$GITHUB_OUTPUT"
+        run: echo "tag=$(sed -n 's/^set menu_version //p' release/menus/version.ipxe)" >> "$GITHUB_OUTPUT"
 
       - name: Fail if tag already exists
         run: |

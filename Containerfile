@@ -1,6 +1,3 @@
-FROM ubuntu:22.04 as deps
-RUN apt update && apt install -y isolinux
-
 FROM alpine:3.24 AS build
 ARG SOURCE_WEBAPP="webapp"
 
@@ -36,9 +33,6 @@ RUN apk add --no-cache \
   libuuid \
   perl \
   xz-dev
-
-# Copy isolinux to later stage
-COPY --from=deps /usr/lib/ISOLINUX /usr/lib/ISOLINUX
 
 #### Deps for the webapp
 RUN apk add --no-cache \
@@ -82,7 +76,8 @@ COPY --from=build /webapp /webapp
 # ROM / boot-media build script (the webapp's Build UI shells out to it)
 COPY scripts/build_ipxe_roms.sh /scripts/build_ipxe_roms.sh
 COPY scripts/ipxe-gas242-binutils.patch /scripts/ipxe-gas242-binutils.patch
-RUN chmod +x /scripts/build_ipxe_roms.sh
+COPY scripts/genfsimg /scripts/genfsimg
+RUN chmod +x /scripts/build_ipxe_roms.sh /scripts/genfsimg
 
 #### VM console support (host libvirt socket mounted at /var/run/libvirt)
 # util-linux provides `script`, which allocates the controlling TTY `virsh console` requires.

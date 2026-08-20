@@ -162,12 +162,12 @@ done
 
 if [ "$gen_iso" = 1 ]; then
   echo "[ipxe] generating ISO"
-  ./util/genfsimg -o "$OUT_ROM/uponlan.xyz.iso" -s uponlan.xyz \
+  "$REPO_ROOT/scripts/genfsimg" -o "$OUT_ROM/uponlan.xyz.iso" \
     bin-x86_64-efi/ipxe.efi bin/ipxe.lkrn
 fi
 if [ "$gen_usb" = 1 ]; then
   echo "[ipxe] generating USB image"
-  ./util/genfsimg -o "$OUT_ROM/uponlan.xyz.img" -s uponlan.xyz \
+  "$REPO_ROOT/scripts/genfsimg" -o "$OUT_ROM/uponlan.xyz.img" \
     bin-x86_64-efi/ipxe.efi bin/ipxe.lkrn
 fi
 

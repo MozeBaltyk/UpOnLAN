@@ -1,6 +1,6 @@
 ## 📡 DHCP configuration insights
 
-The first step of every iPXE boot is: **DHCP assigns an IP and the iPXE chainload path** (step 1️⃣ of [Networks summary](../Networks.md)).
+The first step of every iPXE boot is: **DHCP assigns an IP and the iPXE chainload path** (step 1️⃣ of [Networks summary](Networks/01-Overview.md)).
 
 Two knobs matter:
 
@@ -32,7 +32,7 @@ dhcp-boot=undionly.0,192.168.122.1
 | Key | Meaning |
 |-----|---------|
 | `enable-tftp` | Serve the iPXE binary over TFTP |
-| `tftp-root` | Where the iPXE binaries live (see [Getting Started](../../iPXE.md)) |
+| `tftp-root` | Where the iPXE binaries live (see [iPXE Quick Start](iPXE/01-Quick-Start.md)) |
 | `dhcp-boot=undionly.0,192.168.122.1` | `filename` + `next-server` in one line |
 
 Once iPXE is loaded it fetches the menu over HTTP(S) from the UpOnLAN webapp (step 3️⃣).
@@ -59,7 +59,7 @@ tftp-root=/var/lib/tftpboot
 dhcp-boot=undionly.0
 ```
 
-The bootloader wrapper documented in [ROM Build](../../iPXE/ROM%20Build.md) handles ProxyDHCP detection automatically (`proxydhcp-next-server` fallback).
+The bootloader wrapper documented in [ROM Build](iPXE/03-ROM-Build.md) handles ProxyDHCP detection automatically (`proxydhcp-next-server` fallback).
 
 ---
 

@@ -1,6 +1,6 @@
 # UpOnLAN.xyz
 
-**[Features](#features) • [Getting Started](docs/01-Getting%20Started.md) • [PXE Basics](docs/02-PXE%20Basics.md) • [ROM builds](docs/iPXE/ROM%20Build.md) • [Deployment](docs/UpOnLAN/Deployment.md) • [Operations](docs/UpOnLAN/Operations.md)**
+**[Features](#features) • [Getting Started](docs/01-Getting-Started.md) • [PXE Basics](docs/02-PXE-Basics.md) • [Overview & netboot.xyz](docs/03-UpOnLAN-Overview.md) • [Assets](docs/04-Assets.md) • [ROM builds](docs/iPXE/03-ROM-Build.md) • [Deployment](docs/UpOnLAN/02-Deployment.md) • [CI](docs/UpOnLAN/04-CI.md) • [Operations](docs/UpOnLAN/03-Operations.md)**
 
 This project is a cold fork of Netboot.xyz with the goal of unifying and simplifying the upstream into an all-in-one solution. Its main purpose is to provide an editor for iPXE menus, build the boot mediums and serve them on the fly. Additional features include Wake-on-LAN, PXE menu testing and installation, and documentation in the webapp for developing custom PXE menus. 
     
@@ -20,7 +20,7 @@ This webapp aims to:
 
 ## Documentation goals
 
-The documentation covers both **using and operating UpOnLAN** and the **PXE/iPXE knowledge needed to deploy it safely**. Start with [Getting Started](docs/01-Getting%20Started.md), then [PXE Basics](docs/02-PXE%20Basics.md) to understand the DHCP, TFTP, iPXE, HTTP, firmware, and asset flow. The remaining guides explain UpOnLAN menu editing, ROM builds, deployment, operations, and troubleshooting.
+The documentation covers both **using and operating UpOnLAN** and the **PXE/iPXE knowledge needed to deploy it safely**. Start with [Getting Started](docs/01-Getting-Started.md), then [PXE Basics](docs/02-PXE-Basics.md) to understand the DHCP, TFTP, iPXE, HTTP, firmware, and asset flow. The remaining guides explain UpOnLAN menu editing, ROM builds, deployment, operations, and troubleshooting.
 
 UpOnLAN serves the boot environment; it does not configure DHCP. Network-boot setup therefore requires coordinating the documented UpOnLAN service with your network's DHCP configuration and testing the correct BIOS or UEFI boot target.
 
@@ -76,12 +76,12 @@ asset_target=harvester ./wakemeup.sh -a mirror-assets
 Use `asset_target` to build just one asset set while debugging.
 
 `release/output/assets/endpoints.yml` is the asset catalog consumed separately from `menus.tar.gz`.
-`release/output/` is the single local/pipeline release layout, mirroring the GitHub release structure (`menu/` and `assets/` namespaces).
+`release/output/` is the single local release layout. Its GitHub counterpart is decoupled: the menu ships as `<version>` releases and asset bundles as `<key>` releases (see [Deployment](docs/UpOnLAN/02-Deployment.md)).
 
-See [Deployment](docs/UpOnLAN/Deployment.md) for remote and local deployment, ports, security, and release artifacts. See [Operations](docs/UpOnLAN/Operations.md) for logs, recovery, backup, and destructive-operation behavior.
+See [Deployment](docs/UpOnLAN/02-Deployment.md) for remote and local deployment, ports, security, and release artifacts. See [Operations](docs/UpOnLAN/03-Operations.md) for logs, recovery, backup, and destructive-operation behavior.
 
 ## Custom iPXE ROM/media builds
 
 Editing a served iPXE menu does not normally require a new ROM: an existing iPXE boot binary can chain to the menu. Build when the boot binary itself must embed UpOnLAN's wrapper or start a custom default boot flow, or when you need boot media for a machine that cannot use the existing network-boot path.
 
-In the webapp, open **Menus**, expand **ROM Files**, then select **Build**. Choose the required firmware/media options, provide the site name, boot domain, and boot version, then select **Run**. The existing playbook builds the selected custom iPXE binaries and, when selected, hybrid ISO or USB image media; generated files appear in the ROM Files list. See [ROM Build](docs/iPXE/ROM%20Build.md) for firmware and media selection guidance.
+In the webapp, open **Menus**, expand **ROM Files**, then select **Build**. Choose the required firmware/media options, provide the site name, boot domain, and boot version, then select **Run**. The existing playbook builds the selected custom iPXE binaries and, when selected, hybrid ISO or USB image media; generated files appear in the ROM Files list. See [ROM Build](docs/iPXE/03-ROM-Build.md) for firmware and media selection guidance.

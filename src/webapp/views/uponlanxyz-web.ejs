@@ -1176,34 +1176,46 @@ socket.on('purgestatus', function(){
 });
 
 //// Render Docs ////
-function renderTree(tree, parentPath = '', level = 0) {
-  let html = '<ul class="nav flex-column">';
+function prettyLabel(key) {
+  // Filenames use `-` as a word separator (e.g. `02-PXE-Basics.md` ->
+  // `PXE-Basics`); render them as human words in the sidebar.
+  return key.replace(/-/g, ' ');
+}
 
-  for (const key in tree) {
-    if (key === '__file') continue;
+// Stable, collision-free id for a folder collapse target (key may be `UpOnLAN`,
+// `iPXE`, …). Folders are keyed by their path so nested folders stay unique.
+function folderId(pathPrefix, key) {
+  const slug = (pathPrefix + key).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return 'doc-folder-' + (slug || 'root');
+}
 
+function renderTree(tree, level = 0, pathPrefix = '') {
+  const keys = Object.keys(tree).filter((k) => k !== '__file');
+  let html = '';
+
+  for (const key of keys) {
     const node = tree[key];
-    const fullPath = node.__file || `${parentPath}/${key}`;
-
-    const padding = 15 * level; // 15px indent per level
-
-    html += `<li class="nav-item" style="padding-left: ${padding}px;">`;
+    const label = prettyLabel(key);
+    const pad = 12 + level * 16; // indent nested entries under their folder
 
     if (node.__file) {
-      html += `<a href="#" class="nav-link doc-link" data-doc="${node.__file}">${key}</a>`;
+      html += `<div class="bd-toc-item">
+        <a href="#" class="bd-toc-link doc-link" data-doc="${node.__file}" style="padding-left:${pad}px;">${label}</a>
+      </div>`;
     } else {
-      html += `<strong>${key}</strong>`;
+      // Folder: a collapsible group header (accordion, like the menu editor).
+      const id = folderId(pathPrefix, key);
+      html += `<div class="bd-toc-item">
+        <button type="button" class="btn btn-link btn-block text-left bd-toc-link font-weight-bold text-secondary" style="padding-left:${pad}px;" data-toggle="collapse" data-target="#${id}" aria-expanded="true" aria-controls="${id}">
+          📁 ${label}
+        </button>
+        <div class="collapse show" id="${id}">
+          ${renderTree(node, level + 1, pathPrefix + key + '/')}
+        </div>
+      </div>`;
     }
-
-    const hasChildren = Object.keys(node).some(k => k !== '__file');
-    if (hasChildren) {
-      html += renderTree(node, fullPath, level + 1);
-    }
-
-    html += `</li>`;
   }
 
-  html += '</ul>';
   return html;
 }
 

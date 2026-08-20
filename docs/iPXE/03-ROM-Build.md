@@ -53,7 +53,7 @@ Artifacts land in `release/menus/rom/ipxe/`:
 - `uponlan.xyz-undionly.kpxe` / `uponlan.xyz.kpxe` — legacy BIOS PXE binaries (unused by the test-VM flow, kept for general netboot).
 - `uponlan.xyz.efi` — UEFI PXE binary served to OVMF guests over TFTP.
 
-The embedded script (`scripts/build_ipxe_roms.sh` → `embed.ipxe`) gives the binaries a serial console (`CONSOLE_SERIAL`) and a default flow: DHCP → `menu.ipxe` → `boot.cfg` → menu, with distinct recovery paths for DHCP failure, menu failure, and boot-config failure. `release_menu.sh` refuses to package the menu tarball if any of the four artifacts are missing.
+The embedded script (`scripts/build_ipxe_roms.sh` → `embed.ipxe`) gives the binaries a serial console (`CONSOLE_SERIAL`) and a default flow: DHCP → `menu.ipxe` → `boot.cfg` → menu, with distinct recovery paths for DHCP failure, menu failure, and boot-config failure. `release_menu.sh` warns (but no longer blocks) if any of the four artifacts are missing.
 
 ## Build in the webapp
 

@@ -34,13 +34,19 @@ The shipped Nginx configuration listens on plain HTTP port `8080`; it does not p
 
 `./wakemeup.sh -a mirror-assets` runs `scripts/release_assets.sh` and recreates the asset side of `release/output`, under `release/output/assets/` (the `assets/endpoints.yml` catalog plus `assets/<asset-key>/` bundles). Set `asset_target=<os>` to build a single asset set, e.g. `asset_target=harvester ./wakemeup.sh -a mirror-assets`. A bare (untargeted) run wipes `release/output/assets/` and rebuilds every asset set in `release/assets/*/setting.sh`; a targeted run builds/refreshes only that one set on top of the existing mirror, so you can add asset sets incrementally (e.g. `asset_target=talos` after a full run adds only talos).
 
-`./scripts/release_menu.sh <version>` updates `release/menus/version.ipxe` and writes the menu layer under `release/output/menu/` (`menu/latest` + `menu/<version>/menus.tar.gz`). It **fails fast** if the iPXE ROM artifacts (`release/menus/rom/ipxe/uponlan.xyz-undionly.kpxe`, `uponlan.xyz.kpxe`, `uponlan.xyz.efi`, `uponlan.xyz-e1000.rom`) are missing — the tarball must contain them so `init.sh` can populate the container's TFTP root. The two layers live in sibling directories, so an asset mirror run never clobbers the menu release.
+`./scripts/release_menu.sh <version>` updates `release/menus/version.ipxe` and writes the menu layer under `release/output/menu/` (`menu/latest` + `menu/<version>/menus.tar.gz`). It **warns** — and no longer aborts — if the iPXE ROM artifacts (`release/menus/rom/ipxe/uponlan.xyz-undionly.kpxe`, `uponlan.xyz.kpxe`, `uponlan.xyz.efi`, `uponlan.xyz-e1000.rom`) are missing; build them first so the tarball carries them and `init.sh` can populate the container's TFTP root. The two layers live in sibling directories, so an asset mirror run never clobbers the menu release.
 
 The one-command release build is `scripts/build_release.sh <version>`: it runs the ROM build (`scripts/build_ipxe_roms.sh`), the asset mirror, and then `release_menu.sh` in that order, so the menu artifact can never be built against stale/missing ROMs.
 
 ### Release workflows
 
-Two workflows produce the artifacts a deployment consumes.
+The release is split across **three independent, manually-triggered workflows** so the container image, the menu, and the asset bundles can each ship on their own schedule (a menu fix does not force a multi-GB rebuild of every asset):
+
+| Workflow     | Produces          | Destination                                                                 |
+| ------------ | ----------------- | --------------------------------------------------------------------------- |
+| `image.yml`  | the webapp container | `ghcr.io/mozebaltyk/uponlan:<version>` + `latest`                          |
+| `release.yml` | the menu tarball | GitHub Release tag `<version>`, asset `menus.tar.gz`                        |
+| `assets.yml` | asset bundles     | one GitHub release per bundle (tag = `<key>`) + an `assets` tag carrying `endpoints.yml` |
 
 **Local (testing) workflow** — build everything into `release/output/` on the host:
 
@@ -57,18 +63,20 @@ sudo apt-get install -y build-essential binutils liblzma-dev xz-utils ipxe-qemu 
 ./scripts/build_release.sh <version>   # runs build_ipxe_roms.sh (installs the host option ROM) + assets + menu
 ```
 
-**Repository (GitHub) workflow** — `.github/workflows/release.yml` (manual `workflow_dispatch`):
+**Repository (GitHub) workflow** — three `workflow_dispatch` jobs in `.github/workflows/`:
 
-1. Reads the webapp version from `src/webapp/package.json`; that version becomes the release tag.
-2. Fails if a git tag with that version already exists.
-3. Runs `scripts/release_assets.sh` and `scripts/release_menu.sh <version>` in CI.
-4. Uploads `release/output/**/*` as flat assets to the GitHub release under that tag.
+- `release.yml` (menu): builds the iPXE ROMs (`build_ipxe_roms.sh`), packs `release_menu.sh <version>`, and uploads `menus.tar.gz` as the `<version>` release asset.
+- `assets.yml`: installs `yq` + `p7zip-full`, runs `MIRROR_LAYOUT=github scripts/release_assets.sh`, then creates one release per bundle whose **tag is the endpoint key** (`proxmox-ve-8.4-1-x86_64` → `releases/download/<key>/vmlinuz`). It also publishes `endpoints.yml` on a stable `assets` tag.
+- `image.yml`: builds the Containerfile and pushes the image to GHCR.
 
-A deployment pointed at `ENDPOINT_URL=https://github.com/mozebaltyk/uponlan` fetches the menu tarball from `${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz` and the asset catalog from `${ENDPOINT_URL}/endpoints.yml` (the GitHub branch uses the `releases/download/` path while the local mirror uses `menu/` + `assets/` — `init.sh` switches on whether the endpoint is a GitHub URL).
+Two conventions keep the decoupled releases from colliding:
 
-> ⚠️ Known gaps in the repository workflow:
-> - The dedicated `release_assets` CI job is **commented out**. Assets are built inside the menu job, so every menu release re-downloads all asset bundles (multi-GB) on CI, and there is no way to release assets on their own.
-> - Only the menu tag is published. Asset URLs resolve on GitHub only if a release exists under the exact asset tag (`<os>-<version>-<arch>`); the workflow uploads everything to the single menu version tag, so per-OS bundle URLs (and the Assets-tab download links for a GitHub origin) point at releases that must be created separately. Local mirroring (`deploy --local`) is unaffected because it serves the `assets/` namespace directly.
+1. **Asset releases are `--prerelease`.** GitHub's `releases/latest` (used by `init.sh` to resolve `MENU_VERSION` and by the dashboard's *remote menu version*) skips prereleases, so it stays pinned to the menu release even after asset bundles are published.
+2. **Menu versions are bare semver.** `fetchDevReleases` filters the release list to `^v?\d+\.\d+\.\d+$`, so asset tags never surface as "menu versions" in the endpoint browser.
+
+A deployment pointed at `ENDPOINT_URL=https://github.com/mozebaltyk/uponlan` fetches the menu tarball from `${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz` and the asset catalog from `${ENDPOINT_URL}/releases/download/assets/endpoints.yml` (`init.sh` switches on whether the endpoint is a GitHub URL — `releases/download/` for GitHub, `menu/` + `assets/` for a local mirror).
+
+The full CI setup — test pipeline plus the three release workflows and their conventions — is documented in [CI pipelines](UpOnLAN/04-CI.md).
 
 ### CLI actions
 
@@ -76,7 +84,7 @@ A deployment pointed at `ENDPOINT_URL=https://github.com/mozebaltyk/uponlan` fet
 
 ### Test-VM provisioning (diskless PXE guest)
 
-The web console's VM tab creates a diskless KVM guest (no disk, no VGA, PTY serial on port 0) on the `uponlan` libvirt network with a BIOS/UEFI firmware selector. The guest must load an iPXE **binary** before any menu can render: the VM firmware (SeaBIOS/OVMF) does not interpret iPXE scripts, and Ubuntu's QEMU ships no e1000 PXE option ROM, so without the ROM (BIOS) or the OVMF network stack fetch (UEFI) the guest never even DHCPs. See [ROM Build](../iPXE/ROM%20Build.md) for why the serial console additionally requires a `CONSOLE_SERIAL` ROM build.
+The web console's VM tab creates a diskless KVM guest (no disk, no VGA, PTY serial on port 0) on the `uponlan` libvirt network with a BIOS/UEFI firmware selector. The guest must load an iPXE **binary** before any menu can render: the VM firmware (SeaBIOS/OVMF) does not interpret iPXE scripts, and Ubuntu's QEMU ships no e1000 PXE option ROM, so without the ROM (BIOS) or the OVMF network stack fetch (UEFI) the guest never even DHCPs. See [ROM Build](iPXE/03-ROM-Build.md) for why the serial console additionally requires a `CONSOLE_SERIAL` ROM build.
 
 - **BIOS**: attaches the iPXE e1000 option ROM (`/usr/lib/ipxe/qemu/uponlan-e1000.rom`) — SeaBIOS loads it, iPXE DHCPs, and chains the serial menu.
 - **UEFI**: `<os firmware='efi'>` — libvirt picks OVMF and manages a per-guest NVRAM. OVMF PXE-boots, TFTPs `rom/ipxe/uponlan.xyz.efi` (delivered via `dhcp-boot`/option 67 matched on client arch option 93 = 7), and iPXE renders the same serial menu.

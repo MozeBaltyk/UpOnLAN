@@ -31,7 +31,7 @@ This projects includes several components :
 | Component               | Description                                                        |
 | ----------------------- | ------------------------------------------------------------------ |
 | WebApp (Node.js)        | User interface + backend server logic                              |
-| Menu & Assets Mirror    | Menus and assets as artifacts in the github project                |
+| Menu & Assets Mirror    | Menus and asset bundles released to GitHub; webapp image to GHCR  |
 | Documentation (`/docs`) | Markdown docs rendered within the web interface                    |
 | Scripts & Workflows     | Release/build scripts (iPXE ROMs, assets, menus) + GitHub automation |
  
@@ -183,7 +183,7 @@ npm run test:smoke         # smoke only
 ./wakemeup.sh -a test-webapp    # prompts for a layer, default = all
 ```
 
-In CI, `.github/workflows/test.yml` runs the four layers on every push/PR touching `src/webapp`.
+In CI, `.github/workflows/test.yml` runs the four webapp layers on every push/PR, plus the release-flow specs (`tests/specs`), a `bash -n` shell-lint job over `scripts/*.sh`/`src/*.sh`/`wakemeup.sh`, and a container build smoke. The release workflows are covered in [CI pipelines](UpOnLAN/04-CI.md).
 
 ### Testability notes
 
@@ -193,5 +193,5 @@ In CI, `.github/workflows/test.yml` runs the four layers on every push/PR touchi
 
 ### Release-flow specs (Python)
 
-The shell scripts and the `release/output` layout are covered by a separate Python `unittest` suite in `tests/specs/` (run `./tests/specs/run.sh`). These validate the release pipeline — the `menu/` + `assets/` layout, `build.sh` layouts (GitHub vs local), `release_assets.sh` targeted/untargeted behavior, `release_menu.sh` fail-fast, the iPXE `asset_path` resolution (GitHub vs local), and `init.sh` / `wakemeup.sh` URL construction — against the real scripts in a temp directory with only `curl`/`sudo`/`python3` stubbed.
+The shell scripts and the `release/output` layout are covered by a separate Python `unittest` suite in `tests/specs/` (run `./tests/specs/run.sh`). These validate the release pipeline — the `menu/` + `assets/` layout, `build.sh` layouts (GitHub vs local), `release_assets.sh` targeted/untargeted behavior, `release_menu.sh` warn/missing-ROM behavior, the iPXE `asset_path` resolution (GitHub vs local), and `init.sh` / `wakemeup.sh` URL construction — against the real scripts in a temp directory with only `curl`/`sudo`/`python3` stubbed.
 

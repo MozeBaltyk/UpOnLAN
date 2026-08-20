@@ -15,6 +15,22 @@ This web app aims to:
 
 ---
 
+## 🔀 UpOnLAN vs netboot.xyz
+
+UpOnLAN started as a **cold fork of [netboot.xyz](https://netboot.xyz)** — it keeps the iPXE-menu concept but is a different kind of tool.
+
+| | **netboot.xyz** | **UpOnLAN.xyz** |
+| --- | --- | --- |
+| **What it is** | A public service + curated distro catalog | A self-hosted web **application** |
+| **Menu model** | Generated from Jinja/Ansible templates, updated by bots | Edited in a web UI with layered local/remote overrides |
+| **Asset model** | Central `endpoints.yml` + files in their `asset-mirror` repo | You build/mirror your own assets (`release/assets/` + `release_assets.sh`) and release them via your own CI |
+| **Origin** | Boot against their hosted endpoint (`github.com/netbootxyz`) | You own and run the endpoint |
+| **Extras** | Boot media, menu releases | Diskless KVM test VM + serial console, Wake-on-LAN, ROM builder, docs, live logs/metrics |
+
+The shared core is the iPXE menu plus the *"extract and re-host assets, because vendors don't ship them iPXE-ready"* model — detailed in [Assets](04-Assets.md).
+
+---
+
 ## References
 
 * Similar project but with Vagrant:

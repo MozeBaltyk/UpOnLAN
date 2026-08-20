@@ -7,18 +7,9 @@ spec:
   containers:
     - name: webapp
       image: localhost/uponlan:latest
-      # needed for QEMU
-      #securityContext:
-      #  capabilities:
-      #    add:
-      #      - NET_ADMIN
-      #  devices:
-      #    - name: tun
-      #      devicePath: /dev/net/tun
-      #  privileged: true
       env:
         - name: MENU_VERSION
-          value: "0.0.2"
+          value: "0.1.0"
         - name: ENDPOINT_URL
           value: "https://github.com/mozebaltyk/uponlan"
         - name: NGINX_PORT # need to match with containerPort and hostPort
@@ -36,6 +27,8 @@ spec:
           mountPath: /menu
         - name: uponlan-logs
           mountPath: /logs
+        - name: libvirt-sock
+          mountPath: /var/run/libvirt/libvirt-sock
       ports:
         - containerPort: 8080
           hostPort: 8080
@@ -57,3 +50,6 @@ spec:
     - name: uponlan-logs
       emptyDir:
         path: ./logs
+    - name: libvirt-sock
+      hostPath:
+        path: /var/run/libvirt/libvirt-sock

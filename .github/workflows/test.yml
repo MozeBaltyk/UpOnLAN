@@ -1,0 +1,64 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  webapp:
+    name: webapp test layers
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./src/webapp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # No committed package-lock.json in this repo, so `npm install` (not ci).
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: E2E journeys
+        run: npm run test:e2e
+
+      - name: Smoke tests
+        run: npm run test:smoke
+
+  specs:
+    name: release-flow specs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run specs
+        run: ./tests/specs/run.sh
+
+  shell:
+    name: shell syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash -n on all shell scripts
+        run: |
+          for f in scripts/*.sh src/*.sh wakemeup.sh; do bash -n "$f"; done
+
+  container:
+    name: container build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image (build-only smoke)
+        run: docker build -f Containerfile -t uponlan:ci .

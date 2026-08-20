@@ -1,4 +1,5 @@
 // ../sockets/docHandlers.js
+'use strict';
 const { listDocs, getDocContent, buildTree } = require('../services/docServices');
 
 module.exports = function(socket) {

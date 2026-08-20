@@ -1,11 +1,10 @@
 // ./sockets/menuHandlers.js
-const fs = require('fs');
+'use strict';
 const { 
   getLocalNginx, 
   getMenuVersion, 
   logWithTimestamp, 
   errorWithTimestamp,
-  hasOrphanProcesses,
 } = require('../services/utilServices');
 const {
   upgrademenu,
@@ -32,10 +31,10 @@ module.exports = function registerMenuHandlers(socket, io) {
   socket.on('revertconfig', (filename) => revertconfig(filename, socket));
   socket.on('editgetfile', (filename, islocal) => editgetfile(filename, islocal, socket));  
   socket.on('buildsubmit', async (options) => {
-      const result = await runBuildPlaybook(options, socket);
+      const result = await runBuildPlaybook(options.formats, socket);
       if (result.success) {
           socket.emit('buildStarted', { pid: result.pid });          
-          // Wait for the playbook to finish
+          // Wait for the build to finish
           result.promise.then((finalResult) => {
               socket.emit('buildMenuResult', finalResult);
           }).catch(err => {
@@ -47,12 +46,8 @@ module.exports = function registerMenuHandlers(socket, io) {
   });
 
   socket.on('buildcancel', async () => {
-    const orphanExists = await hasOrphanProcesses();
-    const result = await cancelBuildPlaybook(socket);
-    if (orphanExists) {
-      result.message += ' Warning: Detected orphan ansible-playbook processes.';
-    }
-    socket.emit('buildMenuResult', result);
+    // cancelBuildPlaybook emits 'buildMenuResult' itself
+    await cancelBuildPlaybook(socket);
   });
 
   socket.on('upgrademenu', (version) => { upgrademenu(version, (err, result) => {
@@ -61,7 +56,7 @@ module.exports = function registerMenuHandlers(socket, io) {
       }
       logWithTimestamp('Menu upgrade complete:', result);
       socket.emit('upgrademenu_complete');
-    }, io, socket);
+    }, socket);
   });
 
   socket.on('upgrademenunetboot', (version) => { upgrademenunetboot(version, (err, result) => {
@@ -70,7 +65,7 @@ module.exports = function registerMenuHandlers(socket, io) {
       }
       logWithTimestamp('Menu Netboot upgrade complete:', result);
       socket.emit('upgrademenu_complete');
-    }, io, socket);
+    }, socket);
   });
 
   socket.on('getconfig', async () => {

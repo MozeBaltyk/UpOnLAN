@@ -1,4 +1,5 @@
 // ./services/utilServices.js
+'use strict';
 const { DownloaderHelper } = require('node-downloader-helper');
 const urlLib = require('url');
 const fetch = require('node-fetch');
@@ -7,157 +8,9 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const exec = require('child_process').exec;
-const { promisify } = require('util');
-const execPromise = promisify(exec);
-const { spawn } = require('child_process');
+// Root of the config volume; overridable so tests run against fixtures.
+const CONFIG_ROOT = process.env.UPONLAN_CONFIG || '/config';
 let cachedNginxURL = null;
-let ansibleState = {
-  process: null,
-  pid: null,
-  startedBy: null,
-  startTime: null,
-  currentPlaybook: null,
-};
-
-function resetAnsibleState() {
-  ansibleState = { process: null, pid: null, startedBy: null, startTime: null, currentPlaybook: null, promise: null, };
-}
-
-async function startAnsiblePlaybook(playbookPath, options, socket, progressCallback) {
-  if (ansibleState.process) {
-    return { success: false, message: `Ansible already running (PID ${ansibleState.pid})` };
-  }
-  const { process, promise } = await runAnsiblePlaybook(playbookPath, options, socket, progressCallback);
-
-  logWithTimestamp(`Starting playbook: ${playbookPath} with PID ${process.pid}`);
-
-  ansibleState = {
-      process,
-      pid: process.pid,
-      startedBy: socket.id,
-      startTime: new Date(),
-      currentPlaybook: playbookPath,
-      promise,
-  };
-  promise.finally(() => resetAnsibleState());
-
-  return { success: true, message: `Build started (PID ${process.pid})`, pid: process.pid, promise };
-}
-
-async function cancelAnsiblePlaybook() {
-  if (!ansibleState.process || !ansibleState.promise) {
-    return { success: false, message: 'No active playbook running' };
-  }
-
-  try {
-    logWithTimestamp(`Cancelling playbook with PID ${ansibleState.pid}`);
-    process.kill(-ansibleState.pid, 'SIGTERM');
-
-    // Wait for the playbook promise to resolve
-    const result = await ansibleState.promise;
-    return result;
-  } catch (err) {
-    errorWithTimestamp(`Failed to terminate process ${ansibleState.pid}: ${err.message}`);
-    return { success: false, message: `Failed to terminate process: ${err.message}` };
-  }
-}
-
-async function runAnsiblePlaybook(playbookPath, options, socket, progressCallback) {
-  const logDir = '/logs/ansible';
-  await fs.promises.mkdir(logDir, { recursive: true });
-
-  const extraVars = Object.entries(options)
-    .map(([key, val]) => `${key}="${val}"`)
-    .join(' ');
-
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const logFilePath = path.join(logDir, `${path.basename(playbookPath)}_${timestamp}.log`);
-
-  // Count tasks
-  let taskCount = 0;
-  try {
-    const { stdout } = await execPromise(`sudo ansible-playbook ${playbookPath} --list-tasks`);
-    const rawTaskCount = (stdout.match(/^\s{6,}.*$/gm) || []).length;
-    taskCount = rawTaskCount * 7;
-  } catch (err) {
-    logWithTimestamp(`Failed to count tasks: ${err.message}`);
-  }
-  if (taskCount === 0) {
-    logWithTimestamp('Warning: No tasks detected in playbook. Progress tracking may be inaccurate.');
-  }
-
-  // launch ansible-playbook with setsid to run it in a new session
-  const args = [ playbookPath, '--extra-vars', extraVars];
-  const ansible = spawn('setsid', ['sudo', 'ansible-playbook', ...args]);
-  const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
-  const promise = new Promise((resolve, reject) => {
-    let tasksCompleted = 0;
-
-    ansible.stdout.on('data', (data) => {
-      const lines = data.toString().split('\n');
-      lines.forEach(line => {
-        logStream.write(line + '\n');
-        const taskMatch = line.match(/^TASK \[(.+)\]/);
-        if (taskMatch && progressCallback) {
-          taskCount++;
-          progressCallback({ tasksCompleted, taskCount, currentTask: taskMatch[1] });
-        }
-        if (line.match(/^(ok|changed|failed):/)) {
-          tasksCompleted++;
-          if (progressCallback) {
-            progressCallback({ tasksCompleted, taskCount, currentTask: null });
-          }
-        }
-      });
-    });
-
-    ansible.stderr.on('data', (data) => {
-      logStream.write(data);
-    });
-
-    ansible.on('close', (code, signal) => {
-      logStream.end();
-      if (signal === 'SIGTERM') {
-        // Process was terminated by your cancel
-        resolve({
-          success: false,
-          status: 'cancelled',
-          message: 'Playbook execution was cancelled by the user.',
-        });
-      } else if (code === 0) {
-        resolve({
-          success: true,
-          status: 'success',
-          message: `Playbook completed successfully: ${logFilePath}`,
-        });
-      } else {
-        resolve({
-          success: false,
-          status: 'error',
-          message: `Playbook failed with code ${code}. See log: ${logFilePath}`,
-        });
-      }
-    });
-
-    ansible.on('error', (err) => {
-      logStream.end();
-      reject(new Error(`Failed to start Ansible process: ${err.message}`));
-    });
-  });
-
-  return { process: ansible, promise };
-}
-
-async function hasOrphanProcesses() {
-  const cmd = `ps -o pid,ppid,comm | awk '$2 == 1 && $1 != 1 && $3 ~ /ansible-play/'`;
-  try {
-    const { stdout } = await exec(cmd);
-    return stdout.trim() !== '';
-  } catch {
-    return false;
-  }
-}
-
 function logWithTimestamp(...args) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}]`, ...args);
@@ -185,14 +38,19 @@ function isValidUrl(urlString) {
   }
 }
 
+// Menu releases use a bare semver tag (0.0.2); asset bundles get one release per
+// OS key (proxmox-ve-8.4-1-x86_64). Both share the GitHub releases namespace, so
+// menu-version listings must ignore non-semver tags.
+function isMenuVersionTag(tag) {
+  return /^v?\d+\.\d+\.\d+$/.test(String(tag || ''));
+}
+
 function getMenuData() {
-  const configPath = '/config/endpoints.yml';
-  if (!fs.existsSync(configPath)) {
-    return { version: 'none', origin: 'none' };
-  }
+  const menuPath = path.join(CONFIG_ROOT, 'menu.yml');
+  if (!fs.existsSync(menuPath)) return { version: 'none', origin: 'none' };
 
   try {
-    const fileContent = fs.readFileSync(configPath, 'utf8');
+    const fileContent = fs.readFileSync(menuPath, 'utf8');
     const yamlData = yaml.load(fileContent);
     const menu = yamlData?.menu || {};
     return {
@@ -200,7 +58,7 @@ function getMenuData() {
       origin: menu.origin || 'none'
     };
   } catch (err) {
-    console.error('Error reading endpoints.yml:', err.message);
+    console.error('Error reading menu config:', err.message);
     return { version: 'none', origin: 'none' };
   }
 }
@@ -222,9 +80,12 @@ function getAssetOrigin() {
     if (parsedUrl.hostname === 'github.com' && parsedUrl.pathname.startsWith('/netbootxyz')) {
       return 'https://github.com/netbootxyz';
     }
-    return parsedUrl.toString();
+    // No trailing slash: callers append path segments (e.g. `origin + path`),
+    // and `new URL(...).toString()` adds a trailing slash for root paths,
+    // producing a `//` double-slash.
+    return parsedUrl.toString().replace(/\/+$/, '');
   } catch (err) {
-    console.error('Invalid URL in endpoints.yml:', err.message);
+    console.error('Invalid URL in menu config:', err.message);
     return origin;
   }
 }
@@ -235,7 +96,7 @@ function getLocalNginx() {
     return cachedNginxURL;
   }
 
-  const configPath = '/config/nginx/site-confs/default';
+  const configPath = path.join(CONFIG_ROOT, 'nginx/site-confs/default');
 
   try {
     const configContent = fs.readFileSync(configPath, 'utf8');
@@ -288,8 +149,9 @@ function getEndpointUrls() {
   endpoint_url = endpoint_url.replace(/\/+$/, '');
 
   // Define API and raw URLs based on endpoint_url
-  let api_url, raw_url;
-  if (endpoint_url.startsWith("https://github.com/")) {
+  let api_url, raw_url, latest_url, menu_download_base;
+  const isGitHub = endpoint_url.startsWith("https://github.com/");
+  if (isGitHub) {
     // For GitHub, construct API and raw URLs
     const match = endpoint_url.match(/github\.com\/([^\/]+)\/([^\/]+)(\/)?$/);
     if (match) {
@@ -302,19 +164,23 @@ function getEndpointUrls() {
       api_url = endpoint_url;
       raw_url = endpoint_url;
     }
+    // GitHub: menu tarball lives with the release assets.
+    latest_url = `${api_url}releases/latest`;
+    menu_download_base = `${endpoint_url}/releases/download`;
   } else {
-    // For other endpoints, just use the base URL
-    api_url = endpoint_url;
-    raw_url = endpoint_url;
+    // For local mirrors / non-GitHub endpoints, keep a trailing slash so
+    // callers can append path segments safely (e.g. `${api_url}releases`).
+    api_url = `${endpoint_url}/`;
+    raw_url = api_url;
+    // Local mirror splits menu/ from assets/.
+    latest_url = `${api_url}menu/latest`;
+    menu_download_base = `${endpoint_url}/menu`;
   }
-
-  // Latest release URL
-  latest_url = `${api_url}releases/latest`;
 
   // console.log("API URL:", api_url);
   // console.log("RAW URL:", raw_url);
   // console.log("Endpoint URL:", endpoint_url);
-  return { endpoint_url, api_url, raw_url, latest_url };
+  return { endpoint_url, api_url, raw_url, latest_url, menu_download_base };
 }
 
 
@@ -337,7 +203,7 @@ function deleteFiles(file) {
   }
 }
 
-async function downloader(downloads, io, socket) {
+async function downloader(downloads, socket) {
   let startTime = new Date();
   const total = downloads.length;
 
@@ -370,8 +236,7 @@ async function downloader(downloads, io, socket) {
     try {
       await dl.start();
     } catch (err) {
-      console.error(`Download failed: ${url} -> ${err.message}`);
-      continue; // move to next even on error
+      throw new Error(`Download failed: ${url} -> ${err.message}`);
     }
 
     // Optional .part2 support (for non-GitHub/S3 hosts)
@@ -408,9 +273,6 @@ async function downloader(downloads, io, socket) {
 }
 
 module.exports = {
-  startAnsiblePlaybook,
-  cancelAnsiblePlaybook,
-  hasOrphanProcesses,
   logWithTimestamp,
   errorWithTimestamp,
   execCommand,
@@ -419,6 +281,7 @@ module.exports = {
   getAssetOrigin,
   getLocalNginx,
   isValidUrl,
+  isMenuVersionTag,
   getEndpointUrls,
   deleteAllFilesInDir,
   deleteFiles,

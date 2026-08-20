@@ -8,15 +8,37 @@ fi
 
 HARD_RELEASE=$1
 
+# The release tarball normally bundles the iPXE artifacts the libvirt network
+# advertises (rom/ipxe/uponlan.xyz-*), built by scripts/build_ipxe_roms.sh. They
+# are not required to ship a menu release: the full pipeline (build_release.sh)
+# builds them first, and the e1000 option ROM is installed on the host
+# separately. Warn if they are absent, but do not block the release.
+ROM_ARTIFACTS=(
+  rom/ipxe/uponlan.xyz-undionly.kpxe   # firmware PXE stage-1 (BIOS)
+  rom/ipxe/uponlan.xyz.kpxe            # iPXE stage-2 (BIOS, dhcp-boot)
+  rom/ipxe/uponlan.xyz.efi             # UEFI network boot
+  rom/ipxe/uponlan.xyz-e1000.rom       # built e1000 option ROM (host install)
+)
+for rel in "${ROM_ARTIFACTS[@]}"; do
+  if [[ ! -s "./release/menus/$rel" ]]; then
+    echo "WARNING: iPXE artifact missing - network boot will not answer: release/menus/$rel" >&2
+  fi
+done
+
 echo -e "\n### Releasing menu version ${HARD_RELEASE} ###\n"
-mkdir -p ./release/githubout
+release_dir="./release/output/menu/${HARD_RELEASE}"
+mkdir -p "$release_dir"
 
 # Set Version
 sed -i -e "s/set menu_version .*$/set menu_version ${HARD_RELEASE}/" ./release/menus/version.ipxe
 
 # ipxe Artefacts
-mv ./release/menus/ipxe/* ./release/githubout/ 2> /dev/null || true
+mv ./release/menus/ipxe/* "$release_dir"/ 2> /dev/null || true
 
-# tar all Menus Artefacts
-tar -czf menus.tar.gz -C ./release/menus .
-mv menus.tar.gz release/githubout/.
+# tar all Menus Artefacts. local-vars.ipxe is a per-deployment override (local
+# mirror endpoint) and must never be baked into a shipped release.
+tar -czf "$release_dir/menus.tar.gz" -C ./release/menus --exclude=local-vars.ipxe .
+
+# GitHub-like releases/latest response so the webapp's local endpoint browser
+# (Menu From Endpoint URL) and dashboard resolve this version like a GitHub API.
+echo "{\"tag_name\":\"${HARD_RELEASE}\"}" > ./release/output/menu/latest

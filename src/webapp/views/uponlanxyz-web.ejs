@@ -1,6 +1,73 @@
 // uponlan.xyz
 // Client side javascript
 
+//// UI Helpers ////
+
+// Toast notifications (Bootstrap 4 toast, auto-dismissing)
+function showToast(message, type) {
+  type = type || 'info';
+  const icons = { success: '✅', danger: '❌', warning: '⚠️', info: 'ℹ️' };
+  const el = document.createElement('div');
+  el.className = 'toast show';
+  el.setAttribute('role', 'alert');
+  el.setAttribute('aria-live', 'assertive');
+  el.setAttribute('aria-atomic', 'true');
+  el.setAttribute('data-autohide', 'true');
+  el.innerHTML =
+    '<div class="toast-header">' +
+      '<strong class="mr-auto text-uppercase small">' + type + '</strong>' +
+      '<button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close"><span aria-hidden="true">&times;</span></button>' +
+    '</div>' +
+    '<div class="toast-body">' + icons[type] + ' ' + message + '</div>';
+  const container = document.getElementById('toast-container');
+  if (container) {
+    container.appendChild(el);
+    setTimeout(function() { el.classList.remove('show'); setTimeout(function() { el.remove(); }, 350); }, 5000);
+  }
+  // Fallback if container is missing (page not fully rendered yet)
+  else {
+    alert(message);
+  }
+}
+
+// Consistent loading state injected into a container
+function showLoading(selector, message) {
+  $(selector).empty().append(
+    '<center class="py-5"><div class="spinner-border text-primary" style="width:3rem;height:3rem;" role="status">' +
+    '<span class="sr-only">Loading...</span></div><br><h5 class="mt-3 text-muted">' + message + '</h5></center>'
+  );
+}
+
+// Highlight active nav item
+function setActiveNav(id) {
+  $('.nav-item').removeClass('active');
+  $('#' + id).addClass('active');
+}
+
+// Delegated click dispatch for data-action buttons (no inline onclick in markup)
+$(document).on('click', '[data-action]', function () {
+  const action = $(this).data('action');
+  const handlers = {
+    'createipxe': createipxe,
+    'devbrowser': devbrowser,
+    'nbbrowser': nbbrowser,
+    'resetmenu': resetmenu,
+    'remoteselect': remoteselect,
+    'remoteclear': remoteclear,
+    'dlremote': dlremote,
+    'localselect': localselect,
+    'localclear': localclear,
+    'deletelocal': deletelocal,
+  };
+  if (handlers[action]) handlers[action]();
+});
+
+// Highlight active nav item and switch pages
+function navTo(page, navId) {
+  setActiveNav(navId);
+  window[page]();
+}
+
 //// Theme Management ////
 function initializeTheme() {
   const savedTheme = localStorage.getItem('saved-theme') || 'light';
@@ -55,7 +122,7 @@ $(document).ready(function(){
 //// Dashboard Page rendering ////
 function renderdash(){
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Dashboard</h2></center>');
+  showLoading('#pagecontent', 'Getting Dashboard');
   socket.emit('getdash');
 }
 socket.on('renderdash', function(response){
@@ -166,6 +233,9 @@ socket.on('renderdash', function(response){
                 <li class="nav-item">\
                   <a class="nav-link log-tab" id="nginx-error-tab" data-toggle="tab" href="#nginx-error-log" role="tab" aria-controls="nginx-error-log" aria-selected="false">Nginx Error Logs</a>\
                 </li>\
+                <li class="nav-item">\
+                  <a class="nav-link log-tab" id="rom-build-tab" data-toggle="tab" href="#rom-build-log" role="tab" aria-controls="rom-build-log" aria-selected="false">ROM Build Log</a>\
+                </li>\
               </ul>\
             </div>\
             <div class="card-body d-flex flex-column log-content">\
@@ -181,6 +251,9 @@ socket.on('renderdash', function(response){
                 </div>\
                 <div class="tab-pane fade h-100" id="nginx-error-log" role="tabpanel" aria-labelledby="nginx-error-tab">\
                   <div id="nginx-error-log-content" class="h-100">Click tab to load logs...</div>\
+                </div>\
+                <div class="tab-pane fade h-100" id="rom-build-log" role="tabpanel" aria-labelledby="rom-build-tab">\
+                  <div id="rom-build-log-content" class="h-100">Click tab to load logs...</div>\
                 </div>\
               </div>\
             </div>\
@@ -213,6 +286,7 @@ socket.on('renderdash', function(response){
   renderLog('#tftp-tab', '#tftplog-content', 'gettftplog', 'rendertftplog');
   renderLog('#nginx-access-tab', '#nginx-access-log-content', 'getnginxaccesslog', 'rendernginxaccesslog');
   renderLog('#nginx-error-tab', '#nginx-error-log-content', 'getnginxerrorlog', 'rendernginxerrorlog');
+  renderLog('#rom-build-tab', '#rom-build-log-content', 'getrombuildlog', 'renderrombuildlog');
   // show the webapp logs tab by default
   $('#webapp-tab').trigger('click');
 
@@ -345,12 +419,11 @@ function upgrademenus(version){
 }
 function downloadmenus(version){
   $('#configcontent').empty();
-  $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Pulling menus at version requested</h2></center>');
+showLoading('#configcontent', 'Pulling menus at version requested');
   socket.emit('upgrademenu', version);
 }
 function downloadmenusnetboot(version){
-  $('#configcontent').empty();
-  $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Pulling menus at version requested</h2></center>');
+  showLoading('#configcontent', 'Pulling menus at version requested');
   socket.emit('upgrademenunetboot', version);
 }
 // Re-render dash hook
@@ -364,7 +437,7 @@ socket.on('renderdashhook', function(){
 let current_menu_version = '0.0.1';
 function renderconfig(){
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Config Items</h2></center>');
+  showLoading('#pagecontent', 'Getting Config Items');
   socket.emit('getconfig');
 }
 socket.on('renderconfig', function(remote_files, local_files, list_rom_files, list_index_files, local_nginx_url, menu_version){
@@ -418,24 +491,24 @@ socket.on('renderconfig', function(remote_files, local_files, list_rom_files, li
           <div class="form-row">
             <div class="col-md-4"></div>
             <div class="col-md-2"><input type="text" class="form-control ipxefilename" placeholder="myfile.ipxe"></div>
-            <div class="col-md-2"><button onclick="createipxe()" class="btn btn-primary form-control">Create New</button></div>
+            <div class="col-md-2"><button data-action="createipxe" class="btn btn-primary form-control">Create New</button></div>
             <div class="col-md-4"></div>
           </div><br>
           <h3>Import a menu:</h3>
           <div class="form-row">
             <div class="col-md-4"></div>
-            <div class="col-md-4"><button onclick="devbrowser()" class="btn btn-outline-info form-control">Menu From Endpoint URL</button></div>
+            <div class="col-md-4"><button data-action="devbrowser" class="btn btn-outline-info form-control">Menu From Endpoint URL</button></div>
             <div class="col-md-4"></div>
           </div><br>
           <div class="form-row">
             <div class="col-md-4"></div>
-            <div class="col-md-4"><button onclick="nbbrowser()" class="btn btn-outline-info form-control">Menu Netboot.xyz</button></div>
+            <div class="col-md-4"><button data-action="nbbrowser" class="btn btn-outline-info form-control">Menu Netboot.xyz</button></div>
             <div class="col-md-4"></div>
           </div><br>
           <h3>Erase menus:</h3>
           <div class="form-row">
             <div class="col-md-4"></div>
-            <div class="col-md-4"><button onclick="resetmenu()" class="btn btn-outline-danger form-control">Reset Menus</button></div>
+            <div class="col-md-4"><button data-action="resetmenu" class="btn btn-outline-danger form-control">Reset Menus</button></div>
             <div class="col-md-4"></div>
           </div>
         </center>
@@ -496,55 +569,22 @@ if ($('#buildModal').length === 0) {
           <div class="modal-body">
             <div id="buildAlertArea"></div>
             <div id="buildFormBody">
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="optionEFI" name="optionEFI" checked>
-                <label class="form-check-label" for="optionEFI">Generate EFI disks</label>
-              </div>
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="optionHybrid" name="optionHybrid">
-                <label class="form-check-label" for="optionHybrid">Generate Hybrid disks</label>
-              </div>
+              <p>Select the boot media formats to build (serial-console iPXE, embedded <code>dhcp → menu.ipxe</code>):</p>
               <div class="form-check">
                 <input type="checkbox" class="form-check-input" id="optionLegacy" name="optionLegacy" checked>
-                <label class="form-check-label" for="optionLegacy">Generate Legacy disks</label>
+                <label class="form-check-label" for="optionLegacy">Legacy (BIOS) — <code>.kpxe</code>, <code>.dsk</code>, <code>.pdsk</code>, <code>.lkrn</code></label>
               </div>
               <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="optionLinux" name="optionLinux">
-                <label class="form-check-label" for="optionLinux">Generate Linux disks</label>
+                <input type="checkbox" class="form-check-input" id="optionEFI" name="optionEFI" checked>
+                <label class="form-check-label" for="optionEFI">EFI (UEFI) — <code>.efi</code>, <code>-snp.efi</code>, <code>-snponly.efi</code></label>
               </div>
               <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="optionRpi" name="optionRpi">
-                <label class="form-check-label" for="optionRpi">Generate Rpi disks</label>
+                <input type="checkbox" class="form-check-input" id="optionISO" name="optionISO">
+                <label class="form-check-label" for="optionISO">ISO — bootable CD/DVD image</label>
               </div>
               <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="optionIndex" name="optionIndex" checked>
-                <label class="form-check-label" for="optionIndex">Generate index.html</label>
-              </div>
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="optionSignatures" name="optionSignatures">
-                <label class="form-check-label" for="optionSignatures">Generate Signatures</label>
-              </div>
-              <hr>
-              <div class="form-group row">
-                <label for="siteNameInput" class="col-md-3 col-form-label text-md-right">Site Name:</label>
-                <div class="col-md-7">
-                  <input id="siteNameInput" type="text" class="form-control" placeholder="uponlan.xyz" autocomplete="off">
-                  <div class="invalid-feedback">This field is required.</div>
-                </div>
-              </div>
-              <div class="form-group row">
-                <label for="bootDomainInput" class="col-md-3 col-form-label text-md-right">Boot Domain:</label>
-                <div class="col-md-7">
-                  <input id="bootDomainInput" type="text" class="form-control" placeholder="boot.uponlan.xyz" autocomplete="off">
-                  <div class="invalid-feedback">This field is required.</div>
-                </div>
-              </div>
-              <div class="form-group row">
-                <label for="bootVersionInput" class="col-md-3 col-form-label text-md-right">Boot Version:</label>
-                <div class="col-md-7">
-                  <input id="bootVersionInput" type="text" class="form-control" placeholder="0.0.x" autocomplete="off">
-                  <div class="invalid-feedback">This field is required.</div>
-                </div>
+                <input type="checkbox" class="form-check-input" id="optionUSB" name="optionUSB">
+                <label class="form-check-label" for="optionUSB">USB — bootable USB image</label>
               </div>
             </div>
             <div id="buildProgressContainer" class="my-4 d-none">
@@ -564,9 +604,45 @@ if ($('#buildModal').length === 0) {
   `);
 }
 
+// Firmware selection modal for the Console tab's Create VM button.
+if ($('#vmFirmwareModal').length === 0) {
+  $('body').append(`
+    <div class="modal fade" id="vmFirmwareModal" tabindex="-1" role="dialog" aria-labelledby="vmFirmwareModalLabel">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="vmFirmwareModalLabel">Create VM — firmware</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p>Select the firmware for the new diskless VM:</p>
+            <button type="button" class="btn btn-outline-dark btn-block text-left mb-2" data-firmware="bios">
+              <strong>BIOS</strong><br>
+              <small>Legacy boot via the e1000 iPXE option ROM.</small>
+            </button>
+            <button type="button" class="btn btn-outline-dark btn-block text-left" data-firmware="efi">
+              <strong>UEFI</strong><br>
+              <small>OVMF boot via the iPXE EFI binary.</small>
+            </button>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+$(document).on('click', '#vmFirmwareModal [data-firmware]', function () {
+  $('#vmFirmwareModal').modal('hide');
+  socket.emit('vm:create', $(this).data('firmware'));
+});
+
 // Show modal on Build button click
 $(document).on('click', '#btnBuild', function () {
-  $('#bootVersionInput').attr('placeholder', current_menu_version);
   $('#buildModal').modal('show');
 });
 
@@ -576,45 +652,6 @@ $(document).on('click', '#cancelBuildBtn', function () {
   $('#buildTaskLabel').text('Cancelling build...');
   $('#buildForm button[type="submit"]').prop('disabled', true); // disable until response
 });
-
-// Focus input when modal fully shown
-$('#buildModal').on('shown.bs.modal', function () {
-  $('#bootVersionInput').trigger('focus');
-});
-
-// --- Version Helpers ---
-function parseSemver(ver) {
-  const match = ver.match(/^(\d+)\.(\d+)\.(\d+)(?:-([a-z]+)(?:\.(\d+))?)?$/i);
-  if (!match) return null;
-
-  return {
-    major: parseInt(match[1], 10),
-    minor: parseInt(match[2], 10),
-    patch: parseInt(match[3], 10),
-    prerelease: match[4] || '',
-    prereleaseNum: match[5] ? parseInt(match[5], 10) : 0
-  };
-}
-
-function isVersionGreater(newVersion, currentVersion) {
-  const nv = parseSemver(newVersion);
-  const cv = parseSemver(currentVersion);
-  if (!nv || !cv) return false;
-
-  for (const key of ['major', 'minor', 'patch']) {
-    if (nv[key] > cv[key]) return true;
-    if (nv[key] < cv[key]) return false;
-  }
-
-  const order = { alpha: 0, beta: 1, '': 2 }; // '' = stable
-  const nvTag = nv.prerelease;
-  const cvTag = cv.prerelease;
-
-  if (order[nvTag] > order[cvTag]) return true;
-  if (order[nvTag] < order[cvTag]) return false;
-
-  return nv.prereleaseNum > cv.prereleaseNum;
-}
 
 // --- Alert Helper ---
 function showAlert(type, message) {
@@ -630,50 +667,19 @@ function showAlert(type, message) {
   document.querySelector(`#buildAlertArea .alert-${type}`)?.scrollIntoView({ behavior: 'smooth' });
 }
 
-// --- Invalid Field Helper ---
-function markInvalid(selector, message) {
-  $(selector).addClass('is-invalid');
-  showAlert('danger', message);
-  return true; // so we can return early
-}
-
 // --- Form Handler ---
 $(document).on('submit', '#buildForm', function (e) {
   e.preventDefault();
 
-  const buildOptions = {
-    generate_disks_efi: $('#optionEFI').is(':checked'),
-    generate_disks_hybrid: $('#optionHybrid').is(':checked'),
-    generate_disks_legacy: $('#optionLegacy').is(':checked'),
-    generate_disks_linux: $('#optionLinux').is(':checked'),
-    generate_disks_rpi: $('#optionRpi').is(':checked'),
-    generate_index: $('#optionIndex').is(':checked'),
-    generate_signatures: $('#optionSignatures').is(':checked'),
-    site_name: $('#siteNameInput').val().trim(),
-    boot_domain: $('#bootDomainInput').val().trim(),
-    boot_version: $('#bootVersionInput').val().trim()
-  };
+  const formats = [];
+  if ($('#optionLegacy').is(':checked')) formats.push('legacy');
+  if ($('#optionEFI').is(':checked')) formats.push('efi');
+  if ($('#optionISO').is(':checked')) formats.push('iso');
+  if ($('#optionUSB').is(':checked')) formats.push('usb');
 
-  // Reset previous states
-  $('#siteNameInput, #bootDomainInput, #bootVersionInput').removeClass('is-invalid').removeAttr('aria-invalid');
-
-  // Validate required fields
-  if (!buildOptions.site_name) return markInvalid('#siteNameInput', 'Site Name is required.');
-  if (!buildOptions.boot_domain) return markInvalid('#bootDomainInput', 'Boot Domain is required.');
-
-  const semverRegex = /^\d+\.\d+\.\d+(-(?:alpha|beta)(\.\d+)?)?$/;
-  if (!buildOptions.boot_version) return markInvalid('#bootVersionInput', 'Boot Version is required.');
-  if (!semverRegex.test(buildOptions.boot_version)) {
-    return markInvalid(
-      '#bootVersionInput',
-      'Boot Version must follow format <strong>X.Y.Z</strong> or <strong>X.Y.Z-alpha.N</strong>/<strong>X.Y.Z-beta.N</strong>.'
-    );
-  }
-  if (!isVersionGreater(buildOptions.boot_version, current_menu_version)) {
-    return markInvalid(
-      '#bootVersionInput',
-      `Boot Version must be greater than current version <strong>${current_menu_version}</strong>.`
-    );
+  if (formats.length === 0) {
+    showAlert('danger', 'Select at least one format to build.');
+    return;
   }
 
   // Submit the build
@@ -682,7 +688,7 @@ $(document).on('submit', '#buildForm', function (e) {
   $('#buildProgressContainer').removeClass('d-none');
   $('#buildProgressBar').removeClass('bg-danger').addClass('bg-success').css('width', '0%').text('0%');
   $('#buildTaskLabel').text('Initializing...');
-  socket.emit('buildsubmit', buildOptions);
+  socket.emit('buildsubmit', { formats: formats.join(',') });
 });
 
 // Progress updates
@@ -755,14 +761,13 @@ function resetBuildModal() {
     .text('0%');
   $('#buildTaskLabel').text('');
   $('#buildAlertArea').html('');
-  $('#siteNameInput, #bootDomainInput, #bootVersionInput').removeClass('is-invalid');
 }
 
 // Empty menu
 function resetmenu() {
   if (confirm('Are you sure you want to reset the menu?')) {
     $('#configcontent').empty();
-    $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Empty Menu</h2></center>');
+    showLoading('#configcontent', 'Empty Menu');
     socket.emit('emptymenu');
     // Refresh the config page after a short delay
     setTimeout(renderconfig, 1000)
@@ -771,7 +776,7 @@ function resetmenu() {
 // Render edit window
 function editgetfile(filename,islocal){
   $('#configcontent').empty();
-  $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting File Contents</h2></center>');
+  showLoading('#configcontent', 'Getting File Contents');
   socket.emit('editgetfile',filename,islocal);
 }
 socket.on('editrenderfile', function(response,filename,metadata){
@@ -816,13 +821,13 @@ function saveconfig(filename){
   var text = editor.getValue();
   socket.emit('saveconfig',filename,text);
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Saving File</h2></center>');
+  showLoading('#pagecontent', 'Saving File');
 }
 // Delete a local file (revert)
 function revertconfig(filename){
   socket.emit('revertconfig',filename);
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Reverting File</h2></center>');
+  showLoading('#pagecontent', 'Reverting File');
 }
 // Create a new file
 function createipxe(){
@@ -830,13 +835,13 @@ function createipxe(){
   if (filename){
   socket.emit('createipxe',filename);
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Creating File</h2></center>');
+  showLoading('#pagecontent', 'Creating File');
   }
 }
 // Render edit window DEV Menus From var ENDPOINT_URL
 function devbrowser(){
   $('#configcontent').empty();
-  $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Remote Development Versions</h2></center>');
+  showLoading('#configcontent', 'Getting Remote Development Versions');
   socket.emit('devgetbrowser');
 }
 socket.on('devrenderbrowser', function(releases){
@@ -880,7 +885,7 @@ socket.on('devrenderbrowser', function(releases){
 // Render edit window DEV Menus From Netboot.xyz github
 function nbbrowser(){
   $('#configcontent').empty();
-  $('#configcontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Remote Netboot.xyz Versions</h2></center>');
+  showLoading('#configcontent', 'Getting Remote Netboot.xyz Versions');
   socket.emit('nbgetbrowser');
 }
 socket.on('nbrenderbrowser', function(releases,commits){
@@ -951,7 +956,7 @@ socket.on('renderconfighook', function(){
 //// Local rendering ////
 function renderlocal(){
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting Remote file list</h2></center>');
+  showLoading('#pagecontent', 'Getting Remote file list');
   socket.emit('getlocal');
 }
 socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotemenuorigin,remoteassetorigin,localnginxurl){
@@ -961,13 +966,14 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
     <div class="card">
       <div class="card-header">
         Remote Assets at <a target="_blank" href="${remotemenuorigin}/releases/${remotemenuversion}">${remotemenuversion}</a>
+        <span class="badge badge-secondary ml-2">${endpoints.endpoints ? Object.keys(endpoints.endpoints).length : 0} endpoints</span>
         <br>
         <span style="float:right;">
           <div class="form-row">
             <div class="col"><input type="text" class="form-control form-control-sm" id="remotesearch" placeholder="Filter.."></div>
-            <div class="col"><button onclick="remoteselect()" class="btn btn-primary btn-sm form-control form-control-sm">Select All</button></div>
-            <div class="col"><button onclick="remoteclear()" class="btn btn-secondary btn-sm form-control form-control-sm">Clear Selection</button></div>
-            <div class="col"><button onclick="dlremote()" class="btn btn-success btn-sm form-control form-control-sm">Pull Selected</button></div>
+            <div class="col"><button data-action="remoteselect" class="btn btn-primary btn-sm form-control form-control-sm">Select All</button></div>
+            <div class="col"><button data-action="remoteclear" class="btn btn-secondary btn-sm form-control form-control-sm">Clear Selection</button></div>
+            <div class="col"><button data-action="dlremote" class="btn btn-success btn-sm form-control form-control-sm">Pull Selected</button></div>
           </div>
         </span>
       </div>
@@ -990,14 +996,14 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
         <span style="float:right;">
           <div class="form-row">
             <div class="col"><input type="text" class="form-control form-control-sm" id="localsearch" placeholder="Filter.."></div>
-            <div class="col"><button onclick="localselect()" class="btn btn-primary btn-sm form-control form-control-sm">Select All</button></div>
-            <div class="col"><button onclick="localclear()" class="btn btn-secondary btn-sm form-control form-control-sm">Clear Selection</button></div>
-            <div class="col"><button onclick="deletelocal()" class="btn btn-danger btn-sm form-control form-control-sm">Delete Selected</button></div>
+            <div class="col"><button data-action="localselect" class="btn btn-primary btn-sm form-control form-control-sm">Select All</button></div>
+            <div class="col"><button data-action="localclear" class="btn btn-secondary btn-sm form-control form-control-sm">Clear Selection</button></div>
+            <div class="col"><button data-action="deletelocal" class="btn btn-danger btn-sm form-control form-control-sm">Delete Selected</button></div>
           </div>
         </span>
       </div>
       <div class="card-body">
-        <table class="table table-sm" id="localassets" style=".dataTables_filter {display:none;}">
+        <table class="table table-sm" id="localassets">
           <thead>
             <tr>
               <th style="width: 35%;">Asset Name</th>
@@ -1006,7 +1012,7 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
             </tr>
           </thead>
         </table>
-        <table class="table table-sm" id="untrackedassets" style=".dataTables_filter {display:none;}">
+        <table class="table table-sm" id="untrackedassets">
           <thead>
             <tr>
               <th>Untracked Assets</th>
@@ -1030,23 +1036,31 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
   localtable.clear();
   remotetable.clear();
   $.each(endpoints.endpoints, function(index,value){
+    // URL path (relative to origin) → filesystem path under /assets. The local
+    // mirror serves assets at /assets/<key>/ on the origin but stores them
+    // under /assets/<key>/ (nginx serves /assets at its root), so drop the
+    // leading assets/ namespace when matching local files.
+    var fsPath = value.path.replace(/^\/assets\//, '/');
+    // Display key = last path segment (e.g. harvester-v1.7.3-x86_64), works for
+    // both /releases/download/<key>/ (GitHub) and /assets/<key>/ (local).
+    var displayKey = value.path.split('/').filter(function(s){ return s; }).pop();
     $.each(value.files, function( arrindex, file ) {
-      if (localfiles.includes(value.path + file)){
+      if (localfiles.includes(fsPath + file)){
         localtable.row.add( 
           [
             index,
-            value.path.split('download/')[1] + file,
-            '<span style="float:right;"><input type="checkbox" class="form-check-input localcheck" value="' + value.path + file + '"></span>'
+            displayKey + '/' + file,
+            '<span style="float:right;"><input type="checkbox" class="form-check-input localcheck" value="' + fsPath + file + '"></span>'
 
           ]
         );
-        localfiles.splice( localfiles.indexOf(value.path + file), 1 );
+        localfiles.splice( localfiles.indexOf(fsPath + file), 1 );
       }
       else{
         remotetable.row.add( 
           [
             index,
-            '<a href="' + remoteassetorigin + value.path + file + '" target="_blank">' + value.path.split('download/')[1] + file + '</a>',
+            '<a href="' + remoteassetorigin + value.path + file + '" target="_blank">' + displayKey + '/' + file + '</a>',
             '<span style="float:right;"><input type="checkbox" class="form-check-input remotecheck" value="' + value.path + file + '"></span>'
           ]
         );
@@ -1069,12 +1083,13 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
   }
   remotetable.draw();
   localtable.draw();
-  $('#localsearch').keyup(function(){
-    localtable.search($(this).val()).draw() ;
-  })
-  $('#remotesearch').keyup(function(){
-    remotetable.search($(this).val()).draw() ;
-  })
+  // Debounced per-table filters
+  const debounceSearch = function(fn, delay) {
+    let t;
+    return function() { clearTimeout(t); t = setTimeout(fn, 150); };
+  };
+  $('#localsearch').keyup(debounceSearch(function(){ localtable.search($('#localsearch').val()).draw(); }));
+  $('#remotesearch').keyup(debounceSearch(function(){ remotetable.search($('#remotesearch').val()).draw(); }));
 });
 function remoteselect(){   
   $('.remotecheck').each(function() {
@@ -1108,10 +1123,18 @@ function dlremote(){
     }
   }).promise().done(function(){
     if(dlfiles.length != 0){
+      showToast('Pulling ' + dlfiles.length + ' file(s)...', 'info');
       socket.emit('dlremote',dlfiles);
+    } else {
+      showToast('Select at least one remote asset first', 'warning');
     }
   });
 }
+// After a pull completes, re-render so assets move to the Local column
+socket.on('dlremotedone', function(){
+  showToast('Download finished', 'success');
+  renderlocal();
+});
 // Re-render local hook
 socket.on('renderlocalhook', function(){
   if($('#localassets').length){
@@ -1139,7 +1162,7 @@ socket.on('dldata', function(url, count, stats){
   $('#statusbar').empty();
 $('#statusbar').append('\
   <div class="row">\
-    <div class="col-2">' + count[0] + ' of ' + count[1] + '</div>\
+    <div class="col-auto pr-1 text-nowrap small">' + count[0] + ' of ' + count[1] + '</div>\
     <div class="col-10">\
       <div class="progress mb-1">\
         <div class="progress-bar" role="progressbar" style="width: ' + stats.progress + '%;" aria-valuenow="' + stats.progress + '" aria-valuemin="0" aria-valuemax="100"></div>\
@@ -1153,48 +1176,68 @@ socket.on('purgestatus', function(){
 });
 
 //// Render Docs ////
-function renderTree(tree, parentPath = '', level = 0) {
-  let html = '<ul class="nav flex-column">';
+function prettyLabel(key) {
+  // Filenames use `-` as a word separator (e.g. `02-PXE-Basics.md` ->
+  // `PXE-Basics`); render them as human words in the sidebar.
+  return key.replace(/-/g, ' ');
+}
 
-  for (const key in tree) {
-    if (key === '__file') continue;
+// Stable, collision-free id for a folder collapse target (key may be `UpOnLAN.xyz`,
+// `iPXE`, …). Folders are keyed by their path so nested folders stay unique.
+function folderId(pathPrefix, key) {
+  const slug = (pathPrefix + key).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return 'doc-folder-' + (slug || 'root');
+}
 
+// Explicit per-entry icons, keyed by the prettified label; anything not listed
+// falls back to a folder/file glyph.
+const TOC_ICONS = {
+  'UpOnLAN.xyz': '🏠', 'iPXE': '🥾', 'Networks': '🌐',
+  'Getting Started': '🏁', 'PXE Basics': '📡', 'Assets': '📦',
+  'Overview': '📖', 'DHCP': '🔌',
+  'Quick Start': '⚡', 'Menu Scripting': '📝', 'ROM Build': '💿',
+  'Development': '🧱', 'Deployment': '🚀', 'Operations': '🔄',
+  'CI': '🔧', 'Troubleshoot': '🐛', 'Contribute': '🤝',
+};
+
+function iconFor(label, isFolder) {
+  return TOC_ICONS[label] || (isFolder ? '📁' : '📄');
+}
+
+function renderTree(tree, level = 0, pathPrefix = '') {
+  const keys = Object.keys(tree).filter((k) => k !== '__file');
+  let html = '';
+
+  for (const key of keys) {
     const node = tree[key];
-    const fullPath = node.__file || `${parentPath}/${key}`;
-
-    const padding = 15 * level; // 15px indent per level
-
-    html += `<li class="nav-item" style="padding-left: ${padding}px;">`;
+    const label = prettyLabel(key);
+    const icon = iconFor(label, !node.__file);
+    const pad = 12 + level * 16; // indent nested entries under their folder
 
     if (node.__file) {
-      html += `<a href="#" class="nav-link doc-link" data-doc="${node.__file}">${key}</a>`;
+      html += `<div class="bd-toc-item">
+        <a href="#" class="bd-toc-link doc-link" data-doc="${node.__file}" style="padding-left:${pad}px;">${icon} ${label}</a>
+      </div>`;
     } else {
-      html += `<strong>${key}</strong>`;
+      // Folder: a collapsible group header (accordion, like the menu editor).
+      const id = folderId(pathPrefix, key);
+      html += `<div class="bd-toc-item">
+        <button type="button" class="btn btn-link btn-block text-left bd-toc-link font-weight-bold text-secondary" style="padding-left:${pad}px;" data-toggle="collapse" data-target="#${id}" aria-expanded="true" aria-controls="${id}">
+          ${icon} ${label}
+        </button>
+        <div class="collapse show" id="${id}">
+          ${renderTree(node, level + 1, pathPrefix + key + '/')}
+        </div>
+      </div>`;
     }
-
-    const hasChildren = Object.keys(node).some(k => k !== '__file');
-    if (hasChildren) {
-      html += renderTree(node, fullPath, level + 1);
-    }
-
-    html += `</li>`;
   }
 
-  html += '</ul>';
   return html;
 }
 
 function renderdoc() {
   $('#pagecontent').empty();
-  $('#pagecontent').append(`
-    <center>
-      <div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status">
-        <span class="sr-only">Loading...</span>
-      </div>
-      <br>
-      <h2>Loading Docs</h2>
-    </center>
-  `);
+  showLoading('#pagecontent', 'Loading Docs');
   socket.emit('docs:list');
 }
 socket.on('docs:list:response', function(docs) {
@@ -1262,29 +1305,43 @@ socket.on('docs:list:response', function(docs) {
 });
 function loaddoc(filename) {
   $('#doc-viewer').html(`
-    <div class="text-center">
-      <div class="spinner-border" role="status"></div>
-      <p>Loading <strong>${filename}</strong>...</p>
+    <div class="text-center py-5">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="text-muted mt-2">Loading <strong>${filename}</strong>...</p>
     </div>
   `);
   socket.emit('docs:get', filename);
 }
 // Handle document content response
 socket.on('docs:get:response', function({ filename, content }) {
-  const htmlContent = typeof marked !== 'undefined' ? marked.parse(content) : `<pre>${content}</pre>`;
-  $('#doc-viewer').html(`${htmlContent}`);
+  // content is already server-rendered HTML (docServices.getDocContent).
+  // Inject directly: re-parsing HTML as markdown mangles code blocks that
+  // contain blank lines (e.g. '# comment' lines re-render as <h1> headings).
+  $('#doc-viewer').html(content);
+});
+
+// Internal doc links: [foo](path/to/foo.md) navigate through the viewer.
+// The server strips leading ../ and appends .md if missing; we just decode
+// %20-style encoding and drop any #anchor before emitting. Delegated on
+// document because #doc-viewer is created lazily (first docs:list response),
+// so binding it at load time would attach to nothing.
+$(document).on('click', '#doc-viewer a', function(e) {
+  const href = $(this).attr('href');
+  if (href && href.split('#')[0].endsWith('.md')) {
+    e.preventDefault();
+    loaddoc(decodeURIComponent(href.split('#')[0]));
+  }
 });
 
 //// Render WOL page ////
 
 // Display Error message if any
 socket.on('error', function(msg){
-  // Show the error if the WOL form is visible
+  // Show the error in the WOL form if visible, else a toast
   if ($('#wol-error').length) {
     $('#wol-error').text(msg).show();
   } else {
-    // Fallback: alert if not on WOL page
-    alert(msg);
+    showToast(msg, 'danger');
   }
 });
 
@@ -1297,7 +1354,7 @@ socket.on('renderwolhook', function(){
 
 function renderwol(){
   $('#pagecontent').empty();
-  $('#pagecontent').append('<center><div class="spinner-grow" style="width: 3rem; height: 3rem;" role="status"><span class="sr-only">Loading...</span></div><br><h2>Getting WOL</h2></center>');
+  showLoading('#pagecontent', 'Getting WOL');
   socket.emit('getwol');
 }
 socket.on('renderwol', function(wolpoints, remotemenuversion){
@@ -1380,3 +1437,103 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
     }
   });
 });
+
+//// Render VM Console (serial console via xterm.js) ////
+let vmTerm = null;
+
+// Size the terminal to fill its container. xterm.js otherwise defaults to
+// 80x24, which leaves most of the card empty (the "half console" look).
+// Cell metrics come from the renderer once it has painted; fall back to a
+// rough estimate before that (re-fitted on the next animation frame).
+function fitVmConsole() {
+  if (!vmTerm) return;
+  const el = document.getElementById('vm-console');
+  if (!el) return;
+  const renderer = vmTerm._core && vmTerm._core._renderService;
+  const dims = renderer && renderer.dimensions;
+  const cellW = (dims && dims.css.cell.width) || 8;
+  const cellH = (dims && dims.css.cell.height) || 16;
+  const cols = Math.max(2, Math.floor(el.clientWidth / cellW));
+  const rows = Math.max(1, Math.floor(el.clientHeight / cellH));
+  try { vmTerm.resize(cols, rows); } catch (e) {}
+}
+window.addEventListener('resize', fitVmConsole);
+
+// Module-level socket listeners (registered once, like the other pages).
+socket.on('vm:status', function(data) {
+  let note = '';
+  if (data.hasConsole === false) note = ' (no pty serial console configured)';
+  if (data.state === 'not found') note = ' (VM not defined on host)';
+  $('#vm-state').text(data.name + ': ' + data.state + note);
+  if (data.error) showToast(data.error, 'danger');
+});
+socket.on('vm:action:result', function(res) {
+  if (res.ok && (res.action === 'on' || res.action === 'create' || res.action === 'restart')) {
+    // VM booted/created/restarted — reconnect the serial console (stale session is force-replaced).
+    setTimeout(function() { socket.emit('vm:console:start'); }, 2000);
+  } else if (res.ok && res.action === 'off') {
+    socket.emit('vm:console:stop');
+  } else if (!res.ok) {
+    showToast(res.message, 'danger');
+  }
+});
+socket.on('vm:console:data', function(data) {
+  if (vmTerm) vmTerm.write(data);
+});
+socket.on('vm:console:close', function() {
+  if (vmTerm) vmTerm.write('\r\n[console detached]\r\n');
+});
+
+function renderconsole() {
+  $('#pagecontent').empty();
+  $('#pagecontent').append(`
+    <div class="card">
+      <div class="card-header">VM Console</div>
+      <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+          <button class="btn btn-outline-success btn-sm mr-2" onclick="vmCreate()">Create VM</button>
+          <button class="btn btn-outline-danger btn-sm mr-2" onclick="vmDestroy()">Destroy VM</button>
+          <button class="btn btn-outline-primary btn-sm mr-2" onclick="vmRestart()">Restart VM</button>
+          <span id="vm-state" class="text-muted ml-2"></span>
+        </div>
+        <div id="vm-console" style="height:72vh; min-height:420px; background:#000;"></div>
+        <div class="text-muted mt-2 small">
+          Serial console of the test VM. Interact with the iPXE menu via keyboard
+          (arrow keys / numbers / Enter). Text only — no graphical output.
+        </div>
+      </div>
+    </div>
+  `);
+
+  // Re-attach cleanly if the page was rendered before.
+  socket.emit('vm:console:stop');
+  socket.emit('vm:status');
+
+  if (vmTerm) vmTerm.dispose();
+  vmTerm = new Terminal({
+    cursorBlink: true,
+    fontSize: 13,
+    theme: { background: '#000', foreground: '#e0e0e0' },
+  });
+  vmTerm.open(document.getElementById('vm-console'));
+  vmTerm.onData(function(data) {
+    socket.emit('vm:console:input', data);
+  });
+  // Cell metrics aren't available until the first paint; fit then (and on resize).
+  requestAnimationFrame(function() { fitVmConsole(); });
+  socket.emit('vm:console:start');
+}
+
+function vmCreate() {
+  $('#vmFirmwareModal').modal('show');
+}
+
+function vmRestart() {
+  socket.emit('vm:power', 'restart');
+}
+
+function vmDestroy() {
+  if (confirm('Permanently remove the test VM? This cannot be undone.')) {
+    socket.emit('vm:destroy');
+  }
+}

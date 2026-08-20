@@ -3,81 +3,53 @@ name: release
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  release_menu:
+  release:
     name: Release Menu
     runs-on: ubuntu-latest
-    if: github.repository == 'mozebaltyk/uponlan'
-    permissions:
-      actions: write
-      checks: write
-      contents: write
-      deployments: write
-      packages: write
-      id-token: write
     steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: main
+      - uses: actions/checkout@v4
+        with:
+          ref: main
 
-    - name: Get current webapp version
-      id: get_version
-      run: echo "TAG_VERSION=$(jq -r '.version' ./uponlan/src/webapp/package.json)" >> $GITHUB_OUTPUT
+      - name: Get menu version
+        id: version
+        run: echo "tag=$(sed -n 's/^set menu_version //p' release/menus/version.ipxe)" >> "$GITHUB_OUTPUT"
 
-    - name: Check if tag exists
-      id: check_tag
-      run: echo "TAG_EXISTS=$(git tag | grep ${{ steps.get_version.outputs.TAG_VERSION }})" >> $GITHUB_OUTPUT
+      - name: Fail if tag already exists
+        run: |
+          if git tag --list "${{ steps.version.outputs.tag }}" | grep -q .; then
+            echo "ERROR: git tag ${{ steps.version.outputs.tag }} already exists" >&2
+            exit 1
+          fi
 
-    - name: Fail if tag exists
-      env:
-        tag_version: ${{ steps.get_version.outputs.TAG_VERSION }}
-        tag_exists: ${{ steps.check_tag.outputs.TAG_EXISTS }}
-      if: ${{ steps.get_version.outputs.TAG_VERSION == steps.check_tag.outputs.TAG_EXISTS }}
-      uses: actions/github-script@v7
-      with:
-        script: |
-            core.setFailed('Release tag already exists in git (tag_exists var: ${tag_exists} and tag_version: ${tag_version})')
+      - name: Install iPXE build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential binutils liblzma-dev xz-utils curl
 
-    - name: Set release tag
-      run: echo "release_tag=${{ steps.get_version.outputs.TAG_VERSION }}" >> $GITHUB_ENV
+      # Menu release only: build the iPXE ROMs (baked into menus.tar.gz by
+      # release_menu.sh) then pack the menus. Asset bundles are released
+      # independently by assets.yml; the menu just *points* at them.
+      - name: Build iPXE ROMs
+        run: ./scripts/build_ipxe_roms.sh
 
-    - name: Build Menu release
-      run: |
-        echo "Building release for version ${{ steps.get_version.outputs.TAG_VERSION }}"
-        ./scripts/release_menu.sh ${{ steps.get_version.outputs.TAG_VERSION }}
+      - name: Build Menu release
+        run: ./scripts/release_menu.sh "${{ steps.version.outputs.tag }}"
 
-    - name: Extract release notes
-      id: extract-release-notes
-      uses: ffurrer2/extract-release-notes@v2
+      - name: Extract release notes
+        id: notes
+        uses: ffurrer2/extract-release-notes@v2
 
-    - name: Create Release/Assets for Menu
-      uses: svenstaro/upload-release-action@v2
-      with:
-        file: release/githubout/*
-        file_glob: true
-        overwrite: true
-        prerelease: false
-        release_name: ${{ env.release_tag }}
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        tag: ${{ env.release_tag }}
-        body: ${{ steps.extract-release-notes.outputs.release_notes }}
-
-#  release_assets:
-#    name: Release Assets
-#    runs-on: ubuntu-latest
-#
-#    steps:
-#    - uses: actions/checkout@v4
-#      with:
-#        ref: main
-#
-#    - name: Create release and upload assets
-#      uses: softprops/action-gh-release@v2
-#      with:
-#        tag_name: ${{ env.GITHUB_TAG }}
-#        name: ${{ env.GITHUB_TAG }}
-#        draft: false
-#        prerelease: false
-#        files: buildout/*
-#        token: ${{ secrets.GITHUB_TOKEN }}
-#        body_path: ${{ github.workspace }}-CHANGELOG.txt
+      - name: Create release and upload menu
+        uses: svenstaro/upload-release-action@v2
+        with:
+          file: release/output/menu/${{ steps.version.outputs.tag }}/menus.tar.gz
+          file_glob: false
+          overwrite: true
+          prerelease: false
+          release_name: ${{ steps.version.outputs.tag }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.version.outputs.tag }}
+          body: ${{ steps.notes.outputs.release_notes }}

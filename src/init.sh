@@ -7,7 +7,7 @@ mkdir -p \
   /logs/nginx \
   /logs/tftp \
   /logs/webapp \
-  /logs/ansible \
+  /logs/rom \
   /run \
   /var/lib/nginx/tmp/client_body \
   /var/tmp/nginx \
@@ -34,9 +34,20 @@ else
   fi
 fi
 
-# Import menus
-echo "[uponlanxyz-init] Import menu from ${ENDPOINT_URL} version ${MENU_VERSION}"
-curl -L ${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz -o /config/menus/menus.tar.gz
+# Import menus: use a staged tarball (bind-mounted by test-local) if present, else download
+if [[ -f /config/menus.tar.gz ]]; then
+  echo "[uponlanxyz-init] Using staged menus.tar.gz (local test)"
+else
+  # GitHub serves release assets at /releases/download/<tag>/; the local mirror
+  # (deploy --local) splits menu/ from assets/.
+  if [[ "${ENDPOINT_URL}" == *github.com* ]]; then
+    menu_tarball_url="${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz"
+  else
+    menu_tarball_url="${ENDPOINT_URL}/menu/${MENU_VERSION}/menus.tar.gz"
+  fi
+  echo "[uponlanxyz-init] Import menu from ${ENDPOINT_URL} version ${MENU_VERSION}"
+  curl -L ${menu_tarball_url} -o /config/menus/menus.tar.gz
+fi
 
 # Extract menus if exists
 if [[ ! -f /config/menus/menus.tar.gz ]]; then
@@ -45,25 +56,38 @@ else
   echo "[uponlanxyz-init] Extracting menus.tar.gz"
   tar -xzf /config/menus/menus.tar.gz -C /config/menus/remote
   rm -f /config/menus/menus.tar.gz
-  if [[ -f /config/menus/remote/endpoints.yml ]]; then
-    mv /config/menus/remote/endpoints.yml /config/endpoints.yml
-    echo "[uponlanxyz-init] Extracted endpoints.yml"
-  else
-    echo "[uponlanxyz-init] No endpoints.yml found in extracted menus"
-  fi
-  cp /config/menus/remote/* /config/menus/
+  # -r is required: the tarball contains the rom/ipxe/ directory and a plain
+  # `cp` silently omits directories, leaving the TFTP root without the iPXE
+  # ROMs the network advertises (UEFI/firmware-PXE boot then fails).
+  cp -r /config/menus/remote/* /config/menus/
 fi
 
-# Ensure endpoints.yml exists
+# Ensure endpoints.yml exists from the asset-side release output
 if [[ ! -f /config/endpoints.yml ]]; then
-  echo "[uponlanxyz-init] No endpoints.yml found, creating a default one"
-  echo "menu: {}" > /config/endpoints.yml
+  if [[ "${ENDPOINT_URL}" == *github.com* ]]; then
+    # The asset catalog is published by assets.yml as a release asset on the
+    # stable 'assets' tag (prerelease, so it never shadows the menu's latest).
+    endpoint_catalog_url="${ENDPOINT_URL}/releases/download/assets/endpoints.yml"
+  else
+    endpoint_catalog_url="${ENDPOINT_URL}/assets/endpoints.yml"
+  fi
+  echo "[uponlanxyz-init] Import endpoints.yml from ${endpoint_catalog_url}"
+  if ! curl -fsL ${endpoint_catalog_url} -o /config/endpoints.yml; then
+    echo "[uponlanxyz-init] No endpoints.yml found from asset release, creating a default one"
+    echo "endpoints: {}" > /config/endpoints.yml
+  fi
 fi
 
-# Apply patches using yq
-yq -i ".menu.title = \"${TITLE:-UpOnLAN.xyz}\"" /config/endpoints.yml
-yq -i ".menu.version = \"${MENU_VERSION}\"" /config/endpoints.yml
-yq -i ".menu.origin = \"${ENDPOINT_URL:-https://github.com/mozebaltyk/uponlan}\"" /config/endpoints.yml
+# Ensure menu.yml exists
+if [[ ! -f /config/menu.yml ]]; then
+  echo "[uponlanxyz-init] No menu.yml found, creating a default one"
+  echo "menu: {}" > /config/menu.yml
+fi
+
+# Apply menu metadata using yq
+yq -i ".menu.title = \"${TITLE:-UpOnLAN.xyz}\"" /config/menu.yml
+yq -i ".menu.version = \"${MENU_VERSION}\"" /config/menu.yml
+yq -i ".menu.origin = \"${ENDPOINT_URL:-https://github.com/mozebaltyk/uponlan}\"" /config/menu.yml
 
 # init wol.yml
 if [[ ! -f /config/wol.yml ]]; then

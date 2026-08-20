@@ -1,8 +1,10 @@
+'use strict';
 const {
   getWebLog,
   getTftpLog,
   getNginxAccessLog,
   getNginxErrorLog,
+  getRomBuildLog,
 } = require('../services/logServices');
 
 module.exports = function registerLogHandlers(socket) {
@@ -28,5 +30,11 @@ module.exports = function registerLogHandlers(socket) {
   socket.on('getnginxerrorlog', () => {
     const log = getNginxErrorLog();
     socket.emit('rendernginxerrorlog', log);
+  });
+
+  // ROM / boot-media build log (most recent)
+  socket.on('getrombuildlog', () => {
+    const log = getRomBuildLog();
+    socket.emit('renderrombuildlog', log);
   });
 };

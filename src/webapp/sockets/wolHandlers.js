@@ -1,3 +1,4 @@
+'use strict';
 const wolService = require('../services/wolServices');
 
 module.exports = function registerWolHandlers(socket) {

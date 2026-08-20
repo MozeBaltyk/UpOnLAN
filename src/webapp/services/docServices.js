@@ -1,9 +1,10 @@
 // ../services/docService.js
+'use strict';
 const fs = require('fs').promises;
 const path = require('path');
 const marked = require('marked');
 
-const DOCS_DIR = path.resolve('/docs');
+const DOCS_DIR = path.resolve(process.env.UPONLAN_DOCS || '/docs');
 
 // Recursively get all .md files with relative paths
 async function listDocs(dir = DOCS_DIR, baseDir = DOCS_DIR) {
@@ -41,7 +42,7 @@ function buildTree(paths) {
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       const isFile = part.endsWith('.md');
-      const name = part.replace(/\.md$/, '');
+      const name = part.replace(/\.md$/, '').replace(/^\d{2}-/, '');
 
       if (i === parts.length - 1) {
         // Leaf node

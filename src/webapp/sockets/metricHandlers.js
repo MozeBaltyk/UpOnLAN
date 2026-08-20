@@ -1,26 +1,29 @@
 // ../sockets/metricHandlers.js
+'use strict';
 const { getNginxMetrics, getTftpMetrics, } = require('../services/metricServices');
 
-module.exports = function registerMetricHandlers(socket) {
-  const sendMetrics = () => {
-    const nginx = getNginxMetrics();
-    const tftp = getTftpMetrics();
+const METRICS_POLL_MS = 10000;
+let broadcastTimer = null;
 
-    socket.emit('metrics:update', {
-      timestamp: Date.now(),
-      nginx: nginx || { accepts: 0, handled: 0, requests: 0, active: 0, timestamp: Date.now() },
-      tftp: tftp || { requests: 0, timestamp: Date.now() },
-    });
+function buildMetricsPayload() {
+  const nginx = getNginxMetrics();
+  const tftp = getTftpMetrics();
+
+  return {
+    timestamp: Date.now(),
+    nginx: nginx || { accepts: 0, handled: 0, requests: 0, active: 0, timestamp: Date.now() },
+    tftp: tftp || { requests: 0, timestamp: Date.now() },
   };
+}
 
-  // Emit on a 10s interval
-  const interval = setInterval(sendMetrics, 10000);
+module.exports = function registerMetricHandlers(io, socket) {
+  // One shared broadcast timer for every connected socket instead of one
+  // interval per socket (N tabs did N identical emits per tick). Skipped
+  // under test so no stray timers keep the process alive.
+  if (broadcastTimer === null && process.env.NODE_ENV !== 'test') {
+    broadcastTimer = setInterval(() => io.emit('metrics:update', buildMetricsPayload()), METRICS_POLL_MS);
+  }
 
-  // Optionally emit once immediately
-  sendMetrics();
-
-  // Cleanup
-  socket.on('disconnect', () => {
-    clearInterval(interval);
-  });
+  // Immediate snapshot so a freshly connected dashboard renders right away.
+  socket.emit('metrics:update', buildMetricsPayload());
 };

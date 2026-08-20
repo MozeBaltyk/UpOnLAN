@@ -1,4 +1,5 @@
 // ../sockets/socketHandlers.js
+'use strict';
 const registerDashboardHandlers = require('./dashboardHandlers');
 const registerWolHandlers = require('./wolHandlers');
 const registerMenuHandlers = require('./menuHandlers');
@@ -6,6 +7,7 @@ const registerAssetHandlers = require('./assetHandlers');
 const registerLogHandlers = require('./logHandlers');
 const registerMetricHandlers = require('./metricHandlers');
 const registerDocHandlers = require('./docHandlers');
+const registerVmHandlers = require('./vmHandlers');
 
 module.exports = function(io) {
   io.on('connection', (socket) => {
@@ -18,8 +20,9 @@ module.exports = function(io) {
     registerMenuHandlers(socket, io);
     registerAssetHandlers(socket, io);
     registerLogHandlers(socket, io);
-    registerMetricHandlers(socket);
+    registerMetricHandlers(io, socket);
     registerWolHandlers(socket);
     registerDocHandlers(socket);
+    registerVmHandlers(socket);
   });
 };

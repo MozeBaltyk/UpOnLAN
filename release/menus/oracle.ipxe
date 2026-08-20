@@ -12,25 +12,25 @@ set os_arch ${arch}
 iseq ${os_arch} x86_64 && set os_arch x86_64 ||
 iseq ${os_arch} arm64 && set os_arch aarch64 ||
 item --gap ${os} Versions
-item 8 ${space} ${os} 8
-item 9 ${space} ${os} 9
+# Oracle 8 is x86_64-only (no oracle8-arm64 bundle); only offer it on x86_64.
+iseq ${os_arch} x86_64 && item 8 ${space} ${os} 8 ||
 item 9 ${space} ${os} 9
 choose version || goto oracle_exit
 goto ${version}_${os_arch}
 
 :8_x86_64
-set url ${live_endpoint}/asset-mirror/releases/download/6-1525fd25/
-set repo https://yum.oracle.com/repo/OracleLinux/OL8/baseos/latest/${os_arch}
+set url ${mirror_endpoint}${asset_path}oracle-8-x86_64/
+set repo https://yum.oracle.com/repo/OracleLinux/OL8/baseos/latest/x86_64
 goto boot
 
 :9_aarch64
-set url ${live_endpoint}/asset-mirror/releases/download/U5-f2411221/
-set repo https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/${os_arch}
+set url ${mirror_endpoint}${asset_path}oracle-9-arm64/
+set repo https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/aarch64
 goto boot
 
 :9_x86_64
-set url ${live_endpoint}/asset-mirror/releases/download/U5-5d86c3df/
-set repo https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/${os_arch}
+set url ${mirror_endpoint}${asset_path}oracle-9-x86_64/
+set repo https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64
 goto boot
 
 :boot
@@ -42,4 +42,3 @@ boot
 :oracle_exit
 clear menu
 exit 0
-

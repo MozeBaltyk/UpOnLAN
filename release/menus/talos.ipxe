@@ -1,0 +1,40 @@
+#!ipxe
+
+# Talos Linux
+# https://www.talos.dev/
+
+goto ${menu} ||
+
+:talos
+set os Talos
+menu ${os} - ${arch}
+item --gap Talos Linux:
+item talos_install ${space} Boot Talos Linux v1.13.8 (${arch})
+item --gap Parameters:
+item talos_config_url ${space} Set machine config URL: ${talos_config}
+choose --default ${menu} menu || goto talos_exit
+echo ${cls}
+goto ${menu} ||
+goto talos_exit
+
+:talos_config_url
+echo -n Set machine config URL: && read talos_config
+clear menu
+goto talos
+
+:talos_install
+# ponytail: version pinned to the mirrored bundle (talos-v1.13.8-<arch> in
+# endpoints.yml); re-bump when release_assets mirrors a newer Talos.
+set talos_url ${mirror_endpoint}${asset_path}talos-v1.13.8-${arch}/
+isset ${talos_config} && set talos_param talos.config=${talos_config} || set talos_param
+imgfree
+kernel ${talos_url}vmlinuz talos.platform=metal console=ttyS0 ${talos_param} initrd=initrd.magic
+initrd ${talos_url}initrd
+echo
+echo MD5sums:
+md5sum vmlinuz initrd
+boot
+
+:talos_exit
+clear menu
+exit 0

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # basic var setting
-output_dir="../githubout"
+output_dir="${OUTPUT_DIR:-../githubout}"
 
 # trigger build
 trigger() {
@@ -27,7 +27,17 @@ trigger() {
         else
           GENERIC_ARCH="${ARCH}"
         fi
-        build_dir="${output_dir}/${GENERIC_ARCH}/${OS}/${VERSION}/releases/${RELEASE}"
+        KEY="${OS}-${VERSION}-${GENERIC_ARCH}"
+        if [ "${MIRROR_LAYOUT:-}" = "github" ]; then
+          build_dir="${output_dir}/releases/download/${KEY}"
+          url_path="/releases/download/${KEY}/"
+        elif [ "${MIRROR_LAYOUT:-}" = "local" ]; then
+          build_dir="${output_dir}/${KEY}"
+          url_path="/assets/${KEY}/"
+        else
+          build_dir="${output_dir}/${GENERIC_ARCH}/${OS}/${VERSION}/releases/${RELEASE}"
+          url_path="/releases/download/${KEY}/"
+        fi
         mkdir -p "${build_dir}"
         build "${build_dir}"
         endpoints
@@ -37,12 +47,17 @@ trigger() {
 }
 
 # build the output contents based on build type
+curl_opts=('-Lf')
+if [ -z "${NO_RESUME:-}" ]; then
+  curl_opts+=('-C' '-')
+fi
 build() {
   local build_dir="$1"
   if [ "${BUILD_TYPE}" == "iso_extraction" ]; then
       URL="${URL//REPLACE_ARCH/${ARCH}}"
       echo "Extracting from $URL"
-      curl -C - --retry 5 --retry-delay 5 --retry-connrefused -Lf -o "${build_dir}/$(basename "${URL}")" "${URL}" || { echo "Failed to download ${URL}"; exit 1; }
+      rm -f "${build_dir}/$(basename "${URL}")".part*
+      curl "${curl_opts[@]}" --retry 5 --retry-delay 5 --retry-connrefused -o "${build_dir}/$(basename "${URL}")" "${URL}" || { echo "Failed to download ${URL}"; exit 1; }
       iso_extraction "$build_dir"
   elif [ "${BUILD_TYPE}" == "direct_file" ]; then
     echo "Building direct file download for ${OS} ${VERSION} (${ARCHS})"
@@ -51,7 +66,8 @@ build() {
         echo "Downloading: ${DLD}"
         URL="${DLD%|*}"
         OUT="${DLD#*|}"
-        curl -C - --retry 5 --retry-delay 5 --retry-connrefused -Lf -o "${build_dir}/${OUT}" "${URL}" || { echo "Failed to download ${URL}"; exit 1; }
+        rm -f "${build_dir}/${OUT}".part*
+        curl "${curl_opts[@]}" --retry 5 --retry-delay 5 --retry-connrefused -o "${build_dir}/${OUT}" "${URL}" || { echo "Failed to download ${URL}"; exit 1; }
     done <<< "${EXTRACTS}"
   fi
 }
@@ -100,7 +116,11 @@ endpoints(){
   # Ensure the key exists in the YAML file
   yq e ".endpoints[\"${KEY}\"] = {}" -i "$TMP_YAML"
   # Safely write metadata with yq, all strings quoted
-  yq e ".endpoints[\"${KEY}\"].path = \"/${GENERIC_ARCH}/${OS}/${VERSION}/releases/${RELEASE}/\"" -i "$TMP_YAML"
+  # Path is the asset's URL path relative to the origin. GitHub serves release
+  # assets at /releases/download/<tag>/; the local mirror serves them at
+  # /assets/<key>/. Flat release assets need a unique tag per OS bundle (every
+  # bundle has a vmlinuz/initrd), so the endpoint key doubles as the tag.
+  yq e ".endpoints[\"${KEY}\"].path = \"${url_path}\"" -i "$TMP_YAML"
   yq e ".endpoints[\"${KEY}\"].os = \"${OS}\"" -i "$TMP_YAML"
   yq e ".endpoints[\"${KEY}\"].version = \"${VERSION}\"" -i "$TMP_YAML"
   yq e ".endpoints[\"${KEY}\"].arch = \"${GENERIC_ARCH}\"" -i "$TMP_YAML"

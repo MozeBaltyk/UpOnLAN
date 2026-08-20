@@ -62,7 +62,7 @@ set params splash=verbose proxdebug
 goto boot-pbs
 
 :boot-pbs
-set kernel_url ${live_endpoint}/asset-mirror/releases/download/3.4-1-f308cf4b/
+set kernel_url ${mirror_endpoint}${asset_path}proxmox-pbs-3.4-1-${arch}/
 set proxmox_version 3.4-1
 imgfree
 kernel ${kernel_url}vmlinuz vga=791 video=vesafb:ywrap,mtrr ramdisk_size=16777216 rw quiet ${params} initrd=initrd.magic ${cmdline}
@@ -71,7 +71,7 @@ initrd ${kernel_url}proxmox.iso /proxmox.iso
 boot
 
 :boot-pmg
-set kernel_url ${live_endpoint}/asset-mirror/releases/download/8.2-1-8374c64d/
+set kernel_url ${mirror_endpoint}${asset_path}proxmox-pmg-8.2-1-${arch}/
 set proxmox_version 8.2-1
 imgfree
 kernel ${kernel_url}vmlinuz vga=791 video=vesafb:ywrap,mtrr ramdisk_size=16777216 rw quiet ${params} initrd=initrd.magic ${cmdline}
@@ -80,7 +80,7 @@ initrd ${kernel_url}proxmox.iso /proxmox.iso
 boot
 
 :boot-pve
-set kernel_url ${live_endpoint}/asset-mirror/releases/download/8.4-1-613c19ff/
+set kernel_url ${mirror_endpoint}${asset_path}proxmox-ve-8.4-1-${arch}/
 set proxmox_version 8.4-1
 imgfree
 kernel ${kernel_url}vmlinuz vga=791 video=vesafb:ywrap,mtrr ramdisk_size=16777216 rw quiet ${params} initrd=initrd.magic ${cmdline}

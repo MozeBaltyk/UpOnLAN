@@ -1,3 +1,4 @@
+'use strict';
 const { getDashboardInfo } = require('../services/dashboardServices');
 
 module.exports = function registerDashboardHandlers(socket) {

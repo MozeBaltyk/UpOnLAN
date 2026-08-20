@@ -9,6 +9,7 @@ item harvester ${space} Harvester
 item oracle ${space} Oracle Linux
 item proxmox ${space} Proxmox
 item rockylinux ${space} Rocky Linux
+item talos ${space} Talos Linux
 item ubuntu ${space} Ubuntu
 choose menu || goto linux_exit
 echo ${cls}

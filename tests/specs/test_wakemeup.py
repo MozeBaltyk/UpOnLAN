@@ -84,5 +84,150 @@ class MirrorAssetsSpecs(TempDirTestCase):
         self.assertEqual('', arg_file.read_text())
 
 
+class PreviewPullPolicySpecs(TempDirTestCase):
+    """preview shows the resolved pull policy: Always for ghcr (public image),
+    Never for a local build — so a default deploy always fetches the latest
+    published `latest` tag instead of reusing a stale cached image."""
+
+    def setUp(self):
+        super().setUp()
+        self.copy('wakemeup.sh')
+        self.stub('bin/sudo', STUB_SUDO, exe=True)
+        self.stub('bin/helm', '#!/bin/bash\nexit 0\n', exe=True)
+        self.stub('bin/ss', '#!/bin/bash\nexit 0\n', exe=True)
+
+    def _preview(self, *args):
+        return self.run_cmd('bash', 'wakemeup.sh', '-a', 'preview', *args)
+
+    def test_default_pull_policy_is_always(self):
+        proc = self._preview()
+        self.assertIn('(Always)', proc.stdout)
+
+    def test_build_pull_policy_is_never(self):
+        proc = self._preview('--build')
+        self.assertIn('(Never)', proc.stdout)
+
+
+class DestroySpecs(TempDirTestCase):
+    """destroy removes the image for the deployment mode in effect, not a
+    hardcoded localhost build."""
+
+    def setUp(self):
+        super().setUp()
+        self.copy('wakemeup.sh')
+        # Record sudo's argv so the spec can assert the `podman rmi` target.
+        self.stub(
+            'bin/sudo',
+            '#!/bin/bash\nprintf "%s\\n" "$*" >> "${SUDO_LOG:?}"\nexit 0\n',
+            exe=True,
+        )
+        # destroy -> kube_play --down renders the chart through helm.
+        self.stub('bin/helm', '#!/bin/bash\nexit 0\n', exe=True)
+
+    def _rmi_lines(self, *args):
+        log = self.tmp / 'sudo.log'
+        self.run_cmd(
+            'bash', 'wakemeup.sh', '-a', 'destroy', *args,
+            env={'SUDO_LOG': str(log)},
+        )
+        return [l for l in log.read_text().splitlines() if 'rmi' in l]
+
+    def test_destroy_default_removes_ghcr_image(self):
+        rmis = self._rmi_lines()
+        self.assertTrue(any('ghcr.io/mozebaltyk/uponlan:latest' in r for r in rmis))
+
+    def test_destroy_build_removes_local_image(self):
+        rmis = self._rmi_lines('--build')
+        self.assertTrue(any('localhost/uponlan:latest' in r for r in rmis))
+        self.assertFalse(any('ghcr.io' in r for r in rmis))
+
+
+class ReleaseMenuSpecs(TempDirTestCase):
+    """release-menu runs release_menu.sh with an explicit version when given,
+    else falls back to version.ipxe."""
+
+    def setUp(self):
+        super().setUp()
+        self.copy('wakemeup.sh')
+        self.stub(
+            'scripts/release_menu.sh',
+            '#!/bin/bash\nprintf "%s" "$1" > "${ARG_FILE:?}"\n',
+            exe=True,
+        )
+
+    def test_passes_menu_version(self):
+        self.stub('release/menus/version.ipxe', 'set menu_version 0.2.0\n')
+        arg_file = self.tmp / 'arg.txt'
+        self.run_cmd('bash', 'wakemeup.sh', '-a', 'release-menu', env={'ARG_FILE': str(arg_file)})
+        self.assertEqual('0.2.0', arg_file.read_text())
+
+    def test_positional_version_overrides_version_ipxe(self):
+        self.stub('release/menus/version.ipxe', 'set menu_version 0.2.0\n')
+        arg_file = self.tmp / 'arg.txt'
+        self.run_cmd(
+            'bash', 'wakemeup.sh', '-a', 'release-menu', '0.3.0',
+            env={'ARG_FILE': str(arg_file)},
+        )
+        self.assertEqual('0.3.0', arg_file.read_text())
+
+    def test_errors_without_version(self):
+        self.stub('release/menus/version.ipxe', '')
+        proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'release-menu', check=False)
+        self.assertNotEqual(proc.returncode, 0)
+
+
+class TestActionSpecs(TempDirTestCase):
+    """`-a test` runs tests/specs on the host, then the full webapp suite in
+    the running container."""
+
+    def setUp(self):
+        super().setUp()
+        self.copy('wakemeup.sh')
+        self.stub(
+            'tests/specs/run.sh',
+            '#!/bin/bash\nprintf host > "${HOST_MARKER:?}"\n',
+            exe=True,
+        )
+        # Minimal sudo stub:
+        # - `podman ps --filter name=uponlan-webapp` -> print a fake container id
+        # - `podman exec <cid> test -d /webapp/test` -> success (tests baked in)
+        # - final `podman exec -it <cid> sh -c ...` -> record the webapp step
+        self.stub(
+            'bin/sudo',
+            '''\
+            #!/bin/bash
+            if [ "$1" = "podman" ] && [ "$2" = "ps" ]; then
+              printf 'fakecid\n'
+              exit 0
+            fi
+            if [ "$1" = "podman" ] && [ "$2" = "exec" ] && [ "$4" = "test" ]; then
+              exit 0
+            fi
+            if [ "$1" = "podman" ] && [ "$2" = "exec" ] && [[ " $* " == *" sh -c "* ]]; then
+              printf '%s' "$*" > "${WEBAPP_MARKER:?}"
+              exit 0
+            fi
+            exit 0
+            ''',
+            exe=True,
+        )
+
+    def test_runs_host_specs_then_webapp_suite(self):
+        host_marker = self.tmp / 'host.txt'
+        webapp_marker = self.tmp / 'webapp.txt'
+        proc = self.run_cmd(
+            'bash', 'wakemeup.sh', '-a', 'test',
+            env={'HOST_MARKER': str(host_marker), 'WEBAPP_MARKER': str(webapp_marker)},
+        )
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertEqual('host', host_marker.read_text())
+        self.assertIn('node node_modules/vitest/vitest.mjs run', webapp_marker.read_text())
+
+    def test_old_test_webapp_alias_is_rejected(self):
+        proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'test-webapp', check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn('test - run tests/specs on the host', proc.stdout + proc.stderr)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -7,6 +7,11 @@
 function showToast(message, type) {
   type = type || 'info';
   const icons = { success: '✅', danger: '❌', warning: '⚠️', info: 'ℹ️' };
+  // Record the popup in the webapp log (renderweblog) so it's not lost once
+  // the toast fades.
+  if (typeof socket !== 'undefined' && socket) {
+    socket.emit('logmessage', `[${type}] ${message}`);
+  }
   const el = document.createElement('div');
   el.className = 'toast show';
   el.setAttribute('role', 'alert');
@@ -22,7 +27,17 @@ function showToast(message, type) {
   const container = document.getElementById('toast-container');
   if (container) {
     container.appendChild(el);
-    setTimeout(function() { el.classList.remove('show'); setTimeout(function() { el.remove(); }, 350); }, 5000);
+    // The toast is built by hand (Bootstrap's toast plugin is never .toast()'d),
+    // so data-dismiss="toast" does nothing. Wire the × to the same fade-out as
+    // the auto-dismiss timer so it closes immediately instead of waiting 10s.
+    const closeBtn = el.querySelector('.close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        el.classList.remove('show');
+        setTimeout(function () { el.remove(); }, 350);
+      });
+    }
+    setTimeout(function() { el.classList.remove('show'); setTimeout(function() { el.remove(); }, 350); }, 10000);
   }
   // Fallback if container is missing (page not fully rendered yet)
   else {
@@ -92,6 +107,20 @@ function applyTheme(theme) {
   
   // Update Ace Editor theme if it exists
   updateAceEditorTheme(theme);
+
+  // Re-color the metrics chart legend (its label color is set at init; refresh
+  // it on theme toggle so it stays visible against a dark background).
+  if (typeof MetricsChart !== 'undefined' && MetricsChart && MetricsChart.options
+      && MetricsChart.options.plugins && MetricsChart.options.plugins.legend) {
+    MetricsChart.options.plugins.legend.labels.color = chartLegendColor(theme);
+    MetricsChart.update();
+  }
+}
+
+// Readable Chart.js legend label color for the active theme.
+function chartLegendColor(theme) {
+  const t = theme || document.documentElement.getAttribute('data-theme');
+  return t === 'dark' ? '#cccccc' : '#444';
 }
 
 function updateAceEditorTheme(theme) {
@@ -357,7 +386,7 @@ function initMetricsChart() {
             font: {
               size: 9
             },
-            color: '#444'
+            color: chartLegendColor()
           }
         }
       }
@@ -611,13 +640,13 @@ if ($('#vmFirmwareModal').length === 0) {
       <div class="modal-dialog" role="document">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="vmFirmwareModalLabel">Create VM — firmware</h5>
+            <h5 class="modal-title" id="vmFirmwareModalLabel">Create VM</h5>
             <button type="button" class="close" data-dismiss="modal" aria-label="Close">
               <span>&times;</span>
             </button>
           </div>
           <div class="modal-body">
-            <p>Select the firmware for the new diskless VM:</p>
+            <p>Select the firmware and (optionally) a disk for the new VM:</p>
             <button type="button" class="btn btn-outline-dark btn-block text-left mb-2" data-firmware="bios">
               <strong>BIOS</strong><br>
               <small>Legacy boot via the e1000 iPXE option ROM.</small>
@@ -626,6 +655,11 @@ if ($('#vmFirmwareModal').length === 0) {
               <strong>UEFI</strong><br>
               <small>OVMF boot via the iPXE EFI binary.</small>
             </button>
+            <div class="form-group mt-3 mb-0">
+              <label for="vmDiskSize">Disk size (GiB, 0 = diskless)</label>
+              <input type="number" id="vmDiskSize" class="form-control" min="0" step="1" value="0">
+              <small class="form-text text-muted">Attach a qcow2 disk so a PXE install has somewhere to install to.</small>
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -637,8 +671,9 @@ if ($('#vmFirmwareModal').length === 0) {
 }
 
 $(document).on('click', '#vmFirmwareModal [data-firmware]', function () {
+  const disk = Math.max(0, parseInt($('#vmDiskSize').val(), 10) || 0);
   $('#vmFirmwareModal').modal('hide');
-  socket.emit('vm:create', $(this).data('firmware'));
+  socket.emit('vm:create', { firmware: $(this).data('firmware'), disk });
 });
 
 // Show modal on Build button click
@@ -1057,10 +1092,13 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
         localfiles.splice( localfiles.indexOf(fsPath + file), 1 );
       }
       else{
+        // direct_file endpoints carry vendor `sources` aligned with `files`;
+        // link to the vendor URL when present, else the origin + path.
+        var linkHref = (value.sources && value.sources[arrindex]) ? value.sources[arrindex] : (remoteassetorigin + value.path + file);
         remotetable.row.add( 
           [
             index,
-            '<a href="' + remoteassetorigin + value.path + file + '" target="_blank">' + displayKey + '/' + file + '</a>',
+            '<a href="' + linkHref + '" target="_blank">' + displayKey + '/' + file + '</a>',
             '<span style="float:right;"><input type="checkbox" class="form-check-input remotecheck" value="' + value.path + file + '"></span>'
           ]
         );
@@ -1357,6 +1395,14 @@ function renderwol(){
   showLoading('#pagecontent', 'Getting WOL');
   socket.emit('getwol');
 }
+
+// Status badge for a host: green online / red offline / grey unknown.
+function wolStatusBadge(status) {
+  const s = status || 'unknown';
+  const cls = s === 'online' ? 'success' : (s === 'offline' ? 'danger' : 'secondary');
+  return `<span class="badge badge-${cls}">${s}</span>`;
+}
+
 socket.on('renderwol', function(wolpoints, remotemenuversion){
   $('#pagecontent').empty();
   let html = `
@@ -1372,30 +1418,41 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
           <form class="form-inline">
             <input type="text" class="form-control form-control-sm mr-2" id="new-wol-host" placeholder="Name">
             <input type="text" class="form-control form-control-sm mr-2" id="new-wol-mac" placeholder="MAC">
+            <input type="text" class="form-control form-control-sm mr-2" id="new-wol-ip" placeholder="IP (optional)">
+            <input type="datetime-local" class="form-control form-control-sm mr-2" id="new-wol-wake" placeholder="Schedule (optional)">
             <button type="button" class="btn btn-success btn-sm" id="submit-wol-btn">Add</button>
           </form>
+          <div id="wol-error" class="alert alert-danger py-2 px-3 mt-2 mb-0" style="display:none;"></div>
         </div>
         <table class="table table-hover">
-          <thead><tr><th>Name</th><th>MAC</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>MAC</th><th>IP</th><th>Status</th><th>Schedule</th><th>Actions</th></tr></thead>
           <tbody>
   `;
   if (wolpoints && Array.isArray(wolpoints.wakeonlan)) {
     wolpoints.wakeonlan.forEach(function(host) {
+      const mac = host.default_mac || '';
       html += `<tr>
         <td>${host.hostname || ''}</td>
-        <td>${host.default_mac || ''}</td>
+        <td>${mac}</td>
+        <td>${host.ip || ''}</td>
+        <td>${wolStatusBadge(host.status)}</td>
         <td>
-          <button class="btn btn-success btn-sm wake-wol-btn" data-mac="${host.default_mac}" title="Wake">
+          ${host.wake_at ? `<span class="mr-2">${host.wake_at}</span><button class="btn btn-warning btn-sm clear-wol-schedule-btn" data-mac="${mac}" title="Clear schedule">Clear</button>` : ''}
+          <input type="datetime-local" class="form-control form-control-sm d-inline-block wol-schedule-input" data-mac="${mac}" style="width:auto;">
+          <button class="btn btn-outline-primary btn-sm set-wol-schedule-btn" data-mac="${mac}" title="Set schedule">Set</button>
+        </td>
+        <td>
+          <button class="btn btn-success btn-sm wake-wol-btn" data-mac="${mac}" title="Wake">
             <span style="font-size:1.2em;">&#9889;</span>
           </button>
-          <button class="btn btn-danger btn-sm delete-wol-btn" data-mac="${host.default_mac}">
+          <button class="btn btn-danger btn-sm delete-wol-btn" data-mac="${mac}">
             <span style="font-size:1.2em;">&#128465;</span>
           </button>
         </td>
       </tr>`;
     });
   } else {
-    html += `<tr><td colspan="3" class="text-center">No hosts available</td></tr>`;
+    html += `<tr><td colspan="6" class="text-center">No hosts available</td></tr>`;
   }
   html += `
           </tbody>
@@ -1419,9 +1476,25 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
     socket.emit('wakewol', mac);
   });
 
+  // Set a one-shot wake schedule
+  $('.set-wol-schedule-btn').click(function() {
+    const mac = $(this).data('mac');
+    const value = $(this).closest('td').find('.wol-schedule-input').val();
+    if (value) {
+      socket.emit('updatewol', { default_mac: mac, wake_at: value });
+    }
+  });
+
+  // Clear an existing schedule
+  $('.clear-wol-schedule-btn').click(function() {
+    const mac = $(this).data('mac');
+    socket.emit('updatewol', { default_mac: mac, wake_at: null });
+  });
+
   // Show/hide form on button click
   $('#add-wol-btn').click(function() {
     $('#add-wol-form').toggle();
+    $('#wol-error').hide();
   });
 
   // Handle form submission
@@ -1429,12 +1502,25 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
     $('#wol-error').hide();
     const hostname = $('#new-wol-host').val().trim();
     const mac = $('#new-wol-mac').val().trim();
-    if (hostname && mac) {
-      socket.emit('addwol', { hostname: hostname, default_mac: mac });
-      $('#add-wol-form').hide();
-      $('#new-wol-host').val('');
-      $('#new-wol-mac').val('');
+    if (!hostname) {
+      $('#wol-error').text('Host name is required').show();
+      return;
     }
+    if (!mac) {
+      $('#wol-error').text('MAC address is required').show();
+      return;
+    }
+    const payload = { hostname: hostname, default_mac: mac };
+    const ip = $('#new-wol-ip').val().trim();
+    const wakeAt = $('#new-wol-wake').val().trim();
+    if (ip) payload.ip = ip;
+    if (wakeAt) payload.wake_at = wakeAt;
+    socket.emit('addwol', payload);
+    $('#add-wol-form').hide();
+    $('#new-wol-host').val('');
+    $('#new-wol-mac').val('');
+    $('#new-wol-ip').val('');
+    $('#new-wol-wake').val('');
   });
 });
 

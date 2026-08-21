@@ -25,6 +25,16 @@ describe('vmHandlers.isValidVmName', () => {
   });
 });
 
+describe('vmHandlers.isInactivePoolInfo', () => {
+  const poolInfo = (state) => `Name:           uponlan\nUUID:           12345678-1234-1234-1234-123456789abc\nState:          ${state}\nPersistent:     yes\nAutostart:      no\nCapacity:       1.00 GiB\n`;
+
+  it('detects a defined-but-inactive pool (vol-create-as refuses it)', () => {
+    expect(vmHandlers.isInactivePoolInfo(poolInfo('inactive'))).toBe(true);
+    expect(vmHandlers.isInactivePoolInfo(poolInfo('running'))).toBe(false);
+    expect(vmHandlers.isInactivePoolInfo('')).toBe(false);
+  });
+});
+
 describe('vmHandlers.buildDomainXml', () => {
   const xml = vmHandlers.buildDomainXml('uponlan-client', 'uponlan');
 
@@ -78,6 +88,19 @@ describe('vmHandlers.buildDomainXml (UEFI)', () => {
     expect(vmHandlers.normalizeFirmware('bios')).toBe('bios');
     expect(vmHandlers.normalizeFirmware('anything-else')).toBe('bios');
     expect(vmHandlers.normalizeFirmware(undefined)).toBe('bios');
+  });
+});
+
+describe('vmHandlers.buildDomainXml (with disk)', () => {
+  const xml = vmHandlers.buildDomainXml('uponlan-client', 'uponlan', 'bios', '/var/lib/libvirt/images/uponlan-client.qcow2');
+
+  it('attaches the qcow2 as a virtio disk', () => {
+    expect(xml).toContain("<disk type='file' device='disk'>");
+    expect(xml).toContain("<driver name='qemu' type='qcow2'/>");
+    expect(xml).toContain("<source file='/var/lib/libvirt/images/uponlan-client.qcow2'/>");
+    expect(xml).toContain("<target dev='vda' bus='virtio'/>");
+    expect(xml).toContain("<boot dev='network'/>");
+    expect(xml).toContain("<console type='pty'>");
   });
 });
 

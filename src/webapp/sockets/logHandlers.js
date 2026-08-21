@@ -6,8 +6,15 @@ const {
   getNginxErrorLog,
   getRomBuildLog,
 } = require('../services/logServices');
+const { logWithTimestamp } = require('../services/utilServices');
 
 module.exports = function registerLogHandlers(socket) {
+  // Client-side toasts are recorded here too, so a popup is debuggable in the
+  // webapp log rather than only visible for a few seconds on screen.
+  socket.on('logmessage', (msg) => {
+    logWithTimestamp(`[client] ${String(msg).slice(0, 2000)}`);
+  });
+
   // Webapp logs
   socket.on('getweblog', () => {
     const log = getWebLog();

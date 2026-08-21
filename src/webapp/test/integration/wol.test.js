@@ -115,3 +115,51 @@ describe('wol wake validation over the socket', () => {
     socket.close();
   });
 });
+
+describe('wol host status + one-shot schedule over the socket', () => {
+  it('addwol with ip + wake_at persists both and getwol returns a status field', async () => {
+    const socket = await authedSocket();
+    await Promise.all([
+      once(socket, 'renderwol'),
+      Promise.resolve(socket.emit('addwol', { default_mac: 'DE:AD:BE:EF:00:01', hostname: 'Status host', ip: '203.0.113.7', wake_at: '2026-08-22T07:00' })),
+    ]);
+    expect(persistedWol()).toContain('203.0.113.7');
+    expect(persistedWol()).toContain('wake_at');
+
+    const [args] = await Promise.all([once(socket, 'renderwol'), Promise.resolve(socket.emit('getwol'))]);
+    const entry = args[0].wakeonlan.find((e) => e.default_mac.toLowerCase() === 'de:ad:be:ef:00:01');
+    expect(entry).toBeTruthy();
+    expect(entry.ip).toBe('203.0.113.7');
+    // ping outcome is environment-dependent; status must always be one of the three
+    expect(['online', 'offline', 'unknown']).toContain(entry.status);
+
+    await Promise.all([once(socket, 'renderwol'), Promise.resolve(socket.emit('deletewol', 'DE:AD:BE:EF:00:01'))]);
+    socket.close();
+  });
+
+  it('updatewol sets wake_at (round-trip + persisted) then clears it', async () => {
+    const socket = await authedSocket();
+    await Promise.all([
+      once(socket, 'renderwol'),
+      Promise.resolve(socket.emit('addwol', { default_mac: 'DE:AD:BE:EF:00:02', hostname: 'Sched host' })),
+    ]);
+
+    const [setArgs] = await Promise.all([
+      once(socket, 'renderwol'),
+      Promise.resolve(socket.emit('updatewol', { default_mac: 'DE:AD:BE:EF:00:02', wake_at: '2026-08-22T07:00' })),
+    ]);
+    const setEntry = setArgs[0].wakeonlan.find((e) => e.default_mac.toLowerCase() === 'de:ad:be:ef:00:02');
+    expect(setEntry.wake_at).toBe('2026-08-22T07:00');
+    expect(persistedWol()).toContain('2026-08-22T07:00');
+
+    const [clearArgs] = await Promise.all([
+      once(socket, 'renderwol'),
+      Promise.resolve(socket.emit('updatewol', { default_mac: 'DE:AD:BE:EF:00:02', wake_at: null })),
+    ]);
+    const clearEntry = clearArgs[0].wakeonlan.find((e) => e.default_mac.toLowerCase() === 'de:ad:be:ef:00:02');
+    expect(clearEntry.wake_at).toBeNull();
+
+    await Promise.all([once(socket, 'renderwol'), Promise.resolve(socket.emit('deletewol', 'DE:AD:BE:EF:00:02'))]);
+    socket.close();
+  });
+});

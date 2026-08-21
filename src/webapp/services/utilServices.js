@@ -208,13 +208,16 @@ async function downloader(downloads, socket) {
   const total = downloads.length;
 
   for (let i = 0; i < downloads.length; i++) {
-    const { url, path } = downloads[i];
+    const { url, path, fileName } = downloads[i];
     const dloptions = {
       override: true,
       retry: { maxRetries: 2, delay: 5000 }
     };
+    // Optional pinned filename: vendor sources may have a URL basename that
+    // differs from the desired output file (e.g. initramfs-amd64.xz -> initrd).
+    const mainOptions = fileName ? { ...dloptions, fileName } : dloptions;
 
-    const dl = new DownloaderHelper(url, path, dloptions);
+    const dl = new DownloaderHelper(url, path, mainOptions);
 
     dl.on('end', () => {
       console.log(`Downloaded ${url} to ${path}`);

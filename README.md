@@ -1,6 +1,6 @@
 # UpOnLAN.xyz
 
-**[Features](#features) • [Getting Started](docs/01-Getting-Started.md) • [PXE Basics](docs/02-PXE-Basics.md) • [Overview & netboot.xyz](docs/UpOnLAN.xyz/00-Overview.md) • [Assets](docs/03-Assets.md) • [ROM builds](docs/iPXE/03-ROM-Build.md) • [Deployment](docs/UpOnLAN.xyz/02-Deployment.md) • [CI](docs/UpOnLAN.xyz/04-CI.md) • [Operations](docs/UpOnLAN.xyz/03-Operations.md)**
+**[Features](#features) • [Getting Started](docs/01-Getting-Started.md) • [PXE Basics](docs/02-PXE-Basics.md) • [Overview & netboot.xyz](docs/UpOnLAN.xyz/00-Overview.md) • [Assets](docs/03-Assets.md) • [Menu Scripting](docs/iPXE/02-Menu-Scripting.md) • [ROM builds](docs/iPXE/03-ROM-Build.md) • [Deployment](docs/UpOnLAN.xyz/02-Deployment.md) • [CI](docs/UpOnLAN.xyz/04-CI.md) • [Operations](docs/UpOnLAN.xyz/03-Operations.md) • [Glossary](docs/Glossary.md)**
 
 This project is a cold fork of Netboot.xyz with the goal of unifying and simplifying the upstream into an all-in-one solution. Its main purpose is to provide an editor for iPXE menus, build the boot mediums and serve them on the fly. Additional features include Wake-on-LAN, PXE menu testing and installation, and documentation in the webapp for developing custom PXE menus. 
     
@@ -47,8 +47,9 @@ Allowed Actions
 5. logs - display logs from uponlan container
 6. connect - connect to uponlan container
 7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets
-8. test-webapp - run webapp tests in container
+8. test - run tests/specs on the host + the full webapp suite inside the container
 9. preview - show deployment context and run preflight checks (no deploy)
+10. release-menu - build the menu release (release_menu.sh) for the version in release/menus/version.ipxe
 ```
 
 * 3 types of deployments:
@@ -67,9 +68,9 @@ Use these when you want to test without guessing:
 
 ```bash
 ./wakemeup.sh -a mirror-assets
-./scripts/release_menu.sh 0.1.0
+./wakemeup.sh -a release-menu 0.1.0
 ./wakemeup.sh -a deploy --local
-./wakemeup.sh -a test-webapp
+./wakemeup.sh -a test
 ```
 
 Release artifacts come in two layers, split under `release/output/`:
@@ -79,7 +80,7 @@ Release artifacts come in two layers, split under `release/output/`:
 `mirror-assets` builds the asset layer of `release/output/`.
 `scripts/release_menu.sh <version>` builds the menu layer into `release/output/`.
 `deploy --local` does not build the release artifacts. It serves the already prepared `release/output/` on `:8899` and deploys the Helm chart with `--local`.
-`test-webapp` runs the webapp test suite inside the container.
+`test` runs the release-flow specs in `tests/specs/` on the host, then the full webapp suite inside the running container.
 ```bash
 asset_target=harvester ./wakemeup.sh -a mirror-assets
 ```

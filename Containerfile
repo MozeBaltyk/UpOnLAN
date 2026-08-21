@@ -84,11 +84,12 @@ RUN chmod +x /scripts/build_ipxe_roms.sh /scripts/sources/genfsimg
 #### VM console support (host libvirt socket mounted at /var/run/libvirt)
 # util-linux provides `script`, which allocates the controlling TTY `virsh console` requires.
 RUN apk add --no-cache libvirt-client util-linux
-# Whitelist only the virsh subcommands the webapp Console tab needs; the
-# host libvirt socket is mounted read-write so this grants VM power + serial
-# console access to whatever is visible on the host's qemu:///system.
-# `define` is pinned to the XML file the webapp itself writes under /tmp.
-RUN echo "nbxyz ALL=(root) NOPASSWD:/usr/bin/virsh start *, /usr/bin/virsh destroy *, /usr/bin/virsh reboot *, /usr/bin/virsh domstate *, /usr/bin/virsh list *, /usr/bin/virsh dumpxml *, /usr/bin/virsh console --force *, /usr/bin/virsh net-info *, /usr/bin/virsh define /tmp/uponlan-*.xml, /usr/bin/virsh undefine *, /usr/bin/virsh net-define /tmp/uponlan-net-*.xml, /usr/bin/virsh net-start *, /usr/bin/virsh net-autostart *, /usr/bin/virsh net-destroy *, /usr/bin/virsh net-undefine *" > /etc/sudoers.d/virsh
+# sudo points at the virsh-safe wrapper, not virsh itself, so the webapp's
+# subcommand whitelist + name validation (src/virsh-safe) is enforced at the
+# sudo boundary rather than relying on the webapp's own authentication.
+COPY src/virsh-safe /usr/local/bin/virsh-safe
+RUN chmod +x /usr/local/bin/virsh-safe
+RUN echo "nbxyz ALL=(root) NOPASSWD:/usr/local/bin/virsh-safe" > /etc/sudoers.d/virsh
 RUN chmod 440 /etc/sudoers.d/virsh
 
 # default command

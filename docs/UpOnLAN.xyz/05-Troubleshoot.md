@@ -41,9 +41,17 @@ The webapp's Build button runs `scripts/build_ipxe_roms.sh` directly inside the 
 
 ---
 
+## 🔒 Vendor asset download fails ("self-signed certificate in certificate chain")
+
+The Assets tab now pulls `direct_file` assets straight from the vendor (e.g. `releases.rancher.com`). Behind a TLS-inspecting corporate proxy, the proxy re-signs the connection with its own CA, which the container does not trust — so the download fails with a self-signed-certificate error.
+
+Fix: place your corporate CA (PEM) in `./config/certs/` on the host (mapped to `/config/certs/` in the container), then `./wakemeup.sh -a redeploy`. At startup `init.sh` adds it to the system trust store (for `curl`), and the webapp reads the refreshed bundle via `NODE_EXTRA_CA_CERTS`.
+
+---
+
 ## 🧪 Tests fail inside the container
 
-`./wakemeup.sh -a test-webapp` runs the suite inside the container. Common cause of failure:
+`./wakemeup.sh -a test` runs the release-flow specs on the host, then the full webapp suite inside the container. Common cause of failure:
 
 - **Image too old** — the tests must be baked in at build time (npm is purged from the image afterwards). Rebuild first: `./wakemeup.sh -a build`, then `redeploy`.
 

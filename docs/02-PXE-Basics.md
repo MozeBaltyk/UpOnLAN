@@ -36,3 +36,5 @@ BIOS and UEFI need compatible iPXE boot files. Configure DHCP to select the corr
 ### Trusted-network caution
 
 PXE can deliver executable code and installation content. Use it only on trusted networks, restrict TFTP and boot HTTP to intended clients, and protect administrator access to the webapp. See [Deployment](UpOnLAN.xyz/02-Deployment.md) for deployment-specific ports and authentication guidance.
+
+> See the [Glossary](Glossary.md) for concise definitions of the terms used in these guides (PXE, iPXE, TFTP, DHCP, option ROM, CONSOLE_SERIAL, and more).

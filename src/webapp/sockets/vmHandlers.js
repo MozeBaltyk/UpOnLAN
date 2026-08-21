@@ -12,6 +12,10 @@ const VM_NETWORK = process.env.VM_NETWORK || 'uponlan';
 // host). Used in the network's dhcp-boot answer; empty falls back to the DHCP
 // server's own address.
 const BOOT_SERVER_IP = process.env.BOOT_SERVER_IP || '';
+// Dedicated storage pool for the test VM's disks — created on demand, removed
+// with the VM, so UpOnLAN never touches the host's other pools.
+const VM_STORAGE_POOL = process.env.VM_STORAGE_POOL || 'uponlan';
+const VM_STORAGE_POOL_PATH = process.env.VM_STORAGE_POOL_PATH || '/var/lib/libvirt/images/uponlan';
 // Host-side file QEMU loads as the NIC's option ROM. Without it the e1000 has
 // no PXE ROM on Ubuntu hosts (qemu no longer bundles one) and the guest never
 // attempts network boot. Built by scripts/build_ipxe_roms.sh.
@@ -26,8 +30,8 @@ function normalizeFirmware(firmware) {
   return firmware === 'efi' ? 'efi' : 'bios';
 }
 
-// virsh subcommands the container sudoers whitelist allows (restart is a
-// power cycle — destroy + start — handled separately below).
+// virsh subcommands the virsh-safe wrapper allows (restart is a power cycle —
+// destroy + start — handled separately below).
 const POWER_ACTIONS = { on: 'start', off: 'destroy' };
 
 // `virsh console` is exclusive per domain; keep one attachment per VM so a
@@ -43,7 +47,7 @@ function runVirsh(args) {
   return new Promise((resolve) => {
     let out = '';
     let err = '';
-    const proc = spawn('sudo', ['virsh', ...args]);
+    const proc = spawn('sudo', ['/usr/local/bin/virsh-safe', ...args]);
     proc.stdout.on('data', (d) => (out += d));
     proc.stderr.on('data', (d) => (err += d));
     proc.on('close', (code) => resolve({ ok: code === 0, out: out.trim(), err: err.trim() }));
@@ -68,6 +72,41 @@ async function getVmHasConsole() {
   return res.ok && /<console[^>]*type=['"]pty['"]/.test(res.out);
 }
 
+// `virsh pool-info` prints "State: inactive" for a defined-but-not-started
+// dir pool; only an active pool accepts vol-create-as.
+function isInactivePoolInfo(poolInfoOut) {
+  return /State:\s*inactive/i.test(poolInfoOut);
+}
+
+// Ensure the dedicated storage pool exists (define + start + autostart).
+async function ensureStoragePool() {
+  const info = await runVirsh(['pool-info', VM_STORAGE_POOL]);
+  if (info.ok) {
+    // pool-info succeeds for a defined-but-inactive pool too (e.g. left over
+    // after a destroy where pool-undefine failed, or a host reboot before
+    // autostart). pool-build (re)creates the target directory (idempotent for
+    // a dir pool — succeeds whether the dir already exists or not), then
+    // pool-start activates it.
+    if (isInactivePoolInfo(info.out)) {
+      await runVirsh(['pool-build', VM_STORAGE_POOL]);
+      await runVirsh(['pool-start', VM_STORAGE_POOL]);
+    }
+    return true;
+  }
+  const defined = await runVirsh(['pool-define-as', VM_STORAGE_POOL, 'dir', '--target', VM_STORAGE_POOL_PATH]);
+  if (!defined.ok) return false;
+  await runVirsh(['pool-build', VM_STORAGE_POOL]);
+  await runVirsh(['pool-start', VM_STORAGE_POOL]);
+  await runVirsh(['pool-autostart', VM_STORAGE_POOL]);
+  return true;
+}
+
+// Tear down the dedicated pool (best-effort; call after deleting the volume).
+async function removeStoragePool() {
+  await runVirsh(['pool-destroy', VM_STORAGE_POOL]);
+  await runVirsh(['pool-undefine', VM_STORAGE_POOL]);
+}
+
 // Minimal diskless network-boot domain: it is a PXE client, not a storage
 // target, so no disk, no graphics. `<boot dev='network'/>` is what makes it
 // actually PXE-boot (virt-install's default left the old VM on `hd`).
@@ -80,7 +119,7 @@ async function getVmHasConsole() {
 //   loads the bootloader the DHCP answer advertises (rom/ipxe/uponlan.xyz.efi),
 //   so no PCI option ROM is attached. `<os firmware='efi'>` makes libvirt
 //   pick OVMF and manage the NVRAM automatically.
-function buildDomainXml(name, network, firmware) {
+function buildDomainXml(name, network, firmware, diskPath) {
   const fw = normalizeFirmware(firmware);
   const osTag = fw === 'efi' ? "<os firmware='efi'>" : '<os>';
   const nic = fw === 'efi'
@@ -93,6 +132,14 @@ function buildDomainXml(name, network, firmware) {
       <model type='e1000'/>
       <rom file='${PXE_ROM}'/>
     </interface>`;
+  // Optional: attach a qcow2 disk so a PXE install has somewhere to write to.
+  const disk = diskPath
+    ? `<disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='${diskPath}'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>`
+    : '';
   return `<domain type='kvm'>
   <name>${name}</name>
   <memory unit='KiB'>2097152</memory>
@@ -112,6 +159,7 @@ function buildDomainXml(name, network, firmware) {
   <devices>
     <emulator>/usr/bin/qemu-system-x86_64</emulator>
     ${nic}
+    ${disk}
     <serial type='pty'>
       <target type='isa-serial' port='0'>
         <model name='isa-serial'/>
@@ -213,8 +261,10 @@ module.exports = function registerVmHandlers(socket) {
   // Provision the test VM from a Node-generated domain XML. No bash script:
   // define + start via the whitelisted virsh subcommands only. If the boot
   // network does not exist on the host it is defined first.
-  socket.on('vm:create', async (firmware) => {
-    const fw = normalizeFirmware(firmware);
+  socket.on('vm:create', async (payload) => {
+    const opts = typeof payload === 'string' ? { firmware: payload } : (payload || {});
+    const fw = normalizeFirmware(opts.firmware);
+    const diskSize = Math.max(0, Number(opts.disk) || 0);
     const state = await getVmState();
     if (state !== 'not found') {
       socket.emit('vm:action:result', { action: 'create', ok: false, message: `VM '${VM_NAME}' already exists (${state})` });
@@ -241,9 +291,30 @@ module.exports = function registerVmHandlers(socket) {
         try { fs.unlinkSync(netXmlPath); } catch { /* already gone */ }
       }
     }
+    // Create the requested disk as a qcow2 volume (diskless when size = 0).
+    const volName = `${VM_NAME}.qcow2`;
+    let diskPath = null;
+    if (diskSize > 0) {
+      // Dedicated `uponlan` pool: created on demand, removed with the VM.
+      if (!(await ensureStoragePool())) {
+        socket.emit('vm:action:result', { action: 'create', ok: false, message: `storage pool '${VM_STORAGE_POOL}' create failed` });
+        return;
+      }
+      const created = await runVirsh(['vol-create-as', VM_STORAGE_POOL, volName, '--format', 'qcow2', `${diskSize}G`]);
+      if (!created.ok) {
+        socket.emit('vm:action:result', { action: 'create', ok: false, message: `disk create failed: ${created.err}` });
+        return;
+      }
+      const pathRes = await runVirsh(['vol-path', '--pool', VM_STORAGE_POOL, volName]);
+      diskPath = pathRes.ok ? pathRes.out : null;
+      if (!diskPath) {
+        socket.emit('vm:action:result', { action: 'create', ok: false, message: `disk path lookup failed: ${pathRes.err}` });
+        return;
+      }
+    }
     const xmlPath = `/tmp/uponlan-${VM_NAME}.xml`;
     try {
-      fs.writeFileSync(xmlPath, buildDomainXml(VM_NAME, VM_NETWORK, fw));
+      fs.writeFileSync(xmlPath, buildDomainXml(VM_NAME, VM_NETWORK, fw, diskPath));
       const res = await runVirsh(['define', xmlPath]);
       if (!res.ok) {
         socket.emit('vm:action:result', { action: 'create', ok: false, message: `virsh define failed: ${res.err}` });
@@ -254,7 +325,7 @@ module.exports = function registerVmHandlers(socket) {
         action: 'create',
         ok: boot.ok,
         message: boot.ok
-          ? `VM '${VM_NAME}' (${fw} firmware) created${netCreated ? ` (network '${VM_NETWORK}' recreated)` : ''} and booting (network PXE) — console will show the menu shortly`
+          ? `VM '${VM_NAME}' (${fw} firmware${diskSize > 0 ? `, ${diskSize}G disk` : ', diskless'}) created${netCreated ? ` (network '${VM_NETWORK}' recreated)` : ''} and booting (network PXE) — console will show the menu shortly`
           : `VM defined but start failed: ${boot.err}`,
       });
     } catch (e) {
@@ -280,6 +351,11 @@ module.exports = function registerVmHandlers(socket) {
     const res = await runVirsh(['undefine', '--nvram', VM_NAME]);
     let msg = res.ok ? `VM '${VM_NAME}' destroyed` : `virsh undefine failed: ${res.err}`;
     if (res.ok) {
+      // Remove the disk volume + the dedicated pool it lives in (best-effort:
+      // a diskless VM has neither, and the virsh calls then just report
+      // "not found").
+      await runVirsh(['vol-delete', '--pool', VM_STORAGE_POOL, `${VM_NAME}.qcow2`]);
+      await removeStoragePool();
       // Tear the boot network down too (user request). Best-effort: other
       // guests may still be attached, then net-destroy reports it.
       const nd = await runVirsh(['net-destroy', VM_NETWORK]);
@@ -324,7 +400,7 @@ module.exports = function registerVmHandlers(socket) {
     // `virsh console` refuses to run without a controlling TTY; `script`
     // (util-linux, added in the Containerfile) allocates one. script runs as
     // the unprivileged webapp user and execs the whitelisted
-    // `sudo virsh console --force` inside the pty — never `sudo script`, which
+    // `sudo /usr/local/bin/virsh-safe console --force` inside the pty — never `sudo script`, which
     // would let any authed user run arbitrary shell as root. `--force` takes
     // over any stale/cockpit console session (e.g. a zombie left by a power
     // cycle), otherwise the attach fails with "Active console session exists".
@@ -333,7 +409,7 @@ module.exports = function registerVmHandlers(socket) {
     // `script` (util-linux) silently no-ops its `-c` command when $SHELL is
     // unset — supervisord starts the webapp with a minimal env (no SHELL), so
     // the console attach produced zero output and exited 0. Pin SHELL here.
-    const proc = spawn('script', ['-q', '-c', `sudo virsh console --force '${VM_NAME}'`, '/dev/null'], { detached: true, env: { ...process.env, SHELL: process.env.SHELL || '/bin/sh' } });
+    const proc = spawn('script', ['-q', '-c', `sudo /usr/local/bin/virsh-safe console --force '${VM_NAME}'`, '/dev/null'], { detached: true, env: { ...process.env, SHELL: process.env.SHELL || '/bin/sh' } });
     activeConsoles.set(VM_NAME, proc);
     proc.stdout.on('data', (d) => socket.emit('vm:console:data', d.toString()));
     proc.stderr.on('data', (d) => socket.emit('vm:console:data', d.toString()));
@@ -354,6 +430,7 @@ module.exports = function registerVmHandlers(socket) {
 };
 
 module.exports.isValidVmName = isValidVmName;
+module.exports.isInactivePoolInfo = isInactivePoolInfo;
 module.exports.buildDomainXml = buildDomainXml;
 module.exports.buildNetworkXml = buildNetworkXml;
 module.exports.normalizeFirmware = normalizeFirmware;

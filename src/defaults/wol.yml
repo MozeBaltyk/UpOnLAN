@@ -1,4 +1,5 @@
 wakeonlan:
   - hostname: "hostname1"
     default_mac: "00:00:00:00:00:00"
-
+    ip: ""                    # optional
+    wake_at: ""               # optional, one-shot, local time (YYYY-MM-DDTHH:MM)

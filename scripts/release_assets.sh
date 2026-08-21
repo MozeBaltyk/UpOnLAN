@@ -19,9 +19,26 @@ for i in $(ls release/assets/*/setting.sh); do
     if [ -n "$target" ] && [ "$os" != "$target" ]; then
         continue
     fi
+    # Determine the recipe's build type without sourcing setting.sh (sourcing
+    # would trigger its `VERSION=$(curl ...)` and other side effects).
+    build_type=$(sed -n 's/^BUILD_TYPE=//p' "$i" | head -1)
+    build_type="${build_type%\"}"; build_type="${build_type#\"}"
+    build_type="${build_type%\'}"; build_type="${build_type#\'}"
+    if [ "$build_type" = "direct_file" ] && [ "$mirror_layout" = "github" ]; then
+        # direct_file assets are no longer mirrored to GitHub: they are imported
+        # on-demand by the webapp Assets tab straight from the vendor URL, so no
+        # bundle and no catalog entry is published for them.
+        echo "Skipping $os (direct_file is imported on-demand, not mirrored to GitHub)"
+        continue
+    fi
     echo "Processing $os"
     cd ./release/assets
-    NO_RESUME=1 OUTPUT_DIR=../output/assets MIRROR_LAYOUT="$mirror_layout" ./build.sh "$os"
+    if [ "$build_type" = "direct_file" ]; then
+        # Local mirror: catalog-only (vendor sources + metadata, no download).
+        NO_RESUME=1 OUTPUT_DIR=../output/assets MIRROR_LAYOUT="$mirror_layout" CATALOG_ONLY=1 ./build.sh "$os"
+    else
+        NO_RESUME=1 OUTPUT_DIR=../output/assets MIRROR_LAYOUT="$mirror_layout" ./build.sh "$os"
+    fi
     cd -
 done
 

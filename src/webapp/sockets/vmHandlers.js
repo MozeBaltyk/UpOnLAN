@@ -256,6 +256,18 @@ module.exports = function registerVmHandlers(socket) {
     const volName = `${VM_NAME}.qcow2`;
     let diskPath = null;
     if (diskSize > 0) {
+      // Ensure the `default` storage pool exists — a bare host has none, so
+      // define + start it like the boot network is handled above.
+      const pool = await runVirsh(['pool-info', 'default']);
+      if (!pool.ok) {
+        const defined = await runVirsh(['pool-define-as', 'default', 'dir', '--target', '/var/lib/libvirt/images']);
+        if (!defined.ok) {
+          socket.emit('vm:action:result', { action: 'create', ok: false, message: `storage pool create failed: ${defined.err}` });
+          return;
+        }
+        await runVirsh(['pool-start', 'default']);
+        await runVirsh(['pool-autostart', 'default']);
+      }
       const created = await runVirsh(['vol-create-as', 'default', volName, '--format', 'qcow2', `${diskSize}G`]);
       if (!created.ok) {
         socket.emit('vm:action:result', { action: 'create', ok: false, message: `disk create failed: ${created.err}` });

@@ -7,6 +7,11 @@
 function showToast(message, type) {
   type = type || 'info';
   const icons = { success: '✅', danger: '❌', warning: '⚠️', info: 'ℹ️' };
+  // Record the popup in the webapp log (renderweblog) so it's not lost once
+  // the toast fades.
+  if (typeof socket !== 'undefined' && socket) {
+    socket.emit('logmessage', `[${type}] ${message}`);
+  }
   const el = document.createElement('div');
   el.className = 'toast show';
   el.setAttribute('role', 'alert');
@@ -22,7 +27,7 @@ function showToast(message, type) {
   const container = document.getElementById('toast-container');
   if (container) {
     container.appendChild(el);
-    setTimeout(function() { el.classList.remove('show'); setTimeout(function() { el.remove(); }, 350); }, 5000);
+    setTimeout(function() { el.classList.remove('show'); setTimeout(function() { el.remove(); }, 350); }, 10000);
   }
   // Fallback if container is missing (page not fully rendered yet)
   else {

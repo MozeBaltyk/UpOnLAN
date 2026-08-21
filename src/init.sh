@@ -95,6 +95,22 @@ if [[ ! -f /config/wol.yml ]]; then
   cp /defaults/wol.yml /config/wol.yml
 fi
 
+# Trust a mounted corporate CA bundle (e.g. a TLS-inspecting proxy that
+# re-signs vendor HTTPS like releases.rancher.com). Drop PEM certs in
+# /config/certs/ and they're added to the system trust store so curl trusts
+# them; Node picks up the same bundle via NODE_EXTRA_CA_CERTS (supervisor.conf
+# points the webapp at /etc/ssl/certs/ca-certificates.crt, refreshed here).
+if ls /config/certs/*.crt /config/certs/*.pem >/dev/null 2>&1; then
+  echo "[uponlanxyz-init] Trusting mounted CA certs from /config/certs/"
+  mkdir -p /usr/local/share/ca-certificates
+  for cert in /config/certs/*.crt /config/certs/*.pem; do
+    [ -f "$cert" ] || continue
+    name="$(basename "$cert")"
+    cp "$cert" "/usr/local/share/ca-certificates/${name%.*}.crt" 2>/dev/null || true
+  done
+  update-ca-certificates 2>/dev/null || true
+fi
+
 # Ownership
 chown -R nbxyz:nbxyz /config
 chown -R nbxyz:nbxyz /assets

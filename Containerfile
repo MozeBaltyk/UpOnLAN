@@ -84,10 +84,12 @@ RUN chmod +x /scripts/build_ipxe_roms.sh /scripts/sources/genfsimg
 #### VM console support (host libvirt socket mounted at /var/run/libvirt)
 # util-linux provides `script`, which allocates the controlling TTY `virsh console` requires.
 RUN apk add --no-cache libvirt-client util-linux
-# Full virsh access (passwordless) — the host libvirt socket is mounted
-# read-write, so the webapp can manage any domain/network/pool visible on the
-# host's qemu:///system. Trust boundary = the webapp's own authentication.
-RUN echo "nbxyz ALL=(root) NOPASSWD:/usr/bin/virsh *" > /etc/sudoers.d/virsh
+# sudo points at the virsh-safe wrapper, not virsh itself, so the webapp's
+# subcommand whitelist + name validation (src/virsh-safe) is enforced at the
+# sudo boundary rather than relying on the webapp's own authentication.
+COPY src/virsh-safe /usr/local/bin/virsh-safe
+RUN chmod +x /usr/local/bin/virsh-safe
+RUN echo "nbxyz ALL=(root) NOPASSWD:/usr/local/bin/virsh-safe" > /etc/sudoers.d/virsh
 RUN chmod 440 /etc/sudoers.d/virsh
 
 # default command

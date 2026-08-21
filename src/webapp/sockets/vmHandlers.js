@@ -30,8 +30,8 @@ function normalizeFirmware(firmware) {
   return firmware === 'efi' ? 'efi' : 'bios';
 }
 
-// virsh subcommands the container sudoers whitelist allows (restart is a
-// power cycle — destroy + start — handled separately below).
+// virsh subcommands the virsh-safe wrapper allows (restart is a power cycle —
+// destroy + start — handled separately below).
 const POWER_ACTIONS = { on: 'start', off: 'destroy' };
 
 // `virsh console` is exclusive per domain; keep one attachment per VM so a
@@ -47,7 +47,7 @@ function runVirsh(args) {
   return new Promise((resolve) => {
     let out = '';
     let err = '';
-    const proc = spawn('sudo', ['virsh', ...args]);
+    const proc = spawn('sudo', ['/usr/local/bin/virsh-safe', ...args]);
     proc.stdout.on('data', (d) => (out += d));
     proc.stderr.on('data', (d) => (err += d));
     proc.on('close', (code) => resolve({ ok: code === 0, out: out.trim(), err: err.trim() }));
@@ -382,7 +382,7 @@ module.exports = function registerVmHandlers(socket) {
     // `virsh console` refuses to run without a controlling TTY; `script`
     // (util-linux, added in the Containerfile) allocates one. script runs as
     // the unprivileged webapp user and execs the whitelisted
-    // `sudo virsh console --force` inside the pty — never `sudo script`, which
+    // `sudo /usr/local/bin/virsh-safe console --force` inside the pty — never `sudo script`, which
     // would let any authed user run arbitrary shell as root. `--force` takes
     // over any stale/cockpit console session (e.g. a zombie left by a power
     // cycle), otherwise the attach fails with "Active console session exists".
@@ -391,7 +391,7 @@ module.exports = function registerVmHandlers(socket) {
     // `script` (util-linux) silently no-ops its `-c` command when $SHELL is
     // unset — supervisord starts the webapp with a minimal env (no SHELL), so
     // the console attach produced zero output and exited 0. Pin SHELL here.
-    const proc = spawn('script', ['-q', '-c', `sudo virsh console --force '${VM_NAME}'`, '/dev/null'], { detached: true, env: { ...process.env, SHELL: process.env.SHELL || '/bin/sh' } });
+    const proc = spawn('script', ['-q', '-c', `sudo /usr/local/bin/virsh-safe console --force '${VM_NAME}'`, '/dev/null'], { detached: true, env: { ...process.env, SHELL: process.env.SHELL || '/bin/sh' } });
     activeConsoles.set(VM_NAME, proc);
     proc.stdout.on('data', (d) => socket.emit('vm:console:data', d.toString()));
     proc.stderr.on('data', (d) => socket.emit('vm:console:data', d.toString()));

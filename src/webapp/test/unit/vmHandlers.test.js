@@ -25,6 +25,16 @@ describe('vmHandlers.isValidVmName', () => {
   });
 });
 
+describe('vmHandlers.isInactivePoolInfo', () => {
+  const poolInfo = (state) => `Name:           uponlan\nUUID:           12345678-1234-1234-1234-123456789abc\nState:          ${state}\nPersistent:     yes\nAutostart:      no\nCapacity:       1.00 GiB\n`;
+
+  it('detects a defined-but-inactive pool (vol-create-as refuses it)', () => {
+    expect(vmHandlers.isInactivePoolInfo(poolInfo('inactive'))).toBe(true);
+    expect(vmHandlers.isInactivePoolInfo(poolInfo('running'))).toBe(false);
+    expect(vmHandlers.isInactivePoolInfo('')).toBe(false);
+  });
+});
+
 describe('vmHandlers.buildDomainXml', () => {
   const xml = vmHandlers.buildDomainXml('uponlan-client', 'uponlan');
 

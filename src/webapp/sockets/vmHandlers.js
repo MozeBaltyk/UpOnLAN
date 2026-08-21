@@ -72,10 +72,22 @@ async function getVmHasConsole() {
   return res.ok && /<console[^>]*type=['"]pty['"]/.test(res.out);
 }
 
+// `virsh pool-info` prints "State: inactive" for a defined-but-not-started
+// dir pool; only an active pool accepts vol-create-as.
+function isInactivePoolInfo(poolInfoOut) {
+  return /State:\s*inactive/i.test(poolInfoOut);
+}
+
 // Ensure the dedicated storage pool exists (define + start + autostart).
 async function ensureStoragePool() {
   const info = await runVirsh(['pool-info', VM_STORAGE_POOL]);
-  if (info.ok) return true;
+  if (info.ok) {
+    // pool-info succeeds for a defined-but-inactive pool too (e.g. left over
+    // after a destroy where pool-undefine failed, or a host reboot before
+    // autostart) — start it or vol-create-as will refuse with "not active".
+    if (isInactivePoolInfo(info.out)) await runVirsh(['pool-start', VM_STORAGE_POOL]);
+    return true;
+  }
   const defined = await runVirsh(['pool-define-as', VM_STORAGE_POOL, 'dir', '--target', VM_STORAGE_POOL_PATH]);
   if (!defined.ok) return false;
   await runVirsh(['pool-start', VM_STORAGE_POOL]);
@@ -412,6 +424,7 @@ module.exports = function registerVmHandlers(socket) {
 };
 
 module.exports.isValidVmName = isValidVmName;
+module.exports.isInactivePoolInfo = isInactivePoolInfo;
 module.exports.buildDomainXml = buildDomainXml;
 module.exports.buildNetworkXml = buildNetworkXml;
 module.exports.normalizeFirmware = normalizeFirmware;

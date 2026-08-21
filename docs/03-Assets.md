@@ -50,10 +50,10 @@ There are two `BUILD_TYPE`s in `release/assets/`, and they now take **different 
 
 | `BUILD_TYPE` | Behavior | Release path |
 | --- | --- | --- |
-| `direct_file` | list vendor URLs per file (no extraction); imported on-demand by the Assets tab | catalog-only — never mirrored to GitHub |
+| `direct_file` | list vendor URLs per file (no extraction); imported on-demand by the Assets tab | catalog-only — entries ship in `endpoints.yml`, but no bundle is mirrored to GitHub |
 | `iso_extraction` | download an ISO, then extract kernel/initrd/rootfs out of it | build-time pipeline + GitHub |
 
-`direct_file` recipes list the vendor URLs directly (`talos`, `ubuntu`, `harvester`, `proxmox`): the catalog entry records those URLs in `sources` (aligned with `files`) plus `build_type: direct_file`, and the **Assets tab** pulls each file from its vendor URL into `/assets/<key>/` on demand. Nothing is published to GitHub. `iso_extraction` (no current consumer — Oracle was the only one, removed) still downloads the ISO at build time and extracts the kernel/initrd for GitHub publication, because those files aren't always published separately by the vendor.
+`direct_file` recipes list the vendor URLs directly (`talos`, `ubuntu`, `harvester`, `proxmox`): the catalog entry records those URLs in `sources` (aligned with `files`) plus `build_type: direct_file`, and the **Assets tab** pulls each file from its vendor URL into `/assets/<key>/` on demand. The **catalog entries are still published** (so a remote deploy knows what can be imported), but no direct_file bundle is uploaded to GitHub. `iso_extraction` (no current consumer — Oracle was the only one, removed) still downloads the ISO at build time and extracts the kernel/initrd for GitHub publication, because those files aren't always published separately by the vendor.
 
 `direct_file` fetches whatever the recipe lists — usually small prebuilt boot files (`talos`, `ubuntu`, `harvester`), but `proxmox` also lists a full installer ISO (`proxmox.iso`), imported as a plain file and booted directly. Proxmox publishes no stable directly-downloadable netboot initrd, so that ISO plus the boot files are listed from `netbootxyz/asset-mirror`.
 

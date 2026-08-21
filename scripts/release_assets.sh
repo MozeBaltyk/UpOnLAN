@@ -24,18 +24,16 @@ for i in $(ls release/assets/*/setting.sh); do
     build_type=$(sed -n 's/^BUILD_TYPE=//p' "$i" | head -1)
     build_type="${build_type%\"}"; build_type="${build_type#\"}"
     build_type="${build_type%\'}"; build_type="${build_type#\'}"
-    if [ "$build_type" = "direct_file" ] && [ "$mirror_layout" = "github" ]; then
-        # direct_file assets are no longer mirrored to GitHub: they are imported
-        # on-demand by the webapp Assets tab straight from the vendor URL, so no
-        # bundle and no catalog entry is published for them.
-        echo "Skipping $os (direct_file is imported on-demand, not mirrored to GitHub)"
-        continue
-    fi
     echo "Processing $os"
     cd ./release/assets
     if [ "$build_type" = "direct_file" ]; then
-        # Local mirror: catalog-only (vendor sources + metadata, no download).
-        NO_RESUME=1 OUTPUT_DIR=../output/assets MIRROR_LAYOUT="$mirror_layout" CATALOG_ONLY=1 ./build.sh "$os"
+        # direct_file is always catalog-only (vendor sources + metadata, no
+        # download). Even for the GitHub-published catalog we keep the local
+        # /assets/<key>/ path, because those assets are imported on-demand and
+        # then served locally by nginx rather than fetched from GitHub.
+        catalog_layout="$mirror_layout"
+        [ "$mirror_layout" = "github" ] && catalog_layout="local"
+        NO_RESUME=1 OUTPUT_DIR=../output/assets MIRROR_LAYOUT="$catalog_layout" CATALOG_ONLY=1 ./build.sh "$os"
     else
         NO_RESUME=1 OUTPUT_DIR=../output/assets MIRROR_LAYOUT="$mirror_layout" ./build.sh "$os"
     fi

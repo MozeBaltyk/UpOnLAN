@@ -223,6 +223,11 @@ class TestActionSpecs(TempDirTestCase):
         self.assertEqual('host', host_marker.read_text())
         self.assertIn('node node_modules/vitest/vitest.mjs run', webapp_marker.read_text())
 
+    def test_old_test_webapp_alias_is_rejected(self):
+        proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'test-webapp', check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn('test - run tests/specs on the host', proc.stdout + proc.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

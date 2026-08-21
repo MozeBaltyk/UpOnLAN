@@ -207,12 +207,6 @@ run-webapp-tests() {
     sudo podman exec -it "$cid" sh -c "cd /webapp && $cmd"
 }
 
-test-webapp() {
-    read -p "Which test layer? [all/unit/integration/e2e/smoke] (default: all): " layer
-    layer=${layer:-all}
-    run-webapp-tests "$layer"
-}
-
 run-tests() {
     echo "Running release-flow specs from tests/specs/"
     bash tests/specs/run.sh
@@ -291,7 +285,6 @@ case $action in
     connect) echo "Action: connect to uponlan container" ;;
     mirror-assets) echo "Action: build local asset output" ;;
     test) echo "Action: run tests/specs + full webapp suite" ;;
-    test-webapp) echo "Action: run webapp tests in container" ;;
     preview) echo "Action: show deployment context + preflight" ;;
     release-menu) echo "Action: build menu release" ;;
     *) echo "Invalid action: $action"; print_help; exit 1 ;;

@@ -84,5 +84,87 @@ class MirrorAssetsSpecs(TempDirTestCase):
         self.assertEqual('', arg_file.read_text())
 
 
+class PreviewPullPolicySpecs(TempDirTestCase):
+    """preview shows the resolved pull policy: Always for ghcr (public image),
+    Never for a local build — so a default deploy always fetches the latest
+    published `latest` tag instead of reusing a stale cached image."""
+
+    def setUp(self):
+        super().setUp()
+        self.copy('wakemeup.sh')
+        self.stub('bin/sudo', STUB_SUDO, exe=True)
+        self.stub('bin/helm', '#!/bin/bash\nexit 0\n', exe=True)
+        self.stub('bin/ss', '#!/bin/bash\nexit 0\n', exe=True)
+
+    def _preview(self, *args):
+        return self.run_cmd('bash', 'wakemeup.sh', '-a', 'preview', *args)
+
+    def test_default_pull_policy_is_always(self):
+        proc = self._preview()
+        self.assertIn('(Always)', proc.stdout)
+
+    def test_build_pull_policy_is_never(self):
+        proc = self._preview('--build')
+        self.assertIn('(Never)', proc.stdout)
+
+
+class DestroySpecs(TempDirTestCase):
+    """destroy removes the image for the deployment mode in effect, not a
+    hardcoded localhost build."""
+
+    def setUp(self):
+        super().setUp()
+        self.copy('wakemeup.sh')
+        # Record sudo's argv so the spec can assert the `podman rmi` target.
+        self.stub(
+            'bin/sudo',
+            '#!/bin/bash\nprintf "%s\\n" "$*" >> "${SUDO_LOG:?}"\nexit 0\n',
+            exe=True,
+        )
+        # destroy -> kube_play --down renders the chart through helm.
+        self.stub('bin/helm', '#!/bin/bash\nexit 0\n', exe=True)
+
+    def _rmi_lines(self, *args):
+        log = self.tmp / 'sudo.log'
+        self.run_cmd(
+            'bash', 'wakemeup.sh', '-a', 'destroy', *args,
+            env={'SUDO_LOG': str(log)},
+        )
+        return [l for l in log.read_text().splitlines() if 'rmi' in l]
+
+    def test_destroy_default_removes_ghcr_image(self):
+        rmis = self._rmi_lines()
+        self.assertTrue(any('ghcr.io/mozebaltyk/uponlan:latest' in r for r in rmis))
+
+    def test_destroy_build_removes_local_image(self):
+        rmis = self._rmi_lines('--build')
+        self.assertTrue(any('localhost/uponlan:latest' in r for r in rmis))
+        self.assertFalse(any('ghcr.io' in r for r in rmis))
+
+
+class ReleaseMenuSpecs(TempDirTestCase):
+    """release-menu runs release_menu.sh with the version from version.ipxe."""
+
+    def setUp(self):
+        super().setUp()
+        self.copy('wakemeup.sh')
+        self.stub(
+            'scripts/release_menu.sh',
+            '#!/bin/bash\nprintf "%s" "$1" > "${ARG_FILE:?}"\n',
+            exe=True,
+        )
+
+    def test_passes_menu_version(self):
+        self.stub('release/menus/version.ipxe', 'set menu_version 0.2.0\n')
+        arg_file = self.tmp / 'arg.txt'
+        self.run_cmd('bash', 'wakemeup.sh', '-a', 'release-menu', env={'ARG_FILE': str(arg_file)})
+        self.assertEqual('0.2.0', arg_file.read_text())
+
+    def test_errors_without_version(self):
+        self.stub('release/menus/version.ipxe', '')
+        proc = self.run_cmd('bash', 'wakemeup.sh', '-a', 'release-menu', check=False)
+        self.assertNotEqual(proc.returncode, 0)
+
+
 if __name__ == '__main__':
     unittest.main()

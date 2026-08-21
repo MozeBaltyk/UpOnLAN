@@ -11,17 +11,15 @@ fi
 
 OUTPUT_ROOT="release/output"
 
-run_release_assets() {
-    bash scripts/release_assets.sh "${asset_target:-}"
-}
-
 # Deployment chart + knob defaults. The default deploy pulls the published
-# ghcr image; --build (or --local) builds the local image instead, and --local
-# also switches the endpoint to the local mirror + pins the menu version.
+# ghcr image (public — no login needed); --build (or --local) builds the local
+# image instead, and --local also switches the endpoint to the local mirror +
+# pins the menu version. ghcr pulls use Always so a deploy/redeploy always
+# fetches the latest published `latest` tag instead of reusing a stale cache.
 CHART="charts/uponlan"
 UPONLAN_IMAGE_REPO="ghcr.io/mozebaltyk/uponlan"
 UPONLAN_IMAGE_TAG="latest"
-UPONLAN_PULL_POLICY="IfNotPresent"
+UPONLAN_PULL_POLICY="Always"
 ENDPOINT_URL="https://github.com/mozebaltyk/uponlan"
 MENU_VERSION=""
 
@@ -66,10 +64,6 @@ preflight() {
     local fail=0
     command -v podman >/dev/null || { echo -e "${C_RED}ERROR: 'podman' not found.${C_RESET}" >&2; fail=1; }
     command -v helm   >/dev/null || { echo -e "${C_RED}ERROR: 'helm' not found (needed to render the chart).${C_RESET}" >&2; fail=1; }
-    if [ "${UPONLAN_IMAGE_REPO}" = "ghcr.io/mozebaltyk/uponlan" ] \
-       && ! sudo podman login --get-login ghcr.io >/dev/null 2>&1; then
-        echo -e "${C_YELLOW}WARN: not logged in to ghcr.io — run 'podman login ghcr.io' if the package is private.${C_RESET}" >&2
-    fi
     for pair in "8080 tcp" "3000 tcp" "69 udp"; do
         set -- $pair
         if port_in_use "$1" "$2"; then
@@ -139,10 +133,16 @@ deploy() {
 }
 
 destroy() {
+    # kube_play --down also runs resolve_deploy_knobs, so the image repo/tag
+    # below match the same mode deploy would have used.
     kube_play --down
-    # Tolerate a missing image: a prior destroy/redeploy may have already
-    # removed it, and `set -e` would otherwise abort the whole action.
-    sudo podman rmi localhost/uponlan:latest 2>/dev/null || true
+    # Remove the image for the deployment mode in effect (ghcr pull vs local
+    # build), not a hardcoded `localhost/uponlan:latest`. Tolerate a missing
+    # image: a prior destroy/redeploy may have already removed it, and `set -e`
+    # would otherwise abort the whole action. Removing the ghcr image means the
+    # next deploy/redeploy re-pulls the latest published image instead of
+    # reusing a stale cached one.
+    sudo podman rmi "${UPONLAN_IMAGE_REPO}:${UPONLAN_IMAGE_TAG}" 2>/dev/null || true
 }
 
 redeploy() {
@@ -151,23 +151,35 @@ redeploy() {
 }
 
 logs() {
-    sudo podman pod ps; echo ""
-    sudo podman ps -a; echo ""
-    sudo podman logs -f $(sudo podman ps -q)
+    sudo podman ps --filter name=uponlan-webapp; echo ""
+    sudo podman logs -f $(sudo podman ps --filter name=uponlan-webapp --format "{{.ID}}")
 }
 
 connect() {
-    sudo podman exec -it $(sudo podman ps --filter ancestor=localhost/uponlan:latest --format "{{.ID}}") /bin/sh
+    # Locate the webapp container by name (the chart names it <pod>-webapp),
+    # not by image ancestor — a ghcr deploy has no localhost/uponlan image.
+    sudo podman exec -it $(sudo podman ps --filter name=uponlan-webapp --format "{{.ID}}") /bin/sh
 }
 
 mirror-assets() {
-    run_release_assets
+    bash scripts/release_assets.sh "${asset_target:-}"
     echo "[mirror-assets] local asset output built at ./${OUTPUT_ROOT}"
-    # `[ -n ... ] && echo` returns non-zero under `set -e` when asset_target is
-    # empty, aborting the action — use an explicit if instead.
     if [ -n "${asset_target:-}" ]; then
         echo "[mirror-assets] target: ${asset_target}"
     fi
+}
+
+release-menu() {
+    # Menu version lives in release/menus/version.ipxe (same source deploy --local
+    # and scripts/build_release.sh use). release_menu.sh bumps version.ipxe to it
+    # and packs release/output/menu/<ver>/menus.tar.gz (+ releases/latest JSON).
+    local menu_ver="$(sed -n 's/^set menu_version //p' release/menus/version.ipxe)"
+    if [ -z "$menu_ver" ]; then
+        echo "ERROR: no 'set menu_version' line in release/menus/version.ipxe" >&2
+        return 1
+    fi
+    echo "[release-menu] releasing menu ${menu_ver}"
+    bash scripts/release_menu.sh "$menu_ver"
 }
 
 test-webapp() {
@@ -179,7 +191,9 @@ test-webapp() {
         *) echo "Invalid layer: $layer (use all/unit/integration/e2e/smoke)"; exit 1 ;;
     esac
 
-    cid=$(sudo podman ps --filter ancestor=localhost/uponlan:latest --format "{{.ID}}" | head -n1)
+    # Locate the webapp container by name (not image ancestor) so this works
+    # after either a ghcr or a local build deploy.
+    cid=$(sudo podman ps --filter name=uponlan-webapp --format "{{.ID}}" | head -n1)
     if [[ -z "$cid" ]]; then
         echo "No uponlan container running. Start it first: ./wakemeup.sh -a deploy"
         exit 1
@@ -212,6 +226,7 @@ print_help() {
     echo "7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets"
     echo "8. test-webapp - run webapp tests inside the container"
     echo "9. preview - show deployment context and run preflight checks (no deploy)"
+    echo "10. release-menu - build the menu release (release_menu.sh) for the version in release/menus/version.ipxe"
     echo ""
 }
 
@@ -254,6 +269,7 @@ case $action in
     mirror-assets) echo "Action: build local asset output" ;;
     test-webapp) echo "Action: run webapp tests in container" ;;
     preview) echo "Action: show deployment context + preflight" ;;
+    release-menu) echo "Action: build menu release" ;;
     *) echo "Invalid action: $action"; print_help; exit 1 ;;
 esac
 

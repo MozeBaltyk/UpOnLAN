@@ -3,7 +3,6 @@
 ### Requirements
 
 - A Podman engine and permission to run the `sudo podman` commands used by `wakemeup.sh`.
-- For the default deploy (pulls `ghcr.io/mozebaltyk/uponlan`): a `podman login ghcr.io` session — the package is private by default. Use `--build`/`--local` to build locally instead.
 - Host ports `8080/TCP`, `3000/TCP`, and `69/UDP` available. Port 69 is privileged and must not be occupied by another TFTP service.
 - For `deploy --local`, Python 3 plus prepared `release/output` artifacts.
 
@@ -21,7 +20,7 @@
 - **`--build`** — builds `localhost/uponlan:latest` and deploys it against GitHub assets (local development).
 - **`--local`** — builds locally and serves `release/output` on `:8899`; requires `release/output/assets/endpoints.yml` and `release/output/menu/0.1.0/menus.tar.gz` (build them with `./wakemeup.sh -a mirror-assets` + `./scripts/release_menu.sh 0.1.0`); pins `MENU_VERSION` from `release/menus/version.ipxe`.
 
-`./wakemeup.sh -a preview` prints the resolved context (image / endpoint / menu version / ports) and runs preflight checks — host ports free, `podman` + `helm` present, ghcr login, and the libvirt socket — without deploying anything. `deploy` runs the same checks and aborts on a hard failure (missing `podman`/`helm`); a port already in use only warns, since `deploy` is idempotent (`--replace` recreates the running pod).
+`./wakemeup.sh -a preview` prints the resolved context (image / endpoint / menu version / ports) and runs preflight checks — host ports free, `podman` + `helm` present, and the libvirt socket — without deploying anything. `deploy` runs the same checks and aborts on a hard failure (missing `podman`/`helm`); a port already in use only warns, since `deploy` is idempotent (`--replace` recreates the running pod). The ghcr image is public, so no registry login is required.
 
 ### Security and network exposure
 

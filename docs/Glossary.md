@@ -55,7 +55,7 @@ Quick reference for the terms used across the docs. Grouped by theme; each entry
 ## Deployment
 
 - **deploy modes** — `deploy` (pull the ghcr image + GitHub assets), `--build` (build the local image), `--local` (serve `release/output` and point the menu at it).
-- **preview / preflight** — show the resolved deployment context and run checks (ports free, `podman`/`helm` present, ghcr login, libvirt socket) without deploying.
+- **preview / preflight** — show the resolved deployment context and run checks (ports free, `podman`/`helm` present, libvirt socket) without deploying.
 - **Podman / play kube** — the container engine and its command that runs a Kubernetes YAML pod (fed here by `helm template`).
 - **Helm chart** — `charts/uponlan/`, the templated deployment manifest (`values.yaml` + `pod.yaml`).
 - **KVM / libvirt / virsh** — the hypervisor stack the webapp's VM console controls over `qemu:///system` and the mounted `/var/run/libvirt/libvirt-sock`.

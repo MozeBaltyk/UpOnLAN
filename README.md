@@ -49,6 +49,7 @@ Allowed Actions
 7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets
 8. test-webapp - run webapp tests in container
 9. preview - show deployment context and run preflight checks (no deploy)
+10. release-menu - build the menu release (release_menu.sh) for the version in release/menus/version.ipxe
 ```
 
 * 3 types of deployments:

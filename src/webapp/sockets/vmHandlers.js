@@ -12,6 +12,10 @@ const VM_NETWORK = process.env.VM_NETWORK || 'uponlan';
 // host). Used in the network's dhcp-boot answer; empty falls back to the DHCP
 // server's own address.
 const BOOT_SERVER_IP = process.env.BOOT_SERVER_IP || '';
+// Dedicated storage pool for the test VM's disks — created on demand, removed
+// with the VM, so UpOnLAN never touches the host's other pools.
+const VM_STORAGE_POOL = process.env.VM_STORAGE_POOL || 'uponlan';
+const VM_STORAGE_POOL_PATH = process.env.VM_STORAGE_POOL_PATH || '/var/lib/libvirt/images/uponlan';
 // Host-side file QEMU loads as the NIC's option ROM. Without it the e1000 has
 // no PXE ROM on Ubuntu hosts (qemu no longer bundles one) and the guest never
 // attempts network boot. Built by scripts/build_ipxe_roms.sh.
@@ -68,11 +72,21 @@ async function getVmHasConsole() {
   return res.ok && /<console[^>]*type=['"]pty['"]/.test(res.out);
 }
 
-// Name of the first active libvirt storage pool (varies per host: `default`,
-// `images`, …). Returns '' when none.
-async function discoverStoragePool() {
-  const list = await runVirsh(['pool-list', '--name']);
-  return list.ok ? (list.out.split('\n').map((s) => s.trim()).find(Boolean) || '') : '';
+// Ensure the dedicated storage pool exists (define + start + autostart).
+async function ensureStoragePool() {
+  const info = await runVirsh(['pool-info', VM_STORAGE_POOL]);
+  if (info.ok) return true;
+  const defined = await runVirsh(['pool-define-as', VM_STORAGE_POOL, 'dir', '--target', VM_STORAGE_POOL_PATH]);
+  if (!defined.ok) return false;
+  await runVirsh(['pool-start', VM_STORAGE_POOL]);
+  await runVirsh(['pool-autostart', VM_STORAGE_POOL]);
+  return true;
+}
+
+// Tear down the dedicated pool (best-effort; call after deleting the volume).
+async function removeStoragePool() {
+  await runVirsh(['pool-destroy', VM_STORAGE_POOL]);
+  await runVirsh(['pool-undefine', VM_STORAGE_POOL]);
 }
 
 // Minimal diskless network-boot domain: it is a PXE client, not a storage
@@ -263,25 +277,17 @@ module.exports = function registerVmHandlers(socket) {
     const volName = `${VM_NAME}.qcow2`;
     let diskPath = null;
     if (diskSize > 0) {
-      // Use an existing active storage pool (its name varies per host); create
-      // `default` only when the host has no pool at all.
-      let poolName = await discoverStoragePool();
-      if (!poolName) {
-        const defined = await runVirsh(['pool-define-as', 'default', 'dir', '--target', '/var/lib/libvirt/images']);
-        if (!defined.ok) {
-          socket.emit('vm:action:result', { action: 'create', ok: false, message: `storage pool create failed: ${defined.err}` });
-          return;
-        }
-        await runVirsh(['pool-start', 'default']);
-        await runVirsh(['pool-autostart', 'default']);
-        poolName = 'default';
+      // Dedicated `uponlan` pool: created on demand, removed with the VM.
+      if (!(await ensureStoragePool())) {
+        socket.emit('vm:action:result', { action: 'create', ok: false, message: `storage pool '${VM_STORAGE_POOL}' create failed` });
+        return;
       }
-      const created = await runVirsh(['vol-create-as', poolName, volName, '--format', 'qcow2', `${diskSize}G`]);
+      const created = await runVirsh(['vol-create-as', VM_STORAGE_POOL, volName, '--format', 'qcow2', `${diskSize}G`]);
       if (!created.ok) {
         socket.emit('vm:action:result', { action: 'create', ok: false, message: `disk create failed: ${created.err}` });
         return;
       }
-      const pathRes = await runVirsh(['vol-path', '--pool', poolName, volName]);
+      const pathRes = await runVirsh(['vol-path', '--pool', VM_STORAGE_POOL, volName]);
       diskPath = pathRes.ok ? pathRes.out : null;
       if (!diskPath) {
         socket.emit('vm:action:result', { action: 'create', ok: false, message: `disk path lookup failed: ${pathRes.err}` });
@@ -327,11 +333,11 @@ module.exports = function registerVmHandlers(socket) {
     const res = await runVirsh(['undefine', '--nvram', VM_NAME]);
     let msg = res.ok ? `VM '${VM_NAME}' destroyed` : `virsh undefine failed: ${res.err}`;
     if (res.ok) {
-      // Best-effort disk cleanup (skip when the host has no storage pool).
-      const poolName = await discoverStoragePool();
-      if (poolName) {
-        await runVirsh(['vol-delete', '--pool', poolName, `${VM_NAME}.qcow2`]);
-      }
+      // Remove the disk volume + the dedicated pool it lives in (best-effort:
+      // a diskless VM has neither, and the virsh calls then just report
+      // "not found").
+      await runVirsh(['vol-delete', '--pool', VM_STORAGE_POOL, `${VM_NAME}.qcow2`]);
+      await removeStoragePool();
       // Tear the boot network down too (user request). Best-effort: other
       // guests may still be attached, then net-destroy reports it.
       const nd = await runVirsh(['net-destroy', VM_NETWORK]);

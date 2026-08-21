@@ -58,3 +58,91 @@ describe('wolServices.wakeHost', () => {
     expect(!err || err.message).not.toBe('Invalid MAC address');
   });
 });
+
+describe('wolServices.isValidIp / isValidWakeAt', () => {
+  it('accepts well-formed IPv4 and rejects anything else', () => {
+    expect(wol.isValidIp('192.168.7.10')).toBe(true);
+    expect(wol.isValidIp('0.0.0.0')).toBe(true);
+    expect(wol.isValidIp('255.255.255.255')).toBe(true);
+    expect(wol.isValidIp('256.1.1.1')).toBe(false);
+    expect(wol.isValidIp('1.2.3')).toBe(false);
+    expect(wol.isValidIp('1.2.3.4.5')).toBe(false);
+    expect(wol.isValidIp('abc.def.ghi.jkl')).toBe(false);
+    expect(wol.isValidIp('1.2.3.4; rm -rf /')).toBe(false);
+    expect(wol.isValidIp(null)).toBe(false);
+  });
+
+  it('accepts only YYYY-MM-DDTHH:MM and parses to a real date', () => {
+    expect(wol.isValidWakeAt('2026-08-22T07:00')).toBe(true);
+    expect(wol.isValidWakeAt('2026-08-22')).toBe(false);
+    expect(wol.isValidWakeAt('not-a-time')).toBe(false);
+    expect(wol.isValidWakeAt('2026-99-99T99:99')).toBe(false);
+    expect(wol.isValidWakeAt(null)).toBe(false);
+  });
+});
+
+describe('wolServices.addWolEntry (ip / wake_at validation)', () => {
+  it('rejects an invalid IP address', () => {
+    expect(() => wol.addWolEntry({ default_mac: '11:22:33:44:55:66', ip: '999.1.1.1' })).toThrow('Invalid IP address');
+  });
+
+  it('rejects an invalid wake time', () => {
+    expect(() => wol.addWolEntry({ default_mac: '11:22:33:44:55:66', wake_at: 'tomorrow' })).toThrow('Invalid wake time');
+  });
+});
+
+describe('wolServices.updateWolEntry', () => {
+  it('throws when the MAC does not exist', () => {
+    expect(() => wol.updateWolEntry('00:00:00:00:00:00', { ip: '192.168.1.1' })).toThrow('Entry not found');
+  });
+
+  it('sets then clears ip and wake_at (persisted)', () => {
+    wol.addWolEntry({ default_mac: 'CC:DD:EE:FF:00:11', hostname: 'Updater' });
+
+    let data = wol.updateWolEntry('cc:dd:ee:ff:00:11', { ip: '192.168.1.10', wake_at: '2026-08-22T07:00' });
+    let entry = data.wakeonlan.find((e) => e.default_mac.toLowerCase() === 'cc:dd:ee:ff:00:11');
+    expect(entry.ip).toBe('192.168.1.10');
+    expect(entry.wake_at).toBe('2026-08-22T07:00');
+
+    // persisted to disk
+    entry = wol.getWolEntries().wakeonlan.find((e) => e.default_mac.toLowerCase() === 'cc:dd:ee:ff:00:11');
+    expect(entry.ip).toBe('192.168.1.10');
+    expect(entry.wake_at).toBe('2026-08-22T07:00');
+
+    // null/empty clears the field
+    data = wol.updateWolEntry('cc:dd:ee:ff:00:11', { ip: null, wake_at: '' });
+    entry = data.wakeonlan.find((e) => e.default_mac.toLowerCase() === 'cc:dd:ee:ff:00:11');
+    expect(entry.ip).toBeNull();
+    expect(entry.wake_at).toBeNull();
+
+    wol.deleteWolEntry('cc:dd:ee:ff:00:11');
+  });
+
+  it('rejects invalid ip / wake_at on update', () => {
+    wol.addWolEntry({ default_mac: 'CC:DD:EE:FF:00:22', hostname: 'Updater2' });
+    expect(() => wol.updateWolEntry('cc:dd:ee:ff:00:22', { ip: '999.1.1.1' })).toThrow('Invalid IP address');
+    expect(() => wol.updateWolEntry('cc:dd:ee:ff:00:22', { wake_at: 'not-a-time' })).toThrow('Invalid wake time');
+    wol.deleteWolEntry('cc:dd:ee:ff:00:22');
+  });
+});
+
+describe('wolServices.computeDueWakes', () => {
+  it('returns only entries whose wake_at is due', () => {
+    const entries = [
+      { default_mac: 'AA', wake_at: '2026-08-22T07:00' }, // due
+      { default_mac: 'BB', wake_at: '2026-08-22T09:00' }, // future
+      { default_mac: 'CC' },                              // no schedule
+      { default_mac: 'DD', wake_at: '2026-08-22T07:00' }, // due
+    ];
+    const now = new Date('2026-08-22T08:00:00');
+    expect(wol.computeDueWakes(entries, now).map((e) => e.default_mac)).toEqual(['AA', 'DD']);
+  });
+});
+
+describe('wolServices.pingHost', () => {
+  it('resolves false for an invalid IP without touching the shell', async () => {
+    await expect(wol.pingHost('not-an-ip')).resolves.toBe(false);
+    await expect(wol.pingHost('999.999.999.999')).resolves.toBe(false);
+    await expect(wol.pingHost('')).resolves.toBe(false);
+  });
+});

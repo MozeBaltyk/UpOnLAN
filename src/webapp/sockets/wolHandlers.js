@@ -2,28 +2,40 @@
 const wolService = require('../services/wolServices');
 
 module.exports = function registerWolHandlers(socket) {
-  socket.on('getwol', () => {
+  socket.on('getwol', async () => {
     try {
-      const data = wolService.getWolEntries();
+      const data = await wolService.getWolEntriesWithStatus();
       socket.emit('renderwol', data);
     } catch (err) {
       socket.emit('error', err.message);
     }
   });
 
-  socket.on('addwol', (newEntry) => {
+  // add/update/delete re-emit with live status so the IP badge reflects the
+  // new entry immediately (a raw-config emit would render every host "unknown"
+  // until the next getwol).
+  socket.on('addwol', async (newEntry) => {
     try {
-      const data = wolService.addWolEntry(newEntry);
-      socket.emit('renderwol', data);
+      wolService.addWolEntry(newEntry);
+      socket.emit('renderwol', await wolService.getWolEntriesWithStatus());
     } catch (err) {
       socket.emit('error', err.message);
     }
   });
 
-  socket.on('deletewol', (mac) => {
+  socket.on('updatewol', async (payload) => {
     try {
-      const data = wolService.deleteWolEntry(mac);
-      socket.emit('renderwol', data);
+      wolService.updateWolEntry(payload.default_mac, payload);
+      socket.emit('renderwol', await wolService.getWolEntriesWithStatus());
+    } catch (err) {
+      socket.emit('error', err.message);
+    }
+  });
+
+  socket.on('deletewol', async (mac) => {
+    try {
+      wolService.deleteWolEntry(mac);
+      socket.emit('renderwol', await wolService.getWolEntriesWithStatus());
     } catch (err) {
       socket.emit('error', err.message);
     }

@@ -1422,6 +1422,7 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
             <input type="datetime-local" class="form-control form-control-sm mr-2" id="new-wol-wake" placeholder="Schedule (optional)">
             <button type="button" class="btn btn-success btn-sm" id="submit-wol-btn">Add</button>
           </form>
+          <div id="wol-error" class="alert alert-danger py-2 px-3 mt-2 mb-0" style="display:none;"></div>
         </div>
         <table class="table table-hover">
           <thead><tr><th>Name</th><th>MAC</th><th>IP</th><th>Status</th><th>Schedule</th><th>Actions</th></tr></thead>
@@ -1493,6 +1494,7 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
   // Show/hide form on button click
   $('#add-wol-btn').click(function() {
     $('#add-wol-form').toggle();
+    $('#wol-error').hide();
   });
 
   // Handle form submission
@@ -1500,19 +1502,25 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
     $('#wol-error').hide();
     const hostname = $('#new-wol-host').val().trim();
     const mac = $('#new-wol-mac').val().trim();
-    if (hostname && mac) {
-      const payload = { hostname: hostname, default_mac: mac };
-      const ip = $('#new-wol-ip').val().trim();
-      const wakeAt = $('#new-wol-wake').val().trim();
-      if (ip) payload.ip = ip;
-      if (wakeAt) payload.wake_at = wakeAt;
-      socket.emit('addwol', payload);
-      $('#add-wol-form').hide();
-      $('#new-wol-host').val('');
-      $('#new-wol-mac').val('');
-      $('#new-wol-ip').val('');
-      $('#new-wol-wake').val('');
+    if (!hostname) {
+      $('#wol-error').text('Host name is required').show();
+      return;
     }
+    if (!mac) {
+      $('#wol-error').text('MAC address is required').show();
+      return;
+    }
+    const payload = { hostname: hostname, default_mac: mac };
+    const ip = $('#new-wol-ip').val().trim();
+    const wakeAt = $('#new-wol-wake').val().trim();
+    if (ip) payload.ip = ip;
+    if (wakeAt) payload.wake_at = wakeAt;
+    socket.emit('addwol', payload);
+    $('#add-wol-form').hide();
+    $('#new-wol-host').val('');
+    $('#new-wol-mac').val('');
+    $('#new-wol-ip').val('');
+    $('#new-wol-wake').val('');
   });
 });
 

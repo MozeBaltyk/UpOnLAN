@@ -359,6 +359,23 @@
   text-shadow: none !important;
 }
 
+/* Toasts: Bootstrap defaults them to a near-white card, which made the white
+   .close cross invisible in dark mode. Darken the toast so the cross shows. */
+[data-theme="dark"] .toast {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .toast-header {
+  background-color: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border-bottom-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .toast-body {
+  color: var(--text-primary) !important;
+}
+
 /* Ace Editor line numbers */
 [data-theme="dark"] .ace_gutter {
   background-color: var(--bg-tertiary) !important;

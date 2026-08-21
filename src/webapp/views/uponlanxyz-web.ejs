@@ -27,6 +27,16 @@ function showToast(message, type) {
   const container = document.getElementById('toast-container');
   if (container) {
     container.appendChild(el);
+    // The toast is built by hand (Bootstrap's toast plugin is never .toast()'d),
+    // so data-dismiss="toast" does nothing. Wire the × to the same fade-out as
+    // the auto-dismiss timer so it closes immediately instead of waiting 10s.
+    const closeBtn = el.querySelector('.close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        el.classList.remove('show');
+        setTimeout(function () { el.remove(); }, 350);
+      });
+    }
     setTimeout(function() { el.classList.remove('show'); setTimeout(function() { el.remove(); }, 350); }, 10000);
   }
   // Fallback if container is missing (page not fully rendered yet)
@@ -97,6 +107,20 @@ function applyTheme(theme) {
   
   // Update Ace Editor theme if it exists
   updateAceEditorTheme(theme);
+
+  // Re-color the metrics chart legend (its label color is set at init; refresh
+  // it on theme toggle so it stays visible against a dark background).
+  if (typeof MetricsChart !== 'undefined' && MetricsChart && MetricsChart.options
+      && MetricsChart.options.plugins && MetricsChart.options.plugins.legend) {
+    MetricsChart.options.plugins.legend.labels.color = chartLegendColor(theme);
+    MetricsChart.update();
+  }
+}
+
+// Readable Chart.js legend label color for the active theme.
+function chartLegendColor(theme) {
+  const t = theme || document.documentElement.getAttribute('data-theme');
+  return t === 'dark' ? '#cccccc' : '#444';
 }
 
 function updateAceEditorTheme(theme) {
@@ -362,7 +386,7 @@ function initMetricsChart() {
             font: {
               size: 9
             },
-            color: '#444'
+            color: chartLegendColor()
           }
         }
       }

@@ -68,6 +68,13 @@ async function getVmHasConsole() {
   return res.ok && /<console[^>]*type=['"]pty['"]/.test(res.out);
 }
 
+// Name of the first active libvirt storage pool (varies per host: `default`,
+// `images`, …). Returns '' when none.
+async function discoverStoragePool() {
+  const list = await runVirsh(['pool-list', '--name']);
+  return list.ok ? (list.out.split('\n').map((s) => s.trim()).find(Boolean) || '') : '';
+}
+
 // Minimal diskless network-boot domain: it is a PXE client, not a storage
 // target, so no disk, no graphics. `<boot dev='network'/>` is what makes it
 // actually PXE-boot (virt-install's default left the old VM on `hd`).
@@ -256,10 +263,10 @@ module.exports = function registerVmHandlers(socket) {
     const volName = `${VM_NAME}.qcow2`;
     let diskPath = null;
     if (diskSize > 0) {
-      // Ensure the `default` storage pool exists — a bare host has none, so
-      // define + start it like the boot network is handled above.
-      const pool = await runVirsh(['pool-info', 'default']);
-      if (!pool.ok) {
+      // Use an existing active storage pool (its name varies per host); create
+      // `default` only when the host has no pool at all.
+      let poolName = await discoverStoragePool();
+      if (!poolName) {
         const defined = await runVirsh(['pool-define-as', 'default', 'dir', '--target', '/var/lib/libvirt/images']);
         if (!defined.ok) {
           socket.emit('vm:action:result', { action: 'create', ok: false, message: `storage pool create failed: ${defined.err}` });
@@ -267,13 +274,14 @@ module.exports = function registerVmHandlers(socket) {
         }
         await runVirsh(['pool-start', 'default']);
         await runVirsh(['pool-autostart', 'default']);
+        poolName = 'default';
       }
-      const created = await runVirsh(['vol-create-as', 'default', volName, '--format', 'qcow2', `${diskSize}G`]);
+      const created = await runVirsh(['vol-create-as', poolName, volName, '--format', 'qcow2', `${diskSize}G`]);
       if (!created.ok) {
         socket.emit('vm:action:result', { action: 'create', ok: false, message: `disk create failed: ${created.err}` });
         return;
       }
-      const pathRes = await runVirsh(['vol-path', '--pool', 'default', volName]);
+      const pathRes = await runVirsh(['vol-path', '--pool', poolName, volName]);
       diskPath = pathRes.ok ? pathRes.out : null;
       if (!diskPath) {
         socket.emit('vm:action:result', { action: 'create', ok: false, message: `disk path lookup failed: ${pathRes.err}` });
@@ -319,9 +327,11 @@ module.exports = function registerVmHandlers(socket) {
     const res = await runVirsh(['undefine', '--nvram', VM_NAME]);
     let msg = res.ok ? `VM '${VM_NAME}' destroyed` : `virsh undefine failed: ${res.err}`;
     if (res.ok) {
-      // Best-effort disk cleanup — a diskless VM has no volume, so vol-delete
-      // reports "not found" and we ignore it.
-      await runVirsh(['vol-delete', '--pool', 'default', `${VM_NAME}.qcow2`]);
+      // Best-effort disk cleanup (skip when the host has no storage pool).
+      const poolName = await discoverStoragePool();
+      if (poolName) {
+        await runVirsh(['vol-delete', '--pool', poolName, `${VM_NAME}.qcow2`]);
+      }
       // Tear the boot network down too (user request). Best-effort: other
       // guests may still be attached, then net-destroy reports it.
       const nd = await runVirsh(['net-destroy', VM_NETWORK]);

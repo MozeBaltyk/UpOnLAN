@@ -170,12 +170,13 @@ mirror-assets() {
 }
 
 release-menu() {
-    # Menu version lives in release/menus/version.ipxe (same source deploy --local
-    # and scripts/build_release.sh use). release_menu.sh bumps version.ipxe to it
+    # Version: an explicit positional arg wins; otherwise read
+    # release/menus/version.ipxe (the same source deploy --local and
+    # scripts/build_release.sh use). release_menu.sh bumps version.ipxe to it
     # and packs release/output/menu/<ver>/menus.tar.gz (+ releases/latest JSON).
-    local menu_ver="$(sed -n 's/^set menu_version //p' release/menus/version.ipxe)"
+    local menu_ver="${menu_version_arg:-$(sed -n 's/^set menu_version //p' release/menus/version.ipxe)}"
     if [ -z "$menu_ver" ]; then
-        echo "ERROR: no 'set menu_version' line in release/menus/version.ipxe" >&2
+        echo "ERROR: no version given and no 'set menu_version' line in release/menus/version.ipxe" >&2
         return 1
     fi
     echo "[release-menu] releasing menu ${menu_ver}"
@@ -226,13 +227,14 @@ print_help() {
     echo "7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets"
     echo "8. test-webapp - run webapp tests inside the container"
     echo "9. preview - show deployment context and run preflight checks (no deploy)"
-    echo "10. release-menu - build the menu release (release_menu.sh) for the version in release/menus/version.ipxe"
+    echo "10. release-menu [version] - build the menu release (release_menu.sh) for the given version, or the one in release/menus/version.ipxe"
     echo ""
 }
 
 action=""
 local_deploy=0
 build=0
+menu_version_arg=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -a)
@@ -248,8 +250,15 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         *)
-            print_help
-            exit 1
+            # release-menu accepts one optional positional version (same
+            # semantics as scripts/build_release.sh / scripts/release_menu.sh).
+            if [ "$action" = "release-menu" ] && [ -z "$menu_version_arg" ]; then
+                menu_version_arg="$1"
+                shift
+            else
+                print_help
+                exit 1
+            fi
             ;;
     esac
 done

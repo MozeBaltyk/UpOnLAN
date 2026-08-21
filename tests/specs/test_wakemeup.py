@@ -143,7 +143,8 @@ class DestroySpecs(TempDirTestCase):
 
 
 class ReleaseMenuSpecs(TempDirTestCase):
-    """release-menu runs release_menu.sh with the version from version.ipxe."""
+    """release-menu runs release_menu.sh with an explicit version when given,
+    else falls back to version.ipxe."""
 
     def setUp(self):
         super().setUp()
@@ -159,6 +160,15 @@ class ReleaseMenuSpecs(TempDirTestCase):
         arg_file = self.tmp / 'arg.txt'
         self.run_cmd('bash', 'wakemeup.sh', '-a', 'release-menu', env={'ARG_FILE': str(arg_file)})
         self.assertEqual('0.2.0', arg_file.read_text())
+
+    def test_positional_version_overrides_version_ipxe(self):
+        self.stub('release/menus/version.ipxe', 'set menu_version 0.2.0\n')
+        arg_file = self.tmp / 'arg.txt'
+        self.run_cmd(
+            'bash', 'wakemeup.sh', '-a', 'release-menu', '0.3.0',
+            env={'ARG_FILE': str(arg_file)},
+        )
+        self.assertEqual('0.3.0', arg_file.read_text())
 
     def test_errors_without_version(self):
         self.stub('release/menus/version.ipxe', '')

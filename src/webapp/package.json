@@ -1,6 +1,6 @@
 {
   "name": "UpOnLAN",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Configuration and mirroring application for uponlan.xyz stack",
   "main": "app.js",
   "scripts": {

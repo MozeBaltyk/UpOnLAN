@@ -21,15 +21,20 @@ mkdir -p \
 [[ ! -f /config/nginx/site-confs/default ]] && \
   envsubst '${NGINX_PORT}' < /defaults/default > /config/nginx/site-confs/default
 
-# Import UpOnLAN menus if ENDPOINT_URL is not set
-if [[ -z ${ENDPOINT_URL} ]]; then
+# Default endpoint when none is configured.
+if [[ -z "${ENDPOINT_URL:-}" ]]; then
   export ENDPOINT_URL="https://github.com/mozebaltyk/uponlan/"
-  if [[ -z ${MENU_VERSION+x} ]]; then
+fi
+
+# Resolve the menu version. Empty and unset mean the same thing here: the chart
+# always injects MENU_VERSION (possibly as an empty string), so `${VAR+x}` would
+# wrongly treat an empty version as deliberate and the dashboard would show
+# `none`. GitHub endpoints need the real latest tag; flat/local mirrors use a
+# `latest` file under /menu/latest.
+if [[ -z "${MENU_VERSION:-}" ]]; then
+  if [[ "${ENDPOINT_URL}" == *github.com* ]]; then
     MENU_VERSION=$(curl -sL "https://api.github.com/repos/mozebaltyk/uponlan/releases/latest" | jq -r '.tag_name')
-  fi
-# Import menus if ENDPOINT_URL is set
-else
-  if [[ -z ${MENU_VERSION+x} ]]; then
+  else
     MENU_VERSION="latest"
   fi
 fi
@@ -62,20 +67,28 @@ else
   cp -r /config/menus/remote/* /config/menus/
 fi
 
-# Ensure endpoints.yml exists from the asset-side release output
-if [[ ! -f /config/endpoints.yml ]]; then
-  if [[ "${ENDPOINT_URL}" == *github.com* ]]; then
-    # The asset catalog is published by assets.yml as a release asset on the
-    # stable 'assets' tag (prerelease, so it never shadows the menu's latest).
-    endpoint_catalog_url="${ENDPOINT_URL}/releases/download/assets/endpoints.yml"
+# Refresh endpoints.yml from the configured origin on every startup. The asset
+# catalog is generated, not user-edited state, so a fresh fetch is correct and
+# picks up newly published entries (e.g. direct_file vendor-source catalog
+# changes). If refresh fails, keep an existing local copy; otherwise create an
+# empty catalog as the last resort.
+if [[ "${ENDPOINT_URL}" == *github.com* ]]; then
+  # The asset catalog is published by assets.yml as a release asset on the
+  # stable 'assets' tag (prerelease, so it never shadows the menu's latest).
+  endpoint_catalog_url="${ENDPOINT_URL}/releases/download/assets/endpoints.yml"
+else
+  endpoint_catalog_url="${ENDPOINT_URL}/assets/endpoints.yml"
+fi
+echo "[uponlanxyz-init] Import endpoints.yml from ${endpoint_catalog_url}"
+if ! curl -fsL ${endpoint_catalog_url} -o /tmp/endpoints.yml; then
+  if [[ -f /config/endpoints.yml ]]; then
+    echo "[uponlanxyz-init] Keeping existing /config/endpoints.yml (refresh failed)"
   else
-    endpoint_catalog_url="${ENDPOINT_URL}/assets/endpoints.yml"
-  fi
-  echo "[uponlanxyz-init] Import endpoints.yml from ${endpoint_catalog_url}"
-  if ! curl -fsL ${endpoint_catalog_url} -o /config/endpoints.yml; then
     echo "[uponlanxyz-init] No endpoints.yml found from asset release, creating a default one"
     echo "endpoints: {}" > /config/endpoints.yml
   fi
+else
+  mv /tmp/endpoints.yml /config/endpoints.yml
 fi
 
 # Ensure menu.yml exists

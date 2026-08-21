@@ -134,23 +134,29 @@ class ReleaseAssetsWorkflowSpecs(TempDirTestCase):
     def test_github_layout_passthrough(self):
         # assets.yml relies on release_assets.sh forwarding MIRROR_LAYOUT=github:
         # iso_extraction still builds to the per-bundle /releases/download/<key>/
-        # layout, while direct_file is skipped entirely.
+        # layout, while direct_file contributes catalog entries only (local
+        # /assets/<key>/ path + vendor sources, no GitHub bundle).
         self.run_cmd('bash', 'scripts/release_assets.sh', env={'MIRROR_LAYOUT': 'github'})
         assets = self.tmp / 'release' / 'output' / 'assets'
         self.assertTrue((assets / 'releases' / 'download' / 'oracle-8-x86_64' / 'vmlinuz').is_file())
         yml = (assets / 'endpoints.yml').read_text()
         self.assertIn('path: /releases/download/oracle-8-x86_64/', yml)
         self.assertIn('build_type: iso_extraction', yml)
-        self.assertNotIn('harvester-v1.7.3-x86_64', yml)
-        self.assertNotIn('talos-v1.13.8-x86_64', yml)
+        self.assertIn('path: /assets/harvester-v1.7.3-x86_64/', yml)
+        self.assertIn('path: /assets/talos-v1.13.8-x86_64/', yml)
+        self.assertIn('build_type: direct_file', yml)
+        self.assertFalse((assets / 'releases' / 'download' / 'harvester-v1.7.3-x86_64').exists())
+        self.assertFalse((assets / 'releases' / 'download' / 'talos-v1.13.8-x86_64').exists())
 
-    def test_direct_file_github_is_skipped(self):
-        # direct_file recipes produce no bundle and no catalog entry on GitHub.
+    def test_direct_file_github_is_catalog_only(self):
+        # direct_file recipes publish catalog entries (for on-demand import) but
+        # never a GitHub bundle.
         self.run_cmd('bash', 'scripts/release_assets.sh', 'harvester', env={'MIRROR_LAYOUT': 'github'})
         assets = self.tmp / 'release' / 'output' / 'assets'
         self.assertFalse((assets / 'releases' / 'download' / 'harvester-v1.7.3-x86_64').exists())
         yml = (assets / 'endpoints.yml').read_text()
-        self.assertNotIn('harvester-v1.7.3-x86_64', yml)
+        self.assertIn('path: /assets/harvester-v1.7.3-x86_64/', yml)
+        self.assertIn('- http://example.com/vmlinuz', yml)
 
     def test_local_catalog_only_direct_file(self):
         # default (local) layout: direct_file is catalog-only, no downloads.

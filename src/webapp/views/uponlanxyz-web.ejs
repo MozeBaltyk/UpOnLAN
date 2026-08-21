@@ -1377,6 +1377,7 @@ $(document).on('click', '#doc-viewer a', function(e) {
 socket.on('error', function(msg){
   // Show the error in the WOL form if visible, else a toast
   if ($('#wol-error').length) {
+    $('#add-wol-form').show();
     $('#wol-error').text(msg).show();
   } else {
     showToast(msg, 'danger');
@@ -1516,7 +1517,6 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
     if (ip) payload.ip = ip;
     if (wakeAt) payload.wake_at = wakeAt;
     socket.emit('addwol', payload);
-    $('#add-wol-form').hide();
     $('#new-wol-host').val('');
     $('#new-wol-mac').val('');
     $('#new-wol-ip').val('');

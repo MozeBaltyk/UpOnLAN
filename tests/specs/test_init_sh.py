@@ -26,6 +26,20 @@ class InitShUrlSpecs(unittest.TestCase):
         # The GitHub vs local decision keys off the endpoint host.
         self.assertIn('*github.com*', self.init_sh)
 
+    def test_empty_menu_version_is_resolved_not_left_blank(self):
+        # The chart injects MENU_VERSION even when it is an empty string, so
+        # init.sh must treat empty and unset the same way (`${MENU_VERSION:-}`),
+        # not `${MENU_VERSION+x}`.
+        self.assertIn('if [[ -z "${MENU_VERSION:-}" ]]; then', self.init_sh)
+        self.assertNotIn('if [[ -z ${MENU_VERSION+x} ]]; then', self.init_sh)
+
+    def test_endpoints_catalog_is_refreshed_on_startup(self):
+        # endpoints.yml is generated state and should refresh from the endpoint
+        # on every boot, falling back to the existing local copy if the fetch
+        # fails. This avoids stale empty catalogs after new assets are released.
+        self.assertIn('curl -fsL ${endpoint_catalog_url} -o /tmp/endpoints.yml', self.init_sh)
+        self.assertIn('Keeping existing /config/endpoints.yml (refresh failed)', self.init_sh)
+
     def test_ca_trust_block(self):
         # A mounted corporate CA (TLS-inspecting proxy) is added to the system
         # trust store so curl trusts it; Node reads the refreshed bundle via

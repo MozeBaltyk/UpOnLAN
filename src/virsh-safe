@@ -33,7 +33,7 @@ case "$cmd" in
   net-start|net-autostart|net-destroy|net-undefine|net-info)
     is_name "${1:-}" || fail
     ;;
-  pool-info|pool-start|pool-autostart|pool-destroy|pool-undefine)
+  pool-info|pool-build|pool-start|pool-autostart|pool-destroy|pool-undefine)
     is_name "${1:-}" || fail
     ;;
   pool-define-as)

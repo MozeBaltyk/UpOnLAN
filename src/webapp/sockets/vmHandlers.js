@@ -84,12 +84,18 @@ async function ensureStoragePool() {
   if (info.ok) {
     // pool-info succeeds for a defined-but-inactive pool too (e.g. left over
     // after a destroy where pool-undefine failed, or a host reboot before
-    // autostart) — start it or vol-create-as will refuse with "not active".
-    if (isInactivePoolInfo(info.out)) await runVirsh(['pool-start', VM_STORAGE_POOL]);
+    // autostart). pool-build (re)creates the target directory (idempotent for
+    // a dir pool — succeeds whether the dir already exists or not), then
+    // pool-start activates it.
+    if (isInactivePoolInfo(info.out)) {
+      await runVirsh(['pool-build', VM_STORAGE_POOL]);
+      await runVirsh(['pool-start', VM_STORAGE_POOL]);
+    }
     return true;
   }
   const defined = await runVirsh(['pool-define-as', VM_STORAGE_POOL, 'dir', '--target', VM_STORAGE_POOL_PATH]);
   if (!defined.ok) return false;
+  await runVirsh(['pool-build', VM_STORAGE_POOL]);
   await runVirsh(['pool-start', VM_STORAGE_POOL]);
   await runVirsh(['pool-autostart', VM_STORAGE_POOL]);
   return true;

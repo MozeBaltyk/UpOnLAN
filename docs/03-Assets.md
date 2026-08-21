@@ -46,14 +46,16 @@ UpOnLAN mirrors boot files for the same reason [netboot.xyz](https://netboot.xyz
 - **iPXE doesn't boot ISOs directly.** A multi-gigabyte ISO can't be pulled into memory by a bootloader; you have to extract the small pieces and chain them.
 - **The initramfs usually can't speak HTTPS.** The pre-boot environment ships without CA certificates (or a working `wget`/`curl`) in most distros, and GitHub Releases are HTTPS endpoints that 302-redirect to S3. So an initrd often needs patching before it can pull a rootfs over the network.
 
-There are two `BUILD_TYPE`s in `release/assets/`:
+There are two `BUILD_TYPE`s in `release/assets/`, and they now take **different release paths**:
 
-| `BUILD_TYPE` | Behavior | Used by |
+| `BUILD_TYPE` | Behavior | Release path |
 | --- | --- | --- |
-| `direct_file` | download each `EXTRACTS` file verbatim (no extraction) | `talos`, `ubuntu`, `harvester`, `proxmox` |
-| `iso_extraction` | download an ISO, then extract kernel/initrd/rootfs out of it | unused (Oracle was the only consumer, removed) |
+| `direct_file` | list vendor URLs per file (no extraction); imported on-demand by the Assets tab | catalog-only — never mirrored to GitHub |
+| `iso_extraction` | download an ISO, then extract kernel/initrd/rootfs out of it | build-time pipeline + GitHub |
 
-`direct_file` fetches whatever the recipe lists — usually small prebuilt boot files (`talos`, `ubuntu`, `harvester`), but `proxmox` also lists a full installer ISO (`proxmox.iso`), downloaded as a plain file and booted directly. Proxmox publishes no stable directly-downloadable netboot initrd, so that ISO plus the boot files are mirrored from `netbootxyz/asset-mirror`.
+`direct_file` recipes list the vendor URLs directly (`talos`, `ubuntu`, `harvester`, `proxmox`): the catalog entry records those URLs in `sources` (aligned with `files`) plus `build_type: direct_file`, and the **Assets tab** pulls each file from its vendor URL into `/assets/<key>/` on demand. Nothing is published to GitHub. `iso_extraction` (no current consumer — Oracle was the only one, removed) still downloads the ISO at build time and extracts the kernel/initrd for GitHub publication, because those files aren't always published separately by the vendor.
+
+`direct_file` fetches whatever the recipe lists — usually small prebuilt boot files (`talos`, `ubuntu`, `harvester`), but `proxmox` also lists a full installer ISO (`proxmox.iso`), imported as a plain file and booted directly. Proxmox publishes no stable directly-downloadable netboot initrd, so that ISO plus the boot files are listed from `netbootxyz/asset-mirror`.
 
 > ⚠️ **GitHub release-asset cap — 2 GB.** Release assets are limited to 2 GB. An `iso_extraction` recipe must delete the downloaded DVD after extracting it (`release/assets/build.sh` does this) — that is what made Oracle's ~10 GB image fail. The `proxmox.iso` fetched by `direct_file` works only while it stays under 2 GB, so watch it as Proxmox releases grow.
 
@@ -68,25 +70,27 @@ A menu entry boots an OS by fetching its kernel, initramfs, and rootfs over HTTP
 ```text
 iPXE menu (.ipxe)                      endpoint catalog (endpoints.yml)
     │                                          │
+    │ kernel ${local_endpoint}<key>/vmlinuz    │  path: /assets/<key>/        (direct_file, local)
+    │ initrd  ${local_endpoint}<key>/initrd    │  build_type: direct_file
+    │                                          │  sources: [<vendor URL>, ...]
+    │                                          │
     │ kernel ${mirror_endpoint}${asset_path}<key>/vmlinuz
-    │ initrd  ${mirror_endpoint}${asset_path}<key>/initrd
-    │                                          │  path: /assets/<key>/  (local mirror)
-    │                                          │  files: [vmlinuz, initrd, squashfs.img]
+    │                                          │  path: /releases/download/<key>/  (iso_extraction, GitHub)
     ▼                                          ▼
 <key> = <os>-<version>-<arch>; the files must match the endpoint's `files`
 ```
 
-1. **`endpoints.yml`** declares a boot bundle: a `path` plus the `files` served under it (kernel, initrd, rootfs, checksums...). Its `path` is relative to the *asset origin*: `/assets/<key>/` for the local mirror, `/releases/download/<key>/` for GitHub release assets.
-2. **The Assets tab** mirrors those files with *Pull Selected* (`dlremote`): each `path + file` is downloaded from the configured origin into `/assets/<key>/`. Nginx serves `/assets` as its web root, so every mirrored file is reachable at `<boot host>:${NGINX_PORT}/<key>/<file>`.
-3. **The iPXE menu** points `kernel` / `initrd` / rootfs at exactly those URLs, via two variables defined in `release/menus/boot.cfg`:
-   - `${mirror_endpoint}` — the boot origin for **your** mirrored assets. Defaults to `https://github.com/MozeBaltyk/UpOnLAN`; a local deployment overrides it in `release/menus/local-vars.ipxe` to the nginx URL (e.g. `http://192.168.7.1:8080`).
-   - `${asset_path}` — the path prefix. Defaults to `/releases/download/` (GitHub release layout); the local override sets it to `/` because nginx serves `/assets` at its root, so the local URL is `<mirror_endpoint>/<key>/<file>`.
+1. **`endpoints.yml`** declares a boot bundle: a `path` plus the `files` served under it (kernel, initrd, rootfs, checksums...). Its `path` is relative to the *asset origin*: `/assets/<key>/` for the local mirror, `/releases/download/<key>/` for GitHub release assets. `direct_file` entries also carry `build_type: direct_file` and `sources` (the vendor URLs, aligned with `files`); `iso_extraction` entries carry `build_type: iso_extraction` with no per-file vendor source.
+2. **The Assets tab** resolves each *Pull Selected* (`dlremote`) path: a `direct_file` entry downloads from its vendor `sources[index]` URL, an `iso_extraction` entry downloads from the configured origin (`origin + path`). Files land under `/assets/<key>/`, and nginx serves `/assets` as its web root, so every imported file is reachable at `<boot host>:${NGINX_PORT}/<key>/<file>`.
+3. **The iPXE menu** points `kernel` / `initrd` / rootfs at exactly those URLs, via the variables defined in `release/menus/boot.cfg`:
+   - `${local_endpoint}` — the local nginx origin for **`direct_file`** assets, default `http://192.168.7.1:8080/` (trailing slash included), overridable in `release/menus/local-vars.ipxe`.
+   - `${mirror_endpoint}` / `${asset_path}` — the GitHub origin for **`iso_extraction`** assets. Defaults to `https://github.com/MozeBaltyk/UpOnLAN` + `/releases/download/`.
 
-The full boot URL is `${mirror_endpoint}${asset_path}<key>/<file>`. On GitHub that resolves to `https://github.com/MozeBaltyk/UpOnLAN/releases/download/<key>/<file>`; locally it resolves to `http://192.168.7.1:8080/<key>/<file>` (which nginx maps to `/assets/<key>/<file>`).
+The full boot URL is `${local_endpoint}<key>/<file>` for `direct_file` (nginx maps `<key>/<file>` to `/assets/<key>/<file>`), and `${mirror_endpoint}${asset_path}<key>/<file>` for `iso_extraction`.
 
-The consequence: **the `<key>` and file names in a menu must match an endpoint's `<key>` + `files`** in `endpoints.yml`. If they drift, the boot fails even though the assets are fully mirrored.
+The consequence: **the `<key>` and file names in a menu must match an endpoint's `<key>` + `files`** in `endpoints.yml`. If they drift, the boot fails even though the assets are fully imported.
 
-> ⚠️ Current state of the shipped menus: `talos.ipxe`, `harvester.ipxe`, `rockylinux.ipxe`, `proxmox.ipxe` (PBS/PMG/VE), and `ubuntu.ipxe` (subiquity) all use the endpoint layout above (`${mirror_endpoint}${asset_path}<key>/`) and have mirrored recipes under `release/assets/`. The only remaining vendor-direct entry is `ubuntu.ipxe`'s legacy `d-i` installer, which boots `${ubuntu_mirror}` (archive.ubuntu.com). `boot.cfg`'s `${live_endpoint}` is now unused.
+> ⚠️ Current state of the shipped menus: `talos.ipxe`, `harvester.ipxe`, `rockylinux.ipxe`, `proxmox.ipxe` (PBS/PMG/VE), and `ubuntu.ipxe` (subiquity) are all `direct_file` and chain `${local_endpoint}<key>/`. No shipped menu currently exercises `iso_extraction` (no recipe of that type exists), so `${mirror_endpoint}${asset_path}` is defined in `boot.cfg` but unused until one is added. The only remaining vendor-direct entry is `ubuntu.ipxe`'s legacy `d-i` installer, which boots `${ubuntu_mirror}` (archive.ubuntu.com). `boot.cfg`'s `${live_endpoint}` is now unused.
 
 ---
 
@@ -102,14 +106,14 @@ ds=nocloud;s=http://<server>/<path>/
 
 cloud-init then GETs `<path>/user-data` and `<path>/meta-data`. A seed is therefore just two files the guest pulls over HTTP *at boot time* — exactly like a kernel or initrd — which is why it belongs in the asset model rather than as a separate mechanism:
 
-- **Same transport** — served from the same `${mirror_endpoint}` origin the menu already uses.
+- **Same transport** — served from the same `${local_endpoint}` origin the menu already uses.
 - **Versioned** — a specific `user-data` per deployment, not "whatever is on the host today".
-- **Mirrorable** — `--local` / *Pull Selected* copies it into `/assets/` for offline booting; `ds=nocloud;s=…` must resolve from the guest's network on first boot.
+- **Mirrorable** — `--local` / *Pull Selected* imports it into `/assets/` for offline booting; `ds=nocloud;s=…` must resolve from the guest's network on first boot.
 
 The menu references it like any other bundle:
 
 ```ipxe
-kernel ${url}vmlinuz ds=nocloud;s=${mirror_endpoint}${asset_path}<key>/ …
+kernel ${url}vmlinuz ds=nocloud;s=${local_endpoint}<key>/ …
 initrd ${url}initrd
 ```
 
@@ -133,9 +137,13 @@ endpoints:
     os: talos                          # shown in the Assets tab
     version: v1.13.8
     arch: x86_64
+    build_type: direct_file            # direct_file | iso_extraction
+    sources:                           # vendor URLs, aligned with `files`
+    - https://github.com/siderolabs/talos/releases/download/v1.13.8/vmlinuz-amd64
+    - https://github.com/siderolabs/talos/releases/download/v1.13.8/initramfs-amd64.xz
 ```
 
-> `path` is `/assets/<key>/` for the local mirror and `/releases/download/<key>/` for GitHub release assets (`release/assets/build.sh` sets it from `MIRROR_LAYOUT`). The menu never hardcodes either — it composes `${mirror_endpoint}${asset_path}<key>/`.
+> `path` is `/assets/<key>/` for the local mirror and `/releases/download/<key>/` for GitHub release assets (`release/assets/build.sh` sets it from `MIRROR_LAYOUT`). `sources` is only meaningful for `direct_file` (the Assets tab imports from it); `iso_extraction` entries omit per-file sources because their files are extracted from one ISO at build time. The menu never hardcodes the origin — `direct_file` menus chain `${local_endpoint}<key>/`, `iso_extraction` menus `${mirror_endpoint}${asset_path}<key>/`.
 
 To add a new endpoint:
 
@@ -157,16 +165,16 @@ Adding a brand-new boot entry is a two-sided change: an **asset recipe** (so the
    goto ${menu} ||
 
    :<os>
-   set <os>_url ${mirror_endpoint}${asset_path}<key>/
+   set <os>_url ${local_endpoint}<key>/
    kernel ${<os>_url}vmlinuz <boot params>
    initrd ${<os>_url}initrd
    boot
    ```
 
-   Use `<key> = <os>-<version>-<arch>` exactly as generated, and the exact file names from `endpoints.yml` `files`. This is the contract — no other "wiring" exists between menu and assets.
+   Use `<key> = <os>-<version>-<arch>` exactly as generated, and the exact file names from `endpoints.yml` `files`. This is the contract — no other "wiring" exists between menu and assets. (For an `iso_extraction` recipe, chain `${mirror_endpoint}${asset_path}<key>/` instead.)
 
 3. **Register the entry** in the parent menu so it appears in the menu tree. For a Linux installer, add an `item <os> <label>` to `release/menus/linux.ipxe` (and `linux-arm.ipxe` if it has an arm64 bundle). The main `menu.ipxe` chains `linux.ipxe` when the user selects *Linux Network Installs*.
 
 4. **Rebuild and redeploy.** Run `scripts/release_menu.sh <version>` (warns if the ROMs are missing — build them first so they're included) then `./wakemeup.sh -a redeploy --local`, or the one-shot `scripts/build_release.sh <version>`. The new entry appears on the next boot.
 
-A working reference is `talos.ipxe` + `release/assets/talos/setting.sh`: the recipe mirrors `vmlinuz`/`initrd` to `<key> = talos-v1.13.8-<arch>`, and the menu boots `${mirror_endpoint}${asset_path}talos-v1.13.8-${arch}/vmlinuz` with a config-URL parameter item.
+A working reference is `talos.ipxe` + `release/assets/talos/setting.sh`: the recipe lists `vmlinuz`/`initrd` vendor URLs for `<key> = talos-v1.13.8-<arch>`, and the menu boots `${local_endpoint}talos-v1.13.8-${arch}/vmlinuz` with a config-URL parameter item.

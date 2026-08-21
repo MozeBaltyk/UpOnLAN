@@ -29,8 +29,12 @@ class ReleaseOutputSpecs(TempDirTestCase):
         self.run_cmd('bash', 'scripts/release_assets.sh')
         assets = self.tmp / 'release' / 'output' / 'assets'
         self.assertTrue((assets / 'endpoints.yml').is_file(), 'assets/endpoints.yml missing')
-        self.assertTrue((assets / 'harvester-v1.7.3-x86_64' / 'vmlinuz').is_file(), 'asset bundle missing')
-        self.assertIn('path: /assets/harvester-v1.7.3-x86_64/', (assets / 'endpoints.yml').read_text())
+        yml = (assets / 'endpoints.yml').read_text()
+        self.assertIn('path: /assets/harvester-v1.7.3-x86_64/', yml)
+        # direct_file is catalog-only: metadata + vendor sources, no bundle dir.
+        self.assertIn('build_type: direct_file', yml)
+        self.assertIn('- http://example.com/vmlinuz', yml)
+        self.assertFalse((assets / 'harvester-v1.7.3-x86_64').exists(), 'direct_file must not download a bundle')
 
     def test_release_menu_builds_menu_layout(self):
         self.run_cmd('bash', 'scripts/release_menu.sh', '0.0.2')

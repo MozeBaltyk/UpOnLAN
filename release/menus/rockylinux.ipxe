@@ -23,7 +23,7 @@ set dir ${rockylinux_base_dir}/${osversion}/BaseOS/${os_arch}/os
 set repo ${rockylinux_mirror}/${dir}
 # Boot files come from our mirrored bundle (rocky-<ver>-<arch> in endpoints.yml);
 # packages still come from the Rocky repo via inst.repo.
-set url ${mirror_endpoint}${asset_path}rocky-${osversion}-${arch}/
+set url ${local_endpoint}rocky-${osversion}-${arch}/
 goto boottype
 
 :boottype

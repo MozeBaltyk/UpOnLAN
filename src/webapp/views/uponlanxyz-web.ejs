@@ -1068,10 +1068,13 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
         localfiles.splice( localfiles.indexOf(fsPath + file), 1 );
       }
       else{
+        // direct_file endpoints carry vendor `sources` aligned with `files`;
+        // link to the vendor URL when present, else the origin + path.
+        var linkHref = (value.sources && value.sources[arrindex]) ? value.sources[arrindex] : (remoteassetorigin + value.path + file);
         remotetable.row.add( 
           [
             index,
-            '<a href="' + remoteassetorigin + value.path + file + '" target="_blank">' + displayKey + '/' + file + '</a>',
+            '<a href="' + linkHref + '" target="_blank">' + displayKey + '/' + file + '</a>',
             '<span style="float:right;"><input type="checkbox" class="form-check-input remotecheck" value="' + value.path + file + '"></span>'
           ]
         );

@@ -1,11 +1,13 @@
 #!ipxe
 # Local-asset override. Copy this file to local-vars.ipxe (next to menu.ipxe,
-# in the TFTP root /config/menus) and point the asset origin at your local
-# nginx asset mirror. menu.ipxe chains local-vars.ipxe before boot.cfg, so this
-# wins over boot.cfg's GitHub default. release_menu.sh excludes local-vars.ipxe
-# from menus.tar.gz, so a lab IP never leaks into a shipped release.
+# in the TFTP root /config/menus) and point the local asset origin at your
+# nginx server. menu.ipxe chains local-vars.ipxe before boot.cfg, so this wins
+# over boot.cfg's default. release_menu.sh excludes local-vars.ipxe from
+# menus.tar.gz, so a lab IP never leaks into a shipped release.
 #
-# nginx serves the container /assets tree at its root; mirrored assets live in
-# /assets/<os>-<version>-<arch>/, so the path prefix is the root "/".
-set mirror_endpoint http://192.168.7.1:8080
-set asset_path /
+# nginx serves the container /assets tree at its root; direct_file assets are
+# imported on-demand by the Assets tab into /assets/<os>-<version>-<arch>/ and
+# served at <local_endpoint><key>/, so local_endpoint carries a trailing slash.
+# This only affects direct_file entries — iso_extraction still chains
+# ${mirror_endpoint}${asset_path} (the GitHub origin set in boot.cfg).
+set local_endpoint http://192.168.7.1:8080/

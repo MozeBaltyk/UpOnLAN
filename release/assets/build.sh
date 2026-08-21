@@ -38,9 +38,18 @@ trigger() {
           build_dir="${output_dir}/${GENERIC_ARCH}/${OS}/${VERSION}/releases/${RELEASE}"
           url_path="/releases/download/${KEY}/"
         fi
-        mkdir -p "${build_dir}"
-        build "${build_dir}"
-        endpoints
+        if [ "${CATALOG_ONLY:-}" = "1" ]; then
+          # Catalog-only: write the endpoints.yml entry (path + files + build_type
+          # + sources) but skip the download. Only meaningful for direct_file
+          # (iso_extraction is always built for real). endpoints() needs the
+          # output dir to exist; a normal build gets it via `mkdir -p build_dir`.
+          mkdir -p "${output_dir}"
+          endpoints
+        else
+          mkdir -p "${build_dir}"
+          build "${build_dir}"
+          endpoints
+        fi
       done
     fi
   fi
@@ -125,10 +134,17 @@ endpoints(){
   yq e ".endpoints[\"${KEY}\"].os = \"${OS}\"" -i "$TMP_YAML"
   yq e ".endpoints[\"${KEY}\"].version = \"${VERSION}\"" -i "$TMP_YAML"
   yq e ".endpoints[\"${KEY}\"].arch = \"${GENERIC_ARCH}\"" -i "$TMP_YAML"
-  # Extract filenames from EXTRACTS (right-hand side of '|')
+  yq e ".endpoints[\"${KEY}\"].build_type = \"${BUILD_TYPE}\"" -i "$TMP_YAML"
+  # Extract filenames from EXTRACTS (right-hand side of '|') and the matching
+  # vendor sources (left-hand side, REPLACE_ARCH -> raw arch). `sources` is the
+  # full vendor URL per file, aligned with `files`; only direct_file endpoints
+  # populate it meaningfully (iso_extraction files come from a single ISO).
   yq e ".endpoints[\"$KEY\"].files = []" -i "$TMP_YAML"
-  while IFS='|' read -r _ dst; do
+  yq e ".endpoints[\"$KEY\"].sources = []" -i "$TMP_YAML"
+  while IFS='|' read -r src dst; do
     yq e ".endpoints[\"$KEY\"].files += [\"$dst\"]" -i "$TMP_YAML"
+    src="${src//REPLACE_ARCH/$ARCH}"
+    yq e ".endpoints[\"$KEY\"].sources += [\"$src\"]" -i "$TMP_YAML"
   done <<< "$EXTRACTS"
 }
 

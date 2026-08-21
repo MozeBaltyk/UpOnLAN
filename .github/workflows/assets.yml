@@ -30,11 +30,15 @@ jobs:
       # Each bundle becomes its own GitHub release whose tag is the endpoint key
       # (proxmox-ve-8.4-1-x86_64 -> /releases/download/<key>/vmlinuz). Releases
       # are marked prerelease so they never shadow the menu's `releases/latest`.
+      # Only iso_extraction bundles are published here; direct_file assets are
+      # imported on-demand by the webapp Assets tab, so `releases/download` may
+      # not exist at all — nullglob keeps the loop a no-op in that case.
       - name: Release each bundle under its own key tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          shopt -s nullglob
           dl=release/output/assets/releases/download
           for dir in "$dl"/*/; do
             key="$(basename "$dir")"

@@ -96,3 +96,57 @@ describe('dlremote strips the local assets/ namespace', () => {
     }
   });
 });
+
+describe('dlremote imports direct_file assets from the vendor source', () => {
+  it('downloads from sources[index] and pins the endpoint file name', async () => {
+    // Vendor serves the file under a URL whose basename differs from the
+    // endpoint's file name (initramfs-amd64.xz -> initrd).
+    const vendor = http.createServer((req, res) => {
+      if (req.url === '/talos/initramfs-amd64.xz') {
+        res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
+        res.end('vendor-initrd-bytes');
+      } else {
+        res.writeHead(404);
+        res.end();
+      }
+    });
+    await new Promise((r) => vendor.listen(0, r));
+    const { port } = vendor.address();
+
+    const app = await bootApp({
+      fixtures: {
+        'config/endpoints.yml': [
+          'endpoints:',
+          '  talos-v1.13.8-x86_64:',
+          '    path: /assets/talos-v1.13.8-x86_64/',
+          '    files:',
+          '    - vmlinuz',
+          '    - initrd',
+          '    sources:',
+          `    - http://127.0.0.1:${port}/talos/vmlinuz-amd64`,
+          `    - http://127.0.0.1:${port}/talos/initramfs-amd64.xz`,
+          '    build_type: direct_file',
+        ].join('\n'),
+        // Origin points at a dead port: only the vendor source can succeed.
+        'config/menu.yml': 'menu:\n  origin: http://127.0.0.1:1\n  version: local-test\n',
+      },
+    });
+
+    try {
+      const socket = app.connectClient({ auth: { token: 'secret' } });
+      await once(socket, 'connect');
+
+      const done = once(socket, 'dlremotedone');
+      socket.emit('dlremote', ['/assets/talos-v1.13.8-x86_64/initrd']);
+      await done;
+
+      const expected = path.join(app.root, 'assets', 'talos-v1.13.8-x86_64', 'initrd');
+      expect(fs.readFileSync(expected, 'utf8')).toBe('vendor-initrd-bytes');
+
+      socket.close();
+    } finally {
+      await app.close();
+      await new Promise((r) => vendor.close(r));
+    }
+  });
+});

@@ -30,6 +30,24 @@ STUB_CURL = textwrap.dedent(
 STUB_SUDO = '#!/bin/bash\nexit 0\n'
 STUB_PYTHON3 = '#!/bin/bash\nexit 0\n'
 
+# Stub for `7z`: build.sh iso_extraction runs `7z e <iso> <src> -o<dir> -y` to
+# pull a file out of the ISO. This materializes the file named basename(<src>)
+# into the -o directory so the specs never touch the network or need 7z.
+STUB_7Z = textwrap.dedent(
+    '''\
+    #!/bin/bash
+    src="${3}"
+    dir=""
+    for a in "$@"; do
+      case "$a" in
+        -o*) dir="${a#-o}" ;;
+      esac
+    done
+    mkdir -p "$dir"
+    printf 'extracted' > "$dir/$(basename "$src")"
+    '''
+)
+
 # Fixtures for the iPXE ROM artifacts release_menu.sh bundles when present.
 ROM_ARTIFACTS = (
     'uponlan.xyz-undionly.kpxe',

@@ -26,7 +26,7 @@ goto harvester
 :harvester_url
 # ponytail: version pinned to the mirrored bundle (harvester-v1.7.3-<arch> in
 # endpoints.yml); re-bump when release_assets mirrors a newer Harvester.
-set harvester_url ${mirror_endpoint}${asset_path}harvester-v1.7.3-${arch}/
+set harvester_url ${local_endpoint}harvester-v1.7.3-${arch}/
 goto harvester_boot
 
 :harvester_boot

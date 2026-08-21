@@ -183,9 +183,8 @@ release-menu() {
     bash scripts/release_menu.sh "$menu_ver"
 }
 
-test-webapp() {
-    read -p "Which test layer? [all/unit/integration/e2e/smoke] (default: all): " layer
-    layer=${layer:-all}
+run-webapp-tests() {
+    local layer="${1:-all}"
     case $layer in
         all) cmd="node node_modules/vitest/vitest.mjs run" ;;
         unit|integration|e2e|smoke) cmd="node node_modules/vitest/vitest.mjs run test/${layer}" ;;
@@ -208,8 +207,23 @@ test-webapp() {
     sudo podman exec -it "$cid" sh -c "cd /webapp && $cmd"
 }
 
+test-webapp() {
+    read -p "Which test layer? [all/unit/integration/e2e/smoke] (default: all): " layer
+    layer=${layer:-all}
+    run-webapp-tests "$layer"
+}
+
+run-tests() {
+    echo "Running release-flow specs from tests/specs/"
+    bash tests/specs/run.sh
+    echo "Running full webapp suite inside the container"
+    run-webapp-tests all
+}
+
 exec_cmd() {
-    eval "${action}"
+    local dispatch_action="$action"
+    [ "$dispatch_action" = "test" ] && dispatch_action="run-tests"
+    eval "${dispatch_action}"
 }
 
 print_help() {
@@ -225,7 +239,7 @@ print_help() {
     echo "5. logs - display logs from uponlan container"
     echo "6. connect - connect to uponlan container"
     echo "7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets"
-    echo "8. test-webapp - run webapp tests inside the container"
+    echo "8. test - run tests/specs on the host + the full webapp suite inside the container"
     echo "9. preview - show deployment context and run preflight checks (no deploy)"
     echo "10. release-menu [version] - build the menu release (release_menu.sh) for the given version, or the one in release/menus/version.ipxe"
     echo ""
@@ -276,6 +290,7 @@ case $action in
     logs) echo "Action: display logs from uponlan container" ;;
     connect) echo "Action: connect to uponlan container" ;;
     mirror-assets) echo "Action: build local asset output" ;;
+    test) echo "Action: run tests/specs + full webapp suite" ;;
     test-webapp) echo "Action: run webapp tests in container" ;;
     preview) echo "Action: show deployment context + preflight" ;;
     release-menu) echo "Action: build menu release" ;;

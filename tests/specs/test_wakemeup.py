@@ -176,5 +176,53 @@ class ReleaseMenuSpecs(TempDirTestCase):
         self.assertNotEqual(proc.returncode, 0)
 
 
+class TestActionSpecs(TempDirTestCase):
+    """`-a test` runs tests/specs on the host, then the full webapp suite in
+    the running container."""
+
+    def setUp(self):
+        super().setUp()
+        self.copy('wakemeup.sh')
+        self.stub(
+            'tests/specs/run.sh',
+            '#!/bin/bash\nprintf host > "${HOST_MARKER:?}"\n',
+            exe=True,
+        )
+        # Minimal sudo stub:
+        # - `podman ps --filter name=uponlan-webapp` -> print a fake container id
+        # - `podman exec <cid> test -d /webapp/test` -> success (tests baked in)
+        # - final `podman exec -it <cid> sh -c ...` -> record the webapp step
+        self.stub(
+            'bin/sudo',
+            '''\
+            #!/bin/bash
+            if [ "$1" = "podman" ] && [ "$2" = "ps" ]; then
+              printf 'fakecid\n'
+              exit 0
+            fi
+            if [ "$1" = "podman" ] && [ "$2" = "exec" ] && [ "$4" = "test" ]; then
+              exit 0
+            fi
+            if [ "$1" = "podman" ] && [ "$2" = "exec" ] && [[ " $* " == *" sh -c "* ]]; then
+              printf '%s' "$*" > "${WEBAPP_MARKER:?}"
+              exit 0
+            fi
+            exit 0
+            ''',
+            exe=True,
+        )
+
+    def test_runs_host_specs_then_webapp_suite(self):
+        host_marker = self.tmp / 'host.txt'
+        webapp_marker = self.tmp / 'webapp.txt'
+        proc = self.run_cmd(
+            'bash', 'wakemeup.sh', '-a', 'test',
+            env={'HOST_MARKER': str(host_marker), 'WEBAPP_MARKER': str(webapp_marker)},
+        )
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertEqual('host', host_marker.read_text())
+        self.assertIn('node node_modules/vitest/vitest.mjs run', webapp_marker.read_text())
+
+
 if __name__ == '__main__':
     unittest.main()

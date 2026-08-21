@@ -51,7 +51,7 @@ Fix: place your corporate CA (PEM) in `./config/certs/` on the host (mapped to `
 
 ## 🧪 Tests fail inside the container
 
-`./wakemeup.sh -a test-webapp` runs the suite inside the container. Common cause of failure:
+`./wakemeup.sh -a test` runs the release-flow specs on the host, then the full webapp suite inside the container. Common cause of failure:
 
 - **Image too old** — the tests must be baked in at build time (npm is purged from the image afterwards). Rebuild first: `./wakemeup.sh -a build`, then `redeploy`.
 

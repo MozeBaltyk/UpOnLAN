@@ -80,7 +80,7 @@ The full CI setup — test pipeline plus the three release workflows and their c
 
 ### CLI actions
 
-`./wakemeup.sh -a <action> [--local]` supports: `build`, `deploy`, `destroy`, `redeploy`, `logs`, `connect`, `mirror-assets`, and `test-webapp`. `--local` applies to `deploy` and `redeploy`.
+`./wakemeup.sh -a <action> [--local]` supports: `build`, `deploy`, `destroy`, `redeploy`, `logs`, `connect`, `mirror-assets`, `test`, and `release-menu`. `--local` applies to `deploy` and `redeploy`.
 
 ### Test-VM provisioning (diskless PXE guest)
 

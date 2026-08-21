@@ -47,7 +47,7 @@ Allowed Actions
 5. logs - display logs from uponlan container
 6. connect - connect to uponlan container
 7. mirror-assets - build local asset output; set asset_target=<os> to build one set, e.g. asset_target=harvester ./wakemeup.sh -a mirror-assets
-8. test-webapp - run webapp tests in container
+8. test - run tests/specs on the host + the full webapp suite inside the container
 9. preview - show deployment context and run preflight checks (no deploy)
 10. release-menu - build the menu release (release_menu.sh) for the version in release/menus/version.ipxe
 ```
@@ -70,7 +70,7 @@ Use these when you want to test without guessing:
 ./wakemeup.sh -a mirror-assets
 ./wakemeup.sh -a release-menu 0.1.0
 ./wakemeup.sh -a deploy --local
-./wakemeup.sh -a test-webapp
+./wakemeup.sh -a test
 ```
 
 Release artifacts come in two layers, split under `release/output/`:
@@ -80,7 +80,7 @@ Release artifacts come in two layers, split under `release/output/`:
 `mirror-assets` builds the asset layer of `release/output/`.
 `scripts/release_menu.sh <version>` builds the menu layer into `release/output/`.
 `deploy --local` does not build the release artifacts. It serves the already prepared `release/output/` on `:8899` and deploys the Helm chart with `--local`.
-`test-webapp` runs the webapp test suite inside the container.
+`test` runs the release-flow specs in `tests/specs/` on the host, then the full webapp suite inside the running container.
 ```bash
 asset_target=harvester ./wakemeup.sh -a mirror-assets
 ```

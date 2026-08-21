@@ -180,7 +180,7 @@ npm run test:e2e           # journeys only
 npm run test:smoke         # smoke only
 
 # inside the container
-./wakemeup.sh -a test-webapp    # prompts for a layer, default = all
+./wakemeup.sh -a test           # tests/specs on host + full webapp suite in container
 ```
 
 In CI, `.github/workflows/test.yml` runs the four webapp layers on every push/PR, plus the release-flow specs (`tests/specs`), a `bash -n` shell-lint job over `scripts/*.sh`/`src/*.sh`/`wakemeup.sh`, and a container build smoke. The release workflows are covered in [CI pipelines](UpOnLAN.xyz/04-CI.md).
@@ -194,4 +194,3 @@ In CI, `.github/workflows/test.yml` runs the four webapp layers on every push/PR
 ### Release-flow specs (Python)
 
 The shell scripts and the `release/output` layout are covered by a separate Python `unittest` suite in `tests/specs/` (run `./tests/specs/run.sh`). These validate the release pipeline — the `menu/` + `assets/` layout, `build.sh` layouts (GitHub vs local), `release_assets.sh` targeted/untargeted behavior, `release_menu.sh` warn/missing-ROM behavior, the iPXE `asset_path` resolution (GitHub vs local), and `init.sh` / `wakemeup.sh` URL construction — against the real scripts in a temp directory with only `curl`/`sudo`/`python3` stubbed.
-

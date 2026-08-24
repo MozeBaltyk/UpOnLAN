@@ -381,6 +381,12 @@ function initMetricsChart() {
         legend: {
           display: true,
           position: 'bottom',
+          onClick: function(_event, legendItem, legend) {
+            const chart = legend.chart;
+            const index = legendItem.datasetIndex;
+            chart.setDatasetVisibility(index, !chart.isDatasetVisible(index));
+            chart.update();
+          },
           labels: {
             boxWidth: 9,
             font: {

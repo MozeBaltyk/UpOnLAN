@@ -3,11 +3,16 @@
 // against a real fixture config; no server, no mocks.
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { createFixtureRoot } from '../helpers/fixtures.js';
 
 let menuFile;
 let nginxFile;
+const utilSource = fs.readFileSync(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../services/utilServices.js'),
+  'utf-8',
+);
 
 beforeAll(() => {
   const root = createFixtureRoot();
@@ -125,5 +130,12 @@ describe('utilServices.getLocalNginx', () => {
     fs.rmSync(nginxFile);
     const svc = await loadServices();
     expect(svc.getLocalNginx()).toBe('http://localhost');
+  });
+});
+
+describe('utilServices.downloader source contract', () => {
+  it('uses the WHATWG URL API instead of legacy url.parse for host checks', () => {
+    expect(utilSource).toContain('const parsedUrl = new URL(url);');
+    expect(utilSource).not.toContain('urlLib.parse(url)');
   });
 });

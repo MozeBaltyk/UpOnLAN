@@ -20,11 +20,10 @@ Ordered by priority. All remaining phases land on the `dev` branch, merged to `m
 ## Phase 2 — Menu/asset content → `dev`
 
 - [x] **Rocky Linux local recipe** — `rocky8`/`rocky9` `direct_file` recipes; `rockylinux.ipxe` now boots `${mirror_endpoint}${asset_path}rocky-<ver>-<arch>/` (kernel+initrd re-hosted, `inst.repo` stays on the Rocky mirror).
-- [ ] **Cloud-init assets** — with a "category" column in the Assets tab.
+- [ ] **Cloud-init or kickstart assets** — with a "category" column in the Assets tab.
 
 ## Phase 3 — Webapp features → `dev`
 
-- [ ] **Console: multi-host KVM** — add a KVM host entry + connect to remote hosts over SSH (key-based), not just local `qemu:///system`.
 - [x] **Console: attach disks** — Create VM takes a disk size (GiB); a qcow2 volume is created in the libvirt `default` pool and attached as `vda` (0 = diskless). `vm:destroy` cleans it up.
 - [x] **Wake-on-LAN** — show host status/IP + add a scheduler.
 

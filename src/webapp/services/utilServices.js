@@ -1,7 +1,6 @@
 // ./services/utilServices.js
 'use strict';
 const { DownloaderHelper } = require('node-downloader-helper');
-const urlLib = require('url');
 const fetch = require('node-fetch');
 const allowedHosts = ['github.com', 's3.amazonaws.com'];
 const fs = require('fs');
@@ -243,7 +242,7 @@ async function downloader(downloads, socket) {
     }
 
     // Optional .part2 support (for non-GitHub/S3 hosts)
-    const parsedUrl = urlLib.parse(url);
+    const parsedUrl = new URL(url);
     if (!allowedHosts.includes(parsedUrl.host)) {
       try {
         const response = await fetch(url + '.part2', { method: 'HEAD' });

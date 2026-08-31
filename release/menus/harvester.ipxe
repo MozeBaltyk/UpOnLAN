@@ -33,11 +33,8 @@ goto harvester_boot
 set install_params harvester.install.automatic=true harvester.install.config_url=${harvester_config_url}
 set boot_params ip=dhcp net.ifnames=1 console=ttyS0 console=tty1 rd.cos.disable root=live:${harvester_url}squashfs.img rd.noverifyssl
 imgfree
-kernel ${harvester_url}vmlinuz ${install_params} ${boot_params} initrd=initrd.magic ${cmdline}
+kernel ${harvester_url}vmlinuz ${install_params} ${boot_params} ${cmdline}
 initrd ${harvester_url}initrd
-echo
-echo MD5sums:
-md5sum vmlinuz initrd
 boot
 
 :harvester_exit

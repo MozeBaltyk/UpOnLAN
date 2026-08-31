@@ -19,6 +19,9 @@ class ReleaseOutputSpecs(TempDirTestCase):
             EXTRACTS="http://example.com/vmlinuz|vmlinuz"
             ''',
         )
+        self.stub('release/provisioning/kickstart/example/ks.cfg', '# kickstart\n')
+        self.stub('release/provisioning/cloud-init/example/user-data', '#cloud-config\n')
+        self.stub('release/provisioning/cloud-init/example/meta-data', 'instance-id: example\n')
         self.stub('release/menus/version.ipxe', '#!ipxe\nset menu_version 0.0.1\n')
         self.stub('release/menus/menu.ipxe', '#!ipxe\n:start\nexit\n')
         self.stub('release/menus/boot.cfg', '#!ipxe\n')
@@ -35,6 +38,18 @@ class ReleaseOutputSpecs(TempDirTestCase):
         self.assertIn('build_type: direct_file', yml)
         self.assertIn('- http://example.com/vmlinuz', yml)
         self.assertFalse((assets / 'harvester-v1.7.3-x86_64').exists(), 'direct_file must not download a bundle')
+
+    def test_release_menu_bundles_provisioning_profiles(self):
+        self.run_cmd('bash', 'scripts/release_menu.sh', '0.0.2')
+        tarball = self.tmp / 'release' / 'output' / 'menu' / '0.0.2' / 'menus.tar.gz'
+        import tarfile
+        with tarfile.open(tarball) as tf:
+            names = {n.lstrip('./') for n in tf.getnames()}
+        self.assertIn('provisioning/kickstart/example/ks.cfg', names)
+        self.assertIn('provisioning/cloud-init/example/user-data', names)
+        self.assertIn('provisioning/cloud-init/example/meta-data', names)
+        # local-vars.ipxe must still be excluded from the shipped menu.
+        self.assertNotIn('local-vars.ipxe', names)
 
     def test_release_menu_builds_menu_layout(self):
         self.run_cmd('bash', 'scripts/release_menu.sh', '0.0.2')

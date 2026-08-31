@@ -67,6 +67,10 @@ initrd http://${SERVER}/boot/ubuntu/initrd.img
 boot
 ```
 
+> ⚠️ **Use plain `kernel …` + `initrd …` + `boot`.** UpOnLAN removed two legacy conventions inherited from netboot.xyz that break on a stock iPXE build:
+> - **`md5sum` / `MD5sums`** — not a stock iPXE command; it printed `command not found` and did nothing. Do not add it back.
+> - **`initrd=initrd.magic`** — iPXE treats that as a *file* to fetch and fails with `Failed to open file: initrd.magic` (it was a netboot.xyz-custom-build magic name). Load the initrd with the `initrd <url>` command only; iPXE hands it to the kernel via the Linux boot protocol.
+
 ## 🔗 Chain iPXE scripts
 
 Example of chain usage with  `main.ipxe` Menu:
@@ -101,6 +105,28 @@ pause
 > * `ubuntu.ipxe` contains the full kernel/initrd/boot instructions for Ubuntu.
 > * If chaining fails, we go to failed using conditional logic.
 > * Of course, replace 10.10.10.10 with your actual IP or use DHCP to inject it via next-server.
+
+---
+
+## 🧩 Provisioning URLs in shipped menus
+
+The shipped Linux installers include canned profile items that point at the published provisioning assets via two overridable variables:
+
+- **Rocky Linux** example Kickstart (`${kickstart_url}`):
+
+  ```ipxe
+  set params inst.ks=${kickstart_url}
+  ```
+
+- **Ubuntu Subiquity** example NoCloud seed (`${cloud_init_url}`):
+
+  ```ipxe
+  set install_params autoinstall ds=nocloud-net;s=${cloud_init_url}
+  ```
+
+Both default (in `release/menus/boot.cfg`) to the shipped example profiles under `${local_endpoint}provisioning/...`, and can be overridden in `release/menus/local-vars.ipxe` (copy `local-vars.ipxe.example`) exactly like `${local_endpoint}`.
+
+`release/menus/rockylinux.ipxe` and `release/menus/ubuntu.ipxe` still keep their manual `read` prompt items (`Specify kickstart URL...`, `Specify preseed/autoinstall url...`). The canned entries are shortcuts to the shipped example profiles under `release/provisioning/`, which `scripts/release_menu.sh` bundles into `menus.tar.gz` and `init.sh` serves at `/provisioning/...`.
 
 ---
 

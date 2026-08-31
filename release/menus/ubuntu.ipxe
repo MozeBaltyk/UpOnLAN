@@ -50,10 +50,12 @@ menu ${os} [${ubuntu_version}] Installer
 item --gap Install types
 item install ${space} Install
 item rescue ${space} Rescue Mode
+iseq ${install_type} sub && item automated_example ${space} autoinstall ${cloud_init_url} ||
 item automated ${space} Specify preseed/autoinstall url...
 iseq ${install_type} deb && item priority ${space} Change install priority [ ${install_priority} ] ||
 choose --default ${type} type || goto ubuntu
 echo ${cls}
+iseq ${type} automated_example && goto deb_automated_example ||
 goto deb_${type}
 
 :deb_rescue
@@ -73,6 +75,10 @@ iseq ${install_type} deb && set install_params auto=true priority=${install_prio
 iseq ${install_type} sub && set install_params autoinstall ds=nocloud-net;s=${install_url} ||
 goto deb_install
 
+:deb_automated_example
+set install_params autoinstall ds=nocloud-net;s=${cloud_init_url} ||
+goto deb_install
+
 :deb_install
 iseq ${install_type} deb && goto deb_boot ||
 iseq ${install_type} sub && goto ${ubuntu_version}_${os_arch} ||
@@ -81,11 +87,8 @@ iseq ${install_type} sub && goto ${ubuntu_version}_${os_arch} ||
 echo Loading Ubuntu PXE netboot installer
 set dir ${dir}ubuntu-installer/${os_arch}
 imgfree
-kernel ${ubuntu_mirror}/${dir}/linux ${install_params} ${mirrorcfg} initrd=initrd.magic ${cmdline}
-initrd ${ubuntu_mirror}/${dir}/initrd.gz
-echo
-echo MD5sums:
-md5sum linux initrd.gz
+kernel ${ubuntu_mirror}/${dir}/linux ${install_params} ${mirrorcfg} ${cmdline}
+initrd ${ubuntu_mirror}/${dir}initrd.gz
 boot
 
 :oracular_amd64
@@ -115,11 +118,8 @@ iseq ${os_arch} amd64 && set ubuntu_iso_url http://releases.ubuntu.com/${codenam
 iseq ${os_arch} arm64 && set ubuntu_iso_url http://cdimage.ubuntu.com/releases/${version_number}/release/ubuntu-${version_number}-live-server-${os_arch}.iso ||
 isset ${dhcp-server} && set netboot_params ip=dhcp url=${ubuntu_iso_url} || set netboot_params
 echo Loading Ubuntu Subiquity Network Installer...
-kernel ${kernel_url}vmlinuz root=/dev/ram0 ramdisk_size=3500000 cloud-config-url=/dev/null ${netboot_params} ${install_params} initrd=initrd.magic ${cmdline}
+kernel ${kernel_url}vmlinuz root=/dev/ram0 ramdisk_size=3500000 cloud-config-url=/dev/null ${netboot_params} ${install_params} ${cmdline}
 initrd ${kernel_url}initrd
-echo
-echo MD5sums:
-md5sum vmlinuz initrd
 boot
 
 :ubuntu_exit

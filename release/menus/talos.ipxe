@@ -28,11 +28,8 @@ goto talos
 set talos_url ${local_endpoint}talos-v1.13.8-${arch}/
 isset ${talos_config} && set talos_param talos.config=${talos_config} || set talos_param
 imgfree
-kernel ${talos_url}vmlinuz talos.platform=metal console=ttyS0 ${talos_param} initrd=initrd.magic
+kernel ${talos_url}vmlinuz talos.platform=metal console=ttyS0 ${talos_param}
 initrd ${talos_url}initrd
-echo
-echo MD5sums:
-md5sum vmlinuz initrd
 boot
 
 :talos_exit

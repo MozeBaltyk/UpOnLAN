@@ -51,3 +51,41 @@ describe.skipIf(!fs.existsSync(ENDPOINTS))('remote assets from generated release
     }
   });
 });
+
+describe('provisioning assets in the getlocal payload', () => {
+  it('includes published provisioning files with category/kind metadata', async () => {
+    const app = await bootApp({
+      fixtures: {
+        'config/endpoints.yml': 'endpoints: {}\n',
+        'assets/provisioning/kickstart/example/ks.cfg': '# kickstart\n',
+        'assets/provisioning/cloud-init/example/user-data': '#cloud-config\n',
+        'assets/provisioning/cloud-init/example/meta-data': 'instance-id: example\n',
+      },
+    });
+    const socket = app.connectClient({ auth: { token: 'secret' } });
+
+    try {
+      await once(socket, 'connect');
+      const [args] = await Promise.all([once(socket, 'renderlocal'), Promise.resolve(socket.emit('getlocal'))]);
+
+      const provisioning = args[6];
+      expect(provisioning).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          relativePath: 'kickstart/example/ks.cfg',
+          category: 'Provisioning',
+          kind: 'Kickstart',
+          urlPath: '/provisioning/kickstart/example/ks.cfg',
+        }),
+        expect.objectContaining({
+          relativePath: 'cloud-init/example/user-data',
+          category: 'Provisioning',
+          kind: 'Cloud-init',
+          urlPath: '/provisioning/cloud-init/example/user-data',
+        }),
+      ]));
+    } finally {
+      socket.close();
+      await app.close();
+    }
+  });
+});

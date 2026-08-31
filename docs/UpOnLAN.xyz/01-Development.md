@@ -16,6 +16,10 @@ The **UpOnLAN WebApp** allows users to:
 
 ✅ Create and manage a diskless KVM test VM with an interactive serial console (BIOS/UEFI)
 
+✅ Author **provisioning profiles** — Kickstart (`ks.cfg`) and cloud-init (`user-data`/`meta-data`/`network-config`) — with a per-profile version field and a **Validate** action (`ksvalidator` for kickstart, `cloud-init schema`/YAML for cloud-init)
+
+✅ Manage Wake-on-LAN hosts with live status/IP and a one-shot wake scheduler
+
 ✅ Build ROMs and boot media (Legacy/EFI/ISO/USB) from the web app
 
 ✅ Monitor build progress and system status in real-time via WebSockets
@@ -184,6 +188,19 @@ npm run test:smoke         # smoke only
 ```
 
 In CI, `.github/workflows/test.yml` runs the four webapp layers on every push/PR, plus the release-flow specs (`tests/specs`), a `bash -n` shell-lint job over `scripts/*.sh`/`src/*.sh`/`wakemeup.sh`, and a container build smoke. The release workflows are covered in [CI pipelines](UpOnLAN.xyz/04-CI.md).
+
+## Provisioning profiles
+
+Provisioning files (`ks.cfg`, `user-data`, `meta-data`, `network-config`) are edited from the **Menus** page under the `Provisioning Profiles` section, next to the iPXE menu files, and surfaced in the **Assets** tab's Provisioning sub-tab. Two storage trees, mirroring the menu layer model:
+
+| Tree | Path | Purpose |
+|------|------|---------|
+| editable source | `/config/provisioning/local/` | where the editor reads/writes |
+| published copy | `/assets/provisioning/` | what nginx serves at `/provisioning/...` |
+
+- Saving a profile re-publishes it to `/assets/provisioning/...`; the menu reaches it via `${kickstart_url}` / `${cloud_init_url}`.
+- Shipped example profiles (in `release/provisioning/`) are bundled into `menus.tar.gz` and relocated into both trees at boot by `init.sh`.
+- Validation (`services/provisioningServices.js`) shells out to `ksvalidator` (Kickstart), `cloud-init schema` (user-data), or a YAML parse (`meta-data`/`network-config`); the result renders in a modal.
 
 ### Testability notes
 

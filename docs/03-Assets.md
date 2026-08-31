@@ -33,6 +33,7 @@ This is why the **Assets** tab exists in the web app:
 - ✅ Serve these assets over the configured Nginx HTTP port. Put a TLS-capable reverse proxy in front if HTTPS is required.
 - ✅ Provide helper scripts to extract kernel, initramfs, and squashfs directly from ISO files.
 - ✅ Automatically populate an `endpoints.yml` configuration file for your iPXE menus.
+- ✅ Surface published provisioning files (`/assets/provisioning/...`) alongside boot assets, with a simple **All / Boot / Provisioning** filter and copy/open-editor actions.
 
 This allows you to fully control and serve all necessary assets locally, ensuring reliable and repeatable booting even in isolated environments.
 
@@ -94,7 +95,16 @@ The consequence: **the `<key>` and file names in a menu must match an endpoint's
 
 ---
 
-## ☁️ Cloud-init seeds as assets
+## ☁️ Provisioning profiles (Kickstart + cloud-init) as assets
+
+UpOnLAN manages two kinds of *provisioning* alongside boot assets, and the iPXE menu drives each with a different kernel parameter:
+
+| Profile | Guest consumes it | Kernel param (menu) | Files |
+| --- | --- | --- | --- |
+| **Kickstart** (Rocky/RHEL) | during install (Anaconda) | `inst.ks=${kickstart_url}` | a single `ks.cfg` |
+| **cloud-init** NoCloud (Ubuntu subiquity) | first boot + autoinstall | `autoinstall ds=nocloud-net;s=${cloud_init_url}` | a seed dir (`user-data` + `meta-data` + optional `network-config`) |
+
+`${kickstart_url}` and `${cloud_init_url}` are the two knobs: both default (in `release/menus/boot.cfg`) to the shipped example profiles under `${local_endpoint}provisioning/...`, and are overridable in `release/menus/local-vars.ipxe` exactly like `${local_endpoint}`. The shipped profiles themselves live in `release/provisioning/` and ride the **menu** release (`menus.tar.gz`), not the asset pipeline — see [Menu Scripting](iPXE/02-Menu-Scripting.md).
 
 [cloud-init](https://cloudinit.readthedocs.io/) does post-boot provisioning — hostname, users/SSH keys, network, packages, run-commands — and it's independent of *how* the machine booted, so it composes cleanly with PXE: PXE delivers the kernel + initrd, cloud-init configures the OS that comes up.
 
@@ -119,7 +129,25 @@ initrd ${url}initrd
 
 So a cloud-init seed is a `direct_file` asset whose `files` are `user-data` + `meta-data` instead of `vmlinuz`/`initrd`; its only real difference is that the guest consumes it mid-boot rather than as a menu entry — the "category" to surface in the Assets tab.
 
-> ⚠️ Planned, not implemented — tracked in the TODO under *Cloud-init assets*.
+Today UpOnLAN publishes provisioning files under `/assets/provisioning/...` in two ways:
+
+- **Shipped examples** live in `release/provisioning/` and are bundled into `menus.tar.gz` (under `provisioning/`) by `scripts/release_menu.sh`; `init.sh` moves them out of the menu tree into `/assets/provisioning/...` at boot.
+- **Local edits** live in `/config/provisioning/local/...`; saving from the **Menus** page republishes the file to `/assets/provisioning/...` immediately.
+
+The **Assets** tab treats those files as a separate Provisioning category. Each row shows the kind (`Kickstart` or `Cloud-init`), the version, the published URL, and two small actions:
+
+- **Copy URL** — copy the published local URL for that file/directory (the same `/provisioning/...` path the shipped menus reach through `${local_endpoint}`).
+- **Edit** — jump back to the Menus-page provisioning editor for that file.
+
+In the **Menus** editor, provisioning files get a **Version** field and a **Validate** button:
+
+- Kickstart (`ks.cfg`): a distro dropdown (RHEL 7/8/9, Fedora) whose value feeds `ksvalidator -v <token>`.
+- cloud-init (`user-data`): `cloud-init schema --config-file`.
+- `meta-data` / `network-config`: YAML syntax check.
+
+The validation result opens in a popup. Kickstart validation requires `pykickstart` and cloud-init schema requires `cloud-init` — both are installed in the container image.
+
+Kickstart profiles follow the same pattern, except the URL points at a single `ks.cfg` instead of a NoCloud directory.
 
 ---
 

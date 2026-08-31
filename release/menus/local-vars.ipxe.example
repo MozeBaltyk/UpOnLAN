@@ -11,3 +11,8 @@
 # This only affects direct_file entries — iso_extraction still chains
 # ${mirror_endpoint}${asset_path} (the GitHub origin set in boot.cfg).
 set local_endpoint http://192.168.7.1:8080/
+
+# Provisioning profiles. Optional: override to point the menu at your own seeds.
+# Unset, boot.cfg falls back to the shipped example profiles under local_endpoint.
+#set kickstart_url ${local_endpoint}provisioning/kickstart/example/ks.cfg
+#set cloud_init_url ${local_endpoint}provisioning/cloud-init/example/

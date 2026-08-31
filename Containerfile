@@ -38,6 +38,7 @@ RUN apk add --no-cache \
 RUN apk add --no-cache \
     bash \
     busybox \
+    cloud-init \
     curl \
     dnsmasq \
     gettext-envsubst \
@@ -47,6 +48,8 @@ RUN apk add --no-cache \
     nghttp2-dev \
     nginx \
     nodejs \
+    py3-pip \
+    python3 \
     shadow \
     sudo \
     supervisor \
@@ -57,6 +60,11 @@ RUN apk add --no-cache \
     useradd -u 911 -U -d /config -s /bin/false nbxyz && \
     usermod -G users nbxyz && \
     mkdir /app /config /defaults
+
+# Kickstart validation: ksvalidator (pykickstart). No Alpine 3.24 apk package
+# exists, so install from PyPI. Provides the ksvalidator / ksflatten / ksverdiff
+# console scripts the provisioning Validate button shells out to.
+RUN pip install --no-cache-dir --break-system-packages pykickstart==3.78
 
 ENV TFTPD_OPTS=''
 ENV NGINX_PORT='8080'

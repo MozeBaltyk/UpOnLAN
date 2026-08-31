@@ -1,0 +1,27 @@
+#cloud-config
+# Basic automated Ubuntu Server install (example Subiquity autoinstall seed).
+# Served by release/menus/ubuntu.ipxe via ds=nocloud-net;s=.
+#
+# CHANGE-ME: regenerate the password hash with:
+#   openssl passwd -6 '<password>'
+# (the hash below is for the plaintext password "ubuntu").
+autoinstall:
+  version: 1
+  identity:
+    hostname: ubuntu
+    username: ubuntu
+    password: $6$quk7nd3.J.wZOy87$vEqgiKaRCCVuVgdLZEeAJB3kNVLKD4ZRf1.Tsgy3hojpjC58Ml48yOGISQizzYJGEtZokAlmajXuDCxIiufij0
+  ssh:
+    install-server: true
+    allow-pw: true
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  timezone: UTC
+  storage:
+    layout:
+      name: direct
+  packages:
+    - openssh-server
+  late-commands:
+    - echo "Ubuntu autoinstall complete" > /target/root/autoinstall-complete

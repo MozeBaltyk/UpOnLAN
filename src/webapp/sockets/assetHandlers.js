@@ -6,6 +6,7 @@ const yaml = require('js-yaml');
 const readdirp = require('readdirp');
 const { getMenuOrigin, getLocalNginx, getMenuVersion, getAssetOrigin } = require('../services/utilServices');
 const { dlremote } = require('../services/assetServices');
+const { listProvisioningAssets } = require('../services/provisioningServices');
 
 const CONFIG_ROOT = process.env.UPONLAN_CONFIG || '/config';
 const ASSETS_ROOT = process.env.UPONLAN_ASSETS || '/assets';
@@ -30,11 +31,12 @@ module.exports = function registerAssetHandlers(socket, io) {
       const endpoints = yaml.load(endpointsFile);
       const localfiles = await readdirp.promise(ASSETS_ROOT + '/.');
       const assets = localfiles.map(f => '/' + f.path);
+      const provisioning = await listProvisioningAssets();
       const menuversion = getMenuVersion();
       const menuorigin = getMenuOrigin();
       const assetorigin = getAssetOrigin();
       const localNginx = getLocalNginx();
-      io.sockets.in(socket.id).emit('renderlocal', endpoints, assets, menuversion, menuorigin, assetorigin, localNginx);
+      io.sockets.in(socket.id).emit('renderlocal', endpoints, assets, menuversion, menuorigin, assetorigin, localNginx, provisioning);
     } catch (error) {
       console.error('getlocal error:', error.stack || error);
       socket.emit('error', 'Failed to load local assets: ' + error.message);

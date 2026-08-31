@@ -11,6 +11,7 @@ PXE booting is especially relevant for automating bare-metal installations and e
 This webapp aims to:
 - Serve the PXE menu with real-time edits and local overrides
 - Serve install assets during PXE boot
+- Author Kickstart (`ks.cfg`) and cloud-init (`user-data`/`meta-data`) provisioning profiles, with a distro/version field and built-in syntax validation
 - Manage Wake-on-LAN entries
 - Show logs and live metrics
 - Provide built-in docs for iPXE and UpOnLAN

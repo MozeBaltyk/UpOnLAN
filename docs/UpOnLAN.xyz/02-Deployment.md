@@ -90,4 +90,6 @@ The web console's VM tab creates a diskless KVM guest (no disk, no VGA, PTY seri
 - **UEFI**: `<os firmware='efi'>` — libvirt picks OVMF and manages a per-guest NVRAM. OVMF PXE-boots, TFTPs `rom/ipxe/uponlan.xyz.efi` (delivered via `dhcp-boot`/option 67 matched on client arch option 93 = 7), and iPXE renders the same serial menu.
 - Destroying a UEFI guest removes its NVRAM (`virsh undefine --nvram`); without this, re-creating the VM is blocked by a stale NVRAM file.
 
+The Console tab streams the PTY serial console through xterm.js, with copy/paste, font sizing, autoscroll, and scrollback preserved across tab switches.
+
 The network's dnsmasq intentionally has **no `pxe-service`/`pxe-prompt` lines**: dnsmasq's PXE processing (enabled only by those) injects option 60 `PXEClient` + option 43 into every offer, which makes EDK2/OVMF abort with `PXE-E21: Remote boot cancelled` before any TFTP. Boot files are advertised solely via `dhcp-boot` tags (`ipxe-bios`/`ipxe-efi` on option 175, `uefi-fw` on option 93).

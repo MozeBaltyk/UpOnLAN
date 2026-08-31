@@ -78,11 +78,14 @@ Quick reference for the terms used across the docs. Grouped by theme; each entry
 ## Installer / first-boot tooling
 
 - **Anaconda** — the RHEL/Rocky/Fedora family installer; driven by `inst.repo` and a stage-2 `install.img`.
+- **Kickstart (`ks.cfg`)** — an Anaconda automation file that answers install-time questions (partitioning, packages, users); fetched via `inst.ks=<url>`.
+- **ksvalidator** — `pykickstart`'s syntax checker for `ks.cfg`; backs the webapp's Kickstart Validate action.
 - **inst.repo=** — an Anaconda kernel argument pointing at the package repository (kept vendor-direct in UpOnLAN menus).
 - **dracut** — the initramfs framework behind the RHEL/Rocky family's early boot.
 - **Casper** — Ubuntu's live-system boot hook.
 - **debian-installer (d-i)** — the classic Debian/Ubuntu installer.
-- **subiquity** — Ubuntu's newer server installer (used by the UpOnLAN `ubuntu.ipxe` entry).
+- **subiquity** — Ubuntu's newer server installer (used by the UpOnLAN `ubuntu.ipxe` entry); driven by `autoinstall` / NoCloud.
+- **provisioning profile** — a Kickstart file or cloud-init seed the UpOnLAN menus build follows; edited in Menus, served under `/assets/provisioning/`.
 
 ## Networking / misc
 

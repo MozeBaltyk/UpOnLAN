@@ -61,6 +61,26 @@ else
   echo "[uponlanxyz-init] Extracting menus.tar.gz"
   tar -xzf /config/menus/menus.tar.gz -C /config/menus/remote
   rm -f /config/menus/menus.tar.gz
+
+  # Provisioning profiles (kickstart/cloud-init seeds) ship inside menus.tar.gz
+  # under provisioning/. Move them out of the menu tree into the editable tree
+  # (/config/provisioning/local) and the served tree (/assets/provisioning), so
+  # they aren't exposed as iPXE menu files but are reachable at
+  # /provisioning/... via nginx. Never overwrite an operator's existing file.
+  if [ -d /config/menus/remote/provisioning ]; then
+    mkdir -p /config/provisioning/local /assets/provisioning
+    (cd /config/menus/remote/provisioning && find . -type f | while read -r f; do
+      rel="${f#./}"
+      for dst in /config/provisioning/local /assets/provisioning; do
+        if [ ! -e "$dst/$rel" ]; then
+          mkdir -p "$dst/$(dirname "$rel")"
+          cp "$f" "$dst/$rel"
+        fi
+      done
+    done)
+    rm -rf /config/menus/remote/provisioning
+  fi
+
   # -r is required: the tarball contains the rom/ipxe/ directory and a plain
   # `cp` silently omits directories, leaving the TFTP root without the iPXE
   # ROMs the network advertises (UEFI/firmware-PXE boot then fails).

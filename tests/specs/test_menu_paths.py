@@ -24,9 +24,28 @@ class MenuPathSpecs(unittest.TestCase):
             self.assertIn('${local_endpoint}', content, f'{f} must use the local_endpoint var')
             self.assertNotIn('${mirror_endpoint}${asset_path}', content, f'{f} still chains the GitHub origin')
 
+    def test_rocky_and_ubuntu_ship_canned_provisioning_urls(self):
+        rocky = (self.menus / 'rockylinux.ipxe').read_text()
+        ubuntu = (self.menus / 'ubuntu.ipxe').read_text()
+        self.assertIn('item kickstart_example', rocky)
+        self.assertIn('inst.ks=${kickstart_url}', rocky)
+        self.assertIn('Specify kickstart URL', rocky)
+        self.assertIn('item automated_example', ubuntu)
+        self.assertIn('autoinstall ds=nocloud-net;s=${cloud_init_url}', ubuntu)
+        self.assertIn('Specify preseed/autoinstall url', ubuntu)
+        self.assertNotIn('md5sum', rocky)
+        self.assertNotIn('md5sum', ubuntu)
+
+    def test_boot_cfg_defines_provisioning_url_defaults(self):
+        cfg = (self.menus / 'boot.cfg').read_text()
+        self.assertIn('isset ${kickstart_url} || set kickstart_url ${local_endpoint}provisioning/kickstart/example/ks.cfg', cfg)
+        self.assertIn('isset ${cloud_init_url} || set cloud_init_url ${local_endpoint}provisioning/cloud-init/example/', cfg)
+
     def test_local_vars_override(self):
         lv = (self.menus / 'local-vars.ipxe.example').read_text()
         self.assertIn('set local_endpoint http://192.168.7.1:8080/', lv)
+        self.assertIn('kickstart_url', lv)
+        self.assertIn('cloud_init_url', lv)
 
     def test_menu_url_resolution_local_vs_github(self):
         # Extract the real defaults, then simulate the two origin layouts.

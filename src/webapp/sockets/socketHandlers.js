@@ -4,6 +4,7 @@ const registerDashboardHandlers = require('./dashboardHandlers');
 const registerWolHandlers = require('./wolHandlers');
 const registerMenuHandlers = require('./menuHandlers');
 const registerAssetHandlers = require('./assetHandlers');
+const registerProvisioningHandlers = require('./provisioningHandlers');
 const registerLogHandlers = require('./logHandlers');
 const registerMetricHandlers = require('./metricHandlers');
 const registerDocHandlers = require('./docHandlers');
@@ -19,6 +20,7 @@ module.exports = function(io) {
     registerDashboardHandlers(socket);
     registerMenuHandlers(socket, io);
     registerAssetHandlers(socket, io);
+    registerProvisioningHandlers(socket);
     registerLogHandlers(socket, io);
     registerMetricHandlers(io, socket);
     registerWolHandlers(socket);

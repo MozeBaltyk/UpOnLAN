@@ -50,6 +50,22 @@ class InitShUrlSpecs(unittest.TestCase):
         supervisor = (REPO_ROOT / 'src' / 'etc' / 'supervisor.conf').read_text()
         self.assertIn('NODE_EXTRA_CA_CERTS="/etc/ssl/certs/ca-certificates.crt"', supervisor)
 
+    def test_provisioning_profiles_are_relocated_from_menu_tarball(self):
+        # Provisioning ships inside menus.tar.gz; init.sh moves it out of the
+        # menu tree into the editable + served trees (never overwriting edits).
+        self.assertIn('/config/menus/remote/provisioning', self.init_sh)
+        self.assertIn('/config/provisioning/local', self.init_sh)
+        self.assertIn('/assets/provisioning', self.init_sh)
+        self.assertIn('! -e "$dst/$rel"', self.init_sh)
+        self.assertIn('rm -rf /config/menus/remote/provisioning', self.init_sh)
+        # No longer seeded from an image-baked /defaults/provisioning.
+        self.assertNotIn('/defaults/provisioning', self.init_sh)
+
+    def test_menu_release_bundles_provisioning(self):
+        release_menu = (REPO_ROOT / 'scripts' / 'release_menu.sh').read_text()
+        self.assertIn('./release/provisioning/. "$stage/provisioning"', release_menu)
+        self.assertNotIn('--exclude=local-vars.ipxe .', release_menu)
+
 
 if __name__ == '__main__':
     unittest.main()

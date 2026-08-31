@@ -20,7 +20,11 @@ Ordered by priority. All remaining phases land on the `dev` branch, merged to `m
 ## Phase 2 — Menu/asset content → `dev`
 
 - [x] **Rocky Linux local recipe** — `rocky8`/`rocky9` `direct_file` recipes; `rockylinux.ipxe` now boots `${mirror_endpoint}${asset_path}rocky-<ver>-<arch>/` (kernel+initrd re-hosted, `inst.repo` stays on the Rocky mirror).
-- [ ] **Cloud-init or kickstart assets** — with a "category" column in the Assets tab.
+- [x] **Provisioning profiles (Kickstart + cloud-init)**
+  - **Milestones**
+    - [x] **Phase 2A — backend + publish path**
+    - [x] **Phase 2B — Menus-page authoring UI**
+    - [x] **Phase 2C — Assets visibility + menu wiring + docs/tests**
 
 ## Phase 3 — Webapp features → `dev`
 
@@ -28,12 +32,12 @@ Ordered by priority. All remaining phases land on the `dev` branch, merged to `m
 - [x] **Wake-on-LAN** — show host status/IP + add a scheduler.
 
 ## Phase 4 — Platform hardening → `dev`
-
+- [ ] **Update Node.js** — the container pins an older runtime.
 - [ ] **HTTPS** — TLS termination (reverse proxy or in-nginx certs) for webapp + asset serving (plain HTTP 8080/3000 today).
 - [ ] **Kubernetes** — promote the chart's Pod → Deployment (replicas 1); rework node-local `hostPort` TFTP + `hostPath` libvirt socket.
-- [ ] **Update Node.js** — the container pins an older runtime.
 
 ## Phase 5 — Polish → `dev`
 
 - [ ] **Prose brand sweep** — "UpOnLAN" → "UpOnLAN.xyz" in body text (titles/folder already done).
+- [ ] **Repository endpoint setable** - make the repo url possible to declare (default github). 
 - [ ] **Docs** — ghcr login note + any remaining release/deploy gaps.

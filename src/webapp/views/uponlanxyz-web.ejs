@@ -64,6 +64,8 @@ $(document).on('click', '[data-action]', function () {
   const action = $(this).data('action');
   const handlers = {
     'createipxe': createipxe,
+    'createkickstart': createkickstartprofile,
+    'createcloudinit': createcloudinitprofile,
     'devbrowser': devbrowser,
     'nbbrowser': nbbrowser,
     'resetmenu': resetmenu,
@@ -75,6 +77,38 @@ $(document).on('click', '[data-action]', function () {
     'deletelocal': deletelocal,
   };
   if (handlers[action]) handlers[action]();
+});
+
+$(document).on('click', '[data-provisioning-open]', function () {
+  editprovisioningfile(decodeURIComponent($(this).data('provisioningOpen')));
+});
+
+$(document).on('click', '[data-provisioning-save]', function () {
+  saveprovisioningfile(decodeURIComponent($(this).data('provisioningSave')));
+});
+
+$(document).on('click', '[data-provisioning-delete]', function () {
+  deleteprovisioningfile(decodeURIComponent($(this).data('provisioningDelete')));
+});
+
+$(document).on('click', '[data-provisioning-version]', function () {
+  saveprovisioningversion(decodeURIComponent($(this).data('provisioningVersion')));
+});
+
+$(document).on('click', '[data-provisioning-validate]', function () {
+  validateprovisioning(decodeURIComponent($(this).data('provisioningValidate')));
+});
+
+$(document).on('click', '[data-asset-filter]', function () {
+  setAssetFilter($(this).data('assetFilter'));
+});
+
+$(document).on('click', '[data-copy-url]', function () {
+  copyText(decodeURIComponent($(this).data('copyUrl')));
+});
+
+$(document).on('click', '[data-asset-provisioning-open]', function () {
+  openProvisioningFromAssets(decodeURIComponent($(this).data('assetProvisioningOpen')));
 });
 
 // Highlight active nav item and switch pages
@@ -384,8 +418,13 @@ function initMetricsChart() {
           onClick: function(_event, legendItem, legend) {
             const chart = legend.chart;
             const index = legendItem.datasetIndex;
-            chart.setDatasetVisibility(index, !chart.isDatasetVisible(index));
-            chart.update();
+            if (chart.isDatasetVisible(index)) {
+              chart.hide(index);
+              legendItem.hidden = true;
+            } else {
+              chart.show(index);
+              legendItem.hidden = false;
+            }
           },
           labels: {
             boxWidth: 9,
@@ -470,6 +509,72 @@ socket.on('renderdashhook', function(){
 
 //// Config Page rendering ////
 let current_menu_version = '0.0.1';
+let pendingProvisioningOpen = null;
+let pendingProvisioningReset = false;
+
+function defaultConfigContent() {
+  return `
+    <center>
+      <br><h3>Edit file on the left panel</h3><br>
+      <h3>Create a new file:</h3>
+      <div class="form-row">
+        <div class="col-md-4"></div>
+        <div class="col-md-2"><input type="text" class="form-control ipxefilename" placeholder="myfile.ipxe"></div>
+        <div class="col-md-2"><button data-action="createipxe" class="btn btn-primary form-control">Create New</button></div>
+        <div class="col-md-4"></div>
+      </div><br>
+      <h3>Import a menu:</h3>
+      <div class="form-row">
+        <div class="col-md-4"></div>
+        <div class="col-md-4"><button data-action="devbrowser" class="btn btn-outline-info form-control">Menu From Endpoint URL</button></div>
+        <div class="col-md-4"></div>
+      </div><br>
+      <div class="form-row">
+        <div class="col-md-4"></div>
+        <div class="col-md-4"><button data-action="nbbrowser" class="btn btn-outline-info form-control">Menu Netboot.xyz</button></div>
+        <div class="col-md-4"></div>
+      </div><br>
+      <h3>Erase menus:</h3>
+      <div class="form-row">
+        <div class="col-md-4"></div>
+        <div class="col-md-4"><button data-action="resetmenu" class="btn btn-outline-danger form-control">Reset Menus</button></div>
+        <div class="col-md-4"></div>
+      </div>
+    </center>`;
+}
+
+function editorModeForFile(filename) {
+  const baseName = String(filename || '').split('/').pop();
+  return ['user-data', 'meta-data', 'network-config'].includes(baseName) ? 'ace/mode/yaml' : 'ace/mode/sh';
+}
+
+function renderEditorFile(filename, response, buttons, toolbar) {
+  $('#configcontent').empty();
+  $('#configcontent').append(`
+  <div class="container">
+    <div class="row">
+      <div class="col">
+        <h4 class="m-3 mb-0 text-break">${filename}</h4>
+      </div>
+      <div class="col">
+        ${buttons}
+      </div>
+    </div>
+    ${toolbar || ''}
+  </div>
+  <div id="editor" style="height:100%;width:100%"></div>`);
+  editor = ace.edit('editor');
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+  const aceTheme = currentTheme === 'dark' ? 'ace/theme/monokai' : 'ace/theme/chrome';
+  editor.setTheme(aceTheme);
+  editor.session.setMode(editorModeForFile(filename));
+  editor.$blockScrolling = Infinity;
+  editor.setOptions({
+    readOnly: false,
+  });
+  editor.setValue(response, -1);
+}
+
 function renderconfig(){
   $('#pagecontent').empty();
   showLoading('#pagecontent', 'Getting Config Items');
@@ -516,40 +621,34 @@ socket.on('renderconfig', function(remote_files, local_files, list_rom_files, li
                 </div>
               </div>
             </div>
+            <div class="card">
+              <div class="card-header p-2" id="headingProvisioning">
+                <h6 class="mb-0">
+                  <button class="btn btn-link btn-sm font-weight-bold collapsed" type="button" data-toggle="collapse" data-target="#collapseProvisioning" aria-expanded="false" aria-controls="collapseProvisioning"> 📦 Provisioning Profiles</button>
+                </h6>
+              </div>
+              <div id="collapseProvisioning" class="collapse" aria-labelledby="headingProvisioning" data-parent="#sidebarAccordion">
+                <div id="provisioning-file-list" style="max-height:40vh; overflow-y:auto; padding:5px;"></div>
+                <div class="px-2 pt-2 pb-1">
+                  <small class="text-muted">Create Kickstart profile</small>
+                  <input type="text" class="form-control form-control-sm kickstartprofilename mt-1" placeholder="rocky/base">
+                  <button data-action="createkickstart" class="btn btn-outline-primary btn-sm btn-block mt-2">Create ks.cfg</button>
+                </div>
+                <div class="px-2 pt-2 pb-2 border-top">
+                  <small class="text-muted">Create cloud-init profile</small>
+                  <input type="text" class="form-control form-control-sm cloudinitprofilename mt-1" placeholder="ubuntu/lab">
+                  <button data-action="createcloudinit" class="btn btn-outline-primary btn-sm btn-block mt-2">Create user-data + meta-data</button>
+                </div>
+              </div>
+            </div>
           </div>
         </nav>
       </div>
-      <div id="configcontent" class="col-12 col-md-8 col-xl-9">
-        <center>
-          <br><h3>Edit file on the left panel</h3><br>
-          <h3>Create a new file:</h3>
-          <div class="form-row">
-            <div class="col-md-4"></div>
-            <div class="col-md-2"><input type="text" class="form-control ipxefilename" placeholder="myfile.ipxe"></div>
-            <div class="col-md-2"><button data-action="createipxe" class="btn btn-primary form-control">Create New</button></div>
-            <div class="col-md-4"></div>
-          </div><br>
-          <h3>Import a menu:</h3>
-          <div class="form-row">
-            <div class="col-md-4"></div>
-            <div class="col-md-4"><button data-action="devbrowser" class="btn btn-outline-info form-control">Menu From Endpoint URL</button></div>
-            <div class="col-md-4"></div>
-          </div><br>
-          <div class="form-row">
-            <div class="col-md-4"></div>
-            <div class="col-md-4"><button data-action="nbbrowser" class="btn btn-outline-info form-control">Menu Netboot.xyz</button></div>
-            <div class="col-md-4"></div>
-          </div><br>
-          <h3>Erase menus:</h3>
-          <div class="form-row">
-            <div class="col-md-4"></div>
-            <div class="col-md-4"><button data-action="resetmenu" class="btn btn-outline-danger form-control">Reset Menus</button></div>
-            <div class="col-md-4"></div>
-          </div>
-        </center>
-      </div>
+      <div id="configcontent" class="col-12 col-md-8 col-xl-9">${defaultConfigContent()}</div>
     </div>
   </div>`);
+
+  socket.emit('getprovisioning');
 
   // Fill iPXE menus
   $(local_files).each(function(index, value) {
@@ -587,6 +686,86 @@ socket.on('renderconfig', function(remote_files, local_files, list_rom_files, li
       </div>
     `);
   });
+});
+
+function editprovisioningfile(relativePath){
+  pendingProvisioningOpen = null;
+  pendingProvisioningReset = false;
+  $('#configcontent').empty();
+  showLoading('#configcontent', 'Getting Provisioning File Contents');
+  socket.emit('getprovisioningfile', relativePath);
+}
+
+socket.on('renderprovisioning', function(files){
+  if (!$('#provisioning-file-list').length) return;
+  $('#provisioning-file-list').empty();
+  if (!files || files.length === 0) {
+    $('#provisioning-file-list').append('<div class="text-muted small px-1">No provisioning files yet.</div>');
+  } else {
+    $(files).each(function(index, value) {
+      $('#provisioning-file-list').append(`
+        <div class="bd-toc-item">
+          <div style="cursor:pointer;" class="bd-toc-link" data-provisioning-open="${encodeURIComponent(value)}">
+            ${value}
+          </div>
+        </div>
+      `);
+    });
+  }
+
+  if (pendingProvisioningOpen) {
+    const nextFile = pendingProvisioningOpen;
+    pendingProvisioningOpen = null;
+    editprovisioningfile(nextFile);
+  } else if (pendingProvisioningReset) {
+    pendingProvisioningReset = false;
+    $('#configcontent').html(defaultConfigContent());
+  }
+});
+
+// Version control for the provisioning editor. Kickstart profiles get a distro
+// dropdown (the value feeds `ksvalidator -v <token>`); cloud-init keeps free text
+// (metadata only — `cloud-init schema` takes no version flag).
+function provisioningVersionControl(filename, version) {
+  if (String(filename).split('/').pop() === 'ks.cfg') {
+    const options = [
+      ['', 'Select distro…'],
+      ['RHEL7', 'RHEL 7'],
+      ['RHEL8', 'RHEL 8'],
+      ['RHEL9', 'RHEL 9'],
+      ['F40', 'Fedora 40'],
+      ['F41', 'Fedora 41'],
+    ];
+    const current = version || '';
+    // Preserve a stored value that isn't in the list (e.g. an older free-text entry).
+    if (current && !options.some(([v]) => v === current)) {
+      options.splice(1, 0, [current, current + ' (custom)']);
+    }
+    const opts = options.map(([v, label]) =>
+      `<option value="${v}"${v === current ? ' selected' : ''}>${label}</option>`
+    ).join('');
+    return `<select id="provisioning-version" class="form-control form-control-sm">${opts}</select>`;
+  }
+  return `<input type="text" id="provisioning-version" class="form-control form-control-sm" placeholder="e.g. 24.04" value="${version || ''}">`;
+}
+
+socket.on('renderprovisioningfile', function(response, filename, version){
+  const encodedFilename = encodeURIComponent(filename);
+  const buttons = `<button data-provisioning-save="${encodedFilename}" class="btn btn-success m-3 float-right">Save Config</button>
+                   <button data-provisioning-delete="${encodedFilename}" class="btn btn-danger m-3 float-right">Delete Local File</button>`;
+  const toolbar = `
+  <div class="row align-items-center mx-1 mb-2">
+    <div class="col-auto">
+      ${provisioningVersionControl(filename, version)}
+    </div>
+    <div class="col-auto">
+      <button data-provisioning-version="${encodedFilename}" class="btn btn-outline-secondary btn-sm">Save Version</button>
+    </div>
+    <div class="col-auto">
+      <button data-provisioning-validate="${encodedFilename}" class="btn btn-outline-primary btn-sm">Validate</button>
+    </div>
+  </div>`;
+  renderEditorFile(filename, response, buttons, toolbar);
 });
 
 // Inject the modal HTML once (outside of renderconfig so it’s only created once)
@@ -832,29 +1011,7 @@ socket.on('editrenderfile', function(response,filename,metadata){
     var buttons = '<button onclick="saveconfig(\'' + filename + '\')" class="btn btn-success m-3 float-right">Save Config</button>\
                    <button onclick="revertconfig(\'' + filename + '\')" class="btn btn-danger m-3 float-right">Revert/Delete</button>';
   }
-  $('#configcontent').empty();
-  $('#configcontent').append('\
-  <div class="container">\
-    <div class="row">\
-      <div class="col">\
-        <h1 class="m-3">' + filename + '</h1>\
-      </div>\
-      <div class="col">\
-        ' + buttons + '\
-      </div>\
-    </div>\
-  </div>\
-  <div id="editor" style="height:100%;width:100%"></div>');
-  editor = ace.edit('editor');
-  const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-  const aceTheme = currentTheme === 'dark' ? 'ace/theme/monokai' : 'ace/theme/chrome';
-  editor.setTheme(aceTheme);
-  editor.session.setMode('ace/mode/sh');
-  editor.$blockScrolling = Infinity;
-  editor.setOptions({
-    readOnly: false,
-  });
-  editor.setValue(response, -1);
+  renderEditorFile(filename, response, buttons);
 });
 // Save users file
 function saveconfig(filename){
@@ -877,6 +1034,86 @@ function createipxe(){
   socket.emit('createipxe',filename);
   $('#pagecontent').empty();
   showLoading('#pagecontent', 'Creating File');
+  }
+}
+function saveprovisioningfile(filename){
+  var editor = ace.edit('editor');
+  var text = editor.getValue();
+  pendingProvisioningOpen = filename;
+  pendingProvisioningReset = false;
+  $('#configcontent').empty();
+  showLoading('#configcontent', 'Saving Provisioning File');
+  socket.emit('saveprovisioningfile',filename,text);
+}
+function deleteprovisioningfile(filename){
+  if (!confirm('Are you sure you want to delete this local provisioning file?')) {
+    return;
+  }
+  pendingProvisioningOpen = null;
+  pendingProvisioningReset = true;
+  $('#configcontent').empty();
+  showLoading('#configcontent', 'Deleting Provisioning File');
+  socket.emit('deleteprovisioningfile',filename);
+}
+function saveprovisioningversion(filename){
+  const version = $('#provisioning-version').val().trim();
+  socket.emit('saveprovisioningversion', filename, version);
+  showToast('Version saved', 'success');
+}
+function validateprovisioning(filename){
+  const version = $('#provisioning-version').val().trim();
+  socket.emit('validateprovisioning', filename, version);
+}
+// Validation result popup (cloud-init / kickstart). Injected once, reused on
+// every validate click.
+if ($('#validationModal').length === 0) {
+  $('body').append(`
+    <div class="modal fade" id="validationModal" tabindex="-1" role="dialog" aria-labelledby="validationModalLabel">
+      <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="validationModalLabel">Validation</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <pre id="validationModalBody" class="mb-0" style="white-space:pre-wrap; word-break:break-word;"></pre>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+}
+socket.on('renderprovisioningvalidation', function(relativePath, result){
+  const ok = result.ok;
+  const title = ok ? 'Validation OK' : 'Validation failed';
+  $('#validationModalLabel').text(title);
+  $('#validationModalLabel').removeClass('text-success text-danger').addClass(ok ? 'text-success' : 'text-danger');
+  $('#validationModalBody').text(result.message || '');
+  $('#validationModal').modal('show');
+});
+function createkickstartprofile(){
+  var profile = $('.kickstartprofilename').val().trim().replace(/\/+$/, '');
+  if (profile){
+    pendingProvisioningOpen = profile + '/ks.cfg';
+    pendingProvisioningReset = false;
+    $('#configcontent').empty();
+    showLoading('#configcontent', 'Creating Kickstart Profile');
+    socket.emit('createkickstart',profile);
+  }
+}
+function createcloudinitprofile(){
+  var profile = $('.cloudinitprofilename').val().trim().replace(/\/+$/, '');
+  if (profile){
+    pendingProvisioningOpen = profile + '/user-data';
+    pendingProvisioningReset = false;
+    $('#configcontent').empty();
+    showLoading('#configcontent', 'Creating cloud-init Profile');
+    socket.emit('createcloudinit',profile);
   }
 }
 // Render edit window DEV Menus From var ENDPOINT_URL
@@ -995,19 +1232,80 @@ socket.on('renderconfighook', function(){
 });
 
 //// Local rendering ////
+let assetCategoryFilter = 'all';
+
+function buildAssetUrl(baseUrl, assetPath) {
+  return String(baseUrl || '').replace(/\/+$/, '') + assetPath;
+}
+
+function fallbackCopyText(text) {
+  const input = document.createElement('textarea');
+  input.value = text;
+  input.setAttribute('readonly', 'readonly');
+  input.style.position = 'absolute';
+  input.style.left = '-9999px';
+  document.body.appendChild(input);
+  input.select();
+  document.execCommand('copy');
+  document.body.removeChild(input);
+  showToast('Copied URL', 'success');
+}
+
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text)
+      .then(function () { showToast('Copied URL', 'success'); })
+      .catch(function () { fallbackCopyText(text); });
+    return;
+  }
+  fallbackCopyText(text);
+}
+
+function openProvisioningFromAssets(relativePath) {
+  pendingProvisioningOpen = relativePath;
+  pendingProvisioningReset = false;
+  setActiveNav('navconfig');
+  renderconfig();
+}
+
+function setAssetFilter(filter) {
+  assetCategoryFilter = filter || 'all';
+  applyAssetFilter();
+}
+
+function applyAssetFilter() {
+  if (!$('#boot-assets-card-group').length) return;
+  const showBoot = assetCategoryFilter !== 'provisioning';
+  const showProvisioning = assetCategoryFilter !== 'boot';
+  $('#boot-assets-card-group').toggle(showBoot);
+  $('#provisioning-assets-card').toggle(showProvisioning);
+  $('[data-asset-filter]').removeClass('active');
+  $('[data-asset-filter="' + assetCategoryFilter + '"]').addClass('active');
+}
+
 function renderlocal(){
   $('#pagecontent').empty();
   showLoading('#pagecontent', 'Getting Remote file list');
   socket.emit('getlocal');
 }
-socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotemenuorigin,remoteassetorigin,localnginxurl){
+socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotemenuorigin,remoteassetorigin,localnginxurl,provisioning){
+  const bootCount = endpoints && endpoints.endpoints ? Object.keys(endpoints.endpoints).length : 0;
+  const provisioningCount = provisioning ? provisioning.length : 0;
+  const allCount = bootCount + provisioningCount;
   $('#pagecontent').empty();
   $('#pagecontent').append(`
-  <div class="card-group">
+  <div class="mb-3">
+    <ul class="nav nav-tabs" role="tablist" aria-label="Assets filter">
+      <li class="nav-item"><button type="button" class="nav-link active" data-asset-filter="all">All <span class="badge badge-light ml-1">${allCount}</span></button></li>
+      <li class="nav-item"><button type="button" class="nav-link" data-asset-filter="boot">Boot <span class="badge badge-light ml-1">${bootCount}</span></button></li>
+      <li class="nav-item"><button type="button" class="nav-link" data-asset-filter="provisioning">Provisioning <span class="badge badge-light ml-1">${provisioningCount}</span></button></li>
+    </ul>
+  </div>
+  <div id="boot-assets-card-group" class="card-group">
     <div class="card">
       <div class="card-header">
         Remote Assets at <a target="_blank" href="${remotemenuorigin}/releases/${remotemenuversion}">${remotemenuversion}</a>
-        <span class="badge badge-secondary ml-2">${endpoints.endpoints ? Object.keys(endpoints.endpoints).length : 0} endpoints</span>
+        <span class="badge badge-secondary ml-2">${bootCount} endpoints</span>
         <br>
         <span style="float:right;">
           <div class="form-row">
@@ -1063,6 +1361,27 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
         </table>
       </div>
     </div>
+  </div>
+  <div id="provisioning-assets-card" class="card mt-3">
+    <div class="card-header">
+      Provisioning
+      <span class="badge badge-secondary ml-2">${provisioning ? provisioning.length : 0} published files</span>
+    </div>
+    <div class="card-body">
+      <table class="table table-sm" id="provisioningassets">
+        <thead>
+          <tr>
+            <th>Profile</th>
+            <th>File</th>
+            <th>Type</th>
+            <th>Version</th>
+            <th>Published URL</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="provisioningassetrows"></tbody>
+      </table>
+    </div>
   </div>`);
   var tableoptions = {
     "paging": false,
@@ -1111,6 +1430,8 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
       }
     });
   });
+  const provisioningPaths = (provisioning || []).map(function(item) { return item.urlPath; });
+  localfiles = localfiles.filter(function(file) { return !provisioningPaths.includes(file); });
   if (localfiles.length != 0){
     var untrackedtable = $('#untrackedassets').DataTable(tableoptions);
     $.each(localfiles, function( arrindex, file ) {
@@ -1127,6 +1448,32 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
   }
   remotetable.draw();
   localtable.draw();
+  $('#provisioningassetrows').empty();
+  if (!provisioning || provisioning.length === 0) {
+    $('#provisioningassetrows').append('<tr><td colspan="6" class="text-muted">No published provisioning files yet.</td></tr>');
+  } else {
+    $.each(provisioning, function(index, value) {
+      const publishedUrl = buildAssetUrl(localnginxurl, value.urlPath);
+      const encodedUrl = encodeURIComponent(publishedUrl);
+      const encodedPath = encodeURIComponent(value.relativePath);
+      const kindBadge = value.kind === 'Kickstart'
+        ? '<span class="badge" style="background-color:#f8d7da;color:#721c24;">Kickstart</span>'
+        : '<span class="badge" style="background-color:#d4edda;color:#155724;">Cloud-init</span>';
+      $('#provisioningassetrows').append(`
+        <tr>
+          <td>${value.profile}</td>
+          <td>${value.file}</td>
+          <td>${kindBadge}</td>
+          <td>${value.version || '—'}</td>
+          <td><a target="_blank" href="${publishedUrl}">${publishedUrl}</a></td>
+          <td class="text-right">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-copy-url="${encodedUrl}">Copy URL</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" data-asset-provisioning-open="${encodedPath}">Edit</button>
+          </td>
+        </tr>
+      `);
+    });
+  }
   // Debounced per-table filters
   const debounceSearch = function(fn, delay) {
     let t;
@@ -1134,6 +1481,7 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
   };
   $('#localsearch').keyup(debounceSearch(function(){ localtable.search($('#localsearch').val()).draw(); }));
   $('#remotesearch').keyup(debounceSearch(function(){ remotetable.search($('#remotesearch').val()).draw(); }));
+  applyAssetFilter();
 });
 function remoteselect(){   
   $('.remotecheck').each(function() {
@@ -1204,6 +1552,9 @@ function deletelocal(){
 //// Download Status Bars ////
 socket.on('dldata', function(url, count, stats){
   $('#statusbar').empty();
+  // Show the filename, not a GitHub-only 'download/' path segment: direct_file
+  // assets come from arbitrary vendor URLs with no 'download/' in the path.
+  const filename = decodeURIComponent(String(url || '').split('/').filter(Boolean).pop() || url || '');
 $('#statusbar').append('\
   <div class="row">\
     <div class="col-auto pr-1 text-nowrap small">' + count[0] + ' of ' + count[1] + '</div>\
@@ -1211,7 +1562,7 @@ $('#statusbar').append('\
       <div class="progress mb-1">\
         <div class="progress-bar" role="progressbar" style="width: ' + stats.progress + '%;" aria-valuenow="' + stats.progress + '" aria-valuemin="0" aria-valuemax="100"></div>\
       </div>\
-      <div class="text-muted" style="font-size:0.85em; text-align:center;">' + url.split('download/')[1] + '</div>\
+      <div class="text-muted" style="font-size:0.85em; text-align:center;">' + filename + '</div>\
     </div>\
   </div>');
 });
@@ -1532,6 +1883,22 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
 
 //// Render VM Console (serial console via xterm.js) ////
 let vmTerm = null;
+let vmScrollback = '';
+const VM_SCROLLBACK_MAX = 200000; // chars; drop oldest past this
+let vmAutoScroll = true;
+// Whether the server currently has an active serial console stream for us.
+// Tab switches must NOT tear it down; only power actions / close events do.
+let vmConsoleAttached = false;
+
+function startVmConsole(force) {
+  if (!force && vmConsoleAttached) return;
+  vmConsoleAttached = true;
+  socket.emit('vm:console:start');
+}
+function stopVmConsole() {
+  vmConsoleAttached = false;
+  socket.emit('vm:console:stop');
+}
 
 // Size the terminal to fill its container. xterm.js otherwise defaults to
 // 80x24, which leaves most of the card empty (the "half console" look).
@@ -1561,34 +1928,54 @@ socket.on('vm:status', function(data) {
 });
 socket.on('vm:action:result', function(res) {
   if (res.ok && (res.action === 'on' || res.action === 'create' || res.action === 'restart')) {
-    // VM booted/created/restarted — reconnect the serial console (stale session is force-replaced).
-    setTimeout(function() { socket.emit('vm:console:start'); }, 2000);
+    // VM booted/created/restarted — force re-attach (the old console session
+    // may have raced the destroy and not yet emitted vm:console:close).
+    setTimeout(function() { startVmConsole(true); }, 2000);
   } else if (res.ok && res.action === 'off') {
-    socket.emit('vm:console:stop');
+    stopVmConsole();
   } else if (!res.ok) {
     showToast(res.message, 'danger');
   }
 });
 socket.on('vm:console:data', function(data) {
-  if (vmTerm) vmTerm.write(data);
+  // Accumulate scrollback so it survives tab switches (terminal is recreated
+  // on each render).
+  vmScrollback += data;
+  if (vmScrollback.length > VM_SCROLLBACK_MAX) vmScrollback = vmScrollback.slice(-VM_SCROLLBACK_MAX);
+  if (vmTerm) {
+    vmTerm.write(data);
+    if (vmAutoScroll) vmTerm.scrollToBottom();
+  }
 });
 socket.on('vm:console:close', function() {
+  vmConsoleAttached = false; // session ended (power-off/destroy) — allow re-attach
   if (vmTerm) vmTerm.write('\r\n[console detached]\r\n');
 });
 
 function renderconsole() {
+  // Dispose the xterm and drop the reference first: data arriving mid-render
+  // must land only in the scrollback buffer, not a disposed terminal.
+  if (vmTerm) { try { vmTerm.dispose(); } catch (e) {} vmTerm = null; }
   $('#pagecontent').empty();
   $('#pagecontent').append(`
     <div class="card">
       <div class="card-header">VM Console</div>
       <div class="card-body">
-        <div class="d-flex align-items-center mb-3">
+        <div class="d-flex flex-wrap align-items-center mb-3">
           <button class="btn btn-outline-success btn-sm mr-2" onclick="vmCreate()">Create VM</button>
           <button class="btn btn-outline-danger btn-sm mr-2" onclick="vmDestroy()">Destroy VM</button>
           <button class="btn btn-outline-primary btn-sm mr-2" onclick="vmRestart()">Restart VM</button>
+          <span class="mr-2"></span>
+          <button class="btn btn-outline-secondary btn-sm mr-1" onclick="vmCopyConsole()" title="Copy output">Copy</button>
+          <button class="btn btn-outline-secondary btn-sm mr-1" onclick="vmPasteConsole()" title="Paste from clipboard">Paste</button>
+          <button class="btn btn-outline-secondary btn-sm mr-1" onclick="vmFontConsole(-1)" title="Smaller text">A-</button>
+          <button class="btn btn-outline-secondary btn-sm mr-2" onclick="vmFontConsole(1)" title="Larger text">A+</button>
+          <label class="small mb-0 mr-1" title="Auto-scroll to bottom on new output">
+            <input type="checkbox" id="vm-autoscroll" checked onchange="vmAutoScroll = this.checked;"> Autoscroll
+          </label>
           <span id="vm-state" class="text-muted ml-2"></span>
         </div>
-        <div id="vm-console" style="height:72vh; min-height:420px; background:#000;"></div>
+        <div id="vm-console" style="height:66vh; min-height:420px; background:#000;"></div>
         <div class="text-muted mt-2 small">
           Serial console of the test VM. Interact with the iPXE menu via keyboard
           (arrow keys / numbers / Enter). Text only — no graphical output.
@@ -1597,23 +1984,49 @@ function renderconsole() {
     </div>
   `);
 
-  // Re-attach cleanly if the page was rendered before.
-  socket.emit('vm:console:stop');
+  // Refresh VM state, but do NOT touch the serial session: tab switches just
+  // recreate the xterm; the live virsh console keeps streaming.
   socket.emit('vm:status');
 
-  if (vmTerm) vmTerm.dispose();
   vmTerm = new Terminal({
     cursorBlink: true,
     fontSize: 13,
+    scrollback: 5000,
     theme: { background: '#000', foreground: '#e0e0e0' },
   });
   vmTerm.open(document.getElementById('vm-console'));
   vmTerm.onData(function(data) {
     socket.emit('vm:console:input', data);
   });
+  // Restore accumulated scrollback across tab switches.
+  if (vmScrollback) vmTerm.write(vmScrollback);
   // Cell metrics aren't available until the first paint; fit then (and on resize).
   requestAnimationFrame(function() { fitVmConsole(); });
-  socket.emit('vm:console:start');
+  // Attach once; no-op if the session is already streaming.
+  startVmConsole();
+}
+
+function vmCopyConsole() {
+  const text = vmScrollback || (vmTerm ? '' : '');
+  if (!text) { showToast('Console is empty', 'info'); return; }
+  copyText(text);
+  showToast('Copied console output', 'success');
+}
+function vmPasteConsole() {
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    navigator.clipboard.readText().then(function(t) {
+      socket.emit('vm:console:input', t);
+    }).catch(function() { showToast('Clipboard read denied by browser', 'danger'); });
+  } else {
+    showToast('Clipboard paste not supported here', 'danger');
+  }
+}
+function vmFontConsole(delta) {
+  if (!vmTerm) return;
+  const size = Math.min(24, Math.max(8, (vmTerm.options.fontSize || 13) + delta));
+  vmTerm.options.fontSize = size;
+  try { vmTerm.refresh(0, vmTerm.rows - 1); } catch (e) {}
+  requestAnimationFrame(function() { fitVmConsole(); });
 }
 
 function vmCreate() {

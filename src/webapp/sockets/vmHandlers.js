@@ -414,10 +414,15 @@ module.exports = function registerVmHandlers(socket) {
     proc.stdout.on('data', (d) => socket.emit('vm:console:data', d.toString()));
     proc.stderr.on('data', (d) => socket.emit('vm:console:data', d.toString()));
     proc.on('close', () => {
+      // Only act if THIS proc is still the active one. After a restart, the
+      // old console process's close can fire after the new one was attached;
+      // without this guard it would delete the new session from the map.
+      if (activeConsoles.get(VM_NAME) !== proc) return;
       activeConsoles.delete(VM_NAME);
       socket.emit('vm:console:close');
     });
     proc.on('error', (e) => {
+      if (activeConsoles.get(VM_NAME) !== proc) return;
       activeConsoles.delete(VM_NAME);
       socket.emit('vm:console:data', `\r\n[virsh console failed: ${e.message}]\r\n`);
     });

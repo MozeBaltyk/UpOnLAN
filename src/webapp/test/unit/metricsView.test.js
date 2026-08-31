@@ -9,9 +9,11 @@ const view = fs.readFileSync(
 );
 
 describe('metrics chart legend wiring', () => {
-  it('adds an explicit legend click handler that toggles dataset visibility', () => {
+  it('toggles dataset visibility + legend hidden flag on legend click', () => {
     expect(view).toContain('onClick: function(_event, legendItem, legend)');
-    expect(view).toContain('chart.setDatasetVisibility(index, !chart.isDatasetVisible(index));');
-    expect(view).toContain('chart.update();');
+    expect(view).toContain('chart.hide(index)');
+    expect(view).toContain('chart.show(index)');
+    expect(view).toContain('legendItem.hidden = true');
+    expect(view).toContain('legendItem.hidden = false');
   });
 });

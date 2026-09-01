@@ -5,6 +5,7 @@
 #   build_ipxe_roms.sh                     # release set (TFTP binaries + e1000 option ROM)
 #   build_ipxe_roms.sh legacy,efi,iso,usb  # boot media (media mode)
 #   OUT_ROM=/path build_ipxe_roms.sh ...   # override the output dir (default release/menus/rom/ipxe)
+#   TRUST=ca.pem CERT=client.pem build_ipxe_roms.sh ...  # embed HTTPS trust (optional)
 #
 # release set:
 #   bin/undionly.kpxe        -> uponlan.xyz-undionly.kpxe  (firmware PXE stage-1)
@@ -139,11 +140,25 @@ fi
 # does NOT affect them in gcc 14+).
 EXTRA_CFLAGS_VAL="-std=gnu11 -Wno-error=implicit-function-declaration -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=implicit-int"
 
+# Optional HTTPS trust material, embedded into the ROMs at build time so iPXE can
+# verify the server certificate (and present a client cert when set). Unset by
+# default: iPXE then boots over plain HTTP on the trusted LAN. TRUST takes a PEM
+# of CA cert(s); CERT an optional client cert; paths are relative to the build
+# host/container. Set both (or either) env vars to bake trust into the ROMs.
+SSL_ARGS=""
+for v in TRUST CERT; do
+  val="${!v:-}"
+  if [[ -n "$val" ]]; then
+    [[ -f "$val" ]] || { echo "ERROR: $v file not found: $val" >&2; exit 1; }
+    SSL_ARGS+=" $v=$val"
+  fi
+done
+
 # Phase 1: BIOS with a serial console (SeaBIOS has no serial output of its own).
 if [ -n "$bios_targets" ]; then
   echo "[ipxe] building BIOS (serial):$bios_targets"
   printf '#define CONSOLE_SERIAL\n' > config/local/console.h
-  make -j"$(nproc)" $bios_targets EMBED="$WORK/embed.ipxe" NO_WERROR=1 EXTRA_CFLAGS="$EXTRA_CFLAGS_VAL"
+  make -j"$(nproc)" $bios_targets EMBED="$WORK/embed.ipxe" NO_WERROR=1 EXTRA_CFLAGS="$EXTRA_CFLAGS_VAL" $SSL_ARGS
 fi
 
 # Phase 2: UEFI WITHOUT a serial console — OVMF already redirects its console to
@@ -151,7 +166,7 @@ fi
 if [ -n "$efi_targets" ]; then
   echo "[ipxe] building UEFI (no serial):$efi_targets"
   : > config/local/console.h
-  make -j"$(nproc)" $efi_targets EMBED="$WORK/embed.ipxe" NO_WERROR=1 EXTRA_CFLAGS="$EXTRA_CFLAGS_VAL"
+  make -j"$(nproc)" $efi_targets EMBED="$WORK/embed.ipxe" NO_WERROR=1 EXTRA_CFLAGS="$EXTRA_CFLAGS_VAL" $SSL_ARGS
 fi
 
 mkdir -p "$OUT_ROM"

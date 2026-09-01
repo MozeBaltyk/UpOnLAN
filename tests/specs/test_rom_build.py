@@ -37,6 +37,14 @@ class RomBuildSpecs(unittest.TestCase):
     def test_default_ipxe_version(self):
         self.assertIn('IPXE_VERSION="${IPXE_VERSION:-1.21.1}"', self.script)
 
+    def test_optional_https_trust_knobs(self):
+        # TRUST/CERT are optional and off by default; when set they must be
+        # passed to make and validated to exist.
+        self.assertIn('for v in TRUST CERT; do', self.script)
+        self.assertIn('ERROR: $v file not found', self.script)
+        self.assertIn('$SSL_ARGS', self.script)
+        self.assertIn('bios_targets EMBED="$WORK/embed.ipxe"', self.script)
+
 
 class BuildReleaseSpecs(unittest.TestCase):
     """build_release.sh runs the pipeline in dependency order and reports the

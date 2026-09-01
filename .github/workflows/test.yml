@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       # No committed package-lock.json in this repo, so `npm install` (not ci).
       - name: Install dependencies

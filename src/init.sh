@@ -13,7 +13,8 @@ mkdir -p \
   /var/tmp/nginx \
   /config/menus/remote \
   /config/menus/local \
-  /config/menus/rom
+  /config/menus/rom \
+  /config/tls
 
 # TLS ports (only used when a server cert+key are mounted, see below).
 export HTTPS_PORT="${HTTPS_PORT:-8443}"
@@ -25,18 +26,29 @@ export WEBAPP_HTTPS_PORT="${WEBAPP_HTTPS_PORT:-3443}"
 [[ ! -f /config/nginx/site-confs/default ]] && \
   envsubst '${NGINX_PORT}' < /defaults/default > /config/nginx/site-confs/default
 
-# HTTPS termination: enable only when a server cert+key are mounted at
-# /config/tls/. The shell-format list restricts envsubst to the three ports so
-# nginx's own $host / $http_upgrade variables survive untouched.
-if [[ -f /config/tls/server.crt && -f /config/tls/server.key ]]; then
+# HTTPS termination: use a mounted cert+key pair when present; generate a
+# self-signed fallback only when both are missing (never overwrite an
+# operator's real cert). A lone cert or key is a misconfiguration — skip TLS
+# rather than guess. The shell-format list restricts envsubst to the three
+# ports so nginx's own $host / $http_upgrade variables survive untouched.
+TLS_CRT=/config/tls/server.crt
+TLS_KEY=/config/tls/server.key
+if [[ -f "$TLS_CRT" && -f "$TLS_KEY" ]]; then
+  echo "[uponlanxyz-init] TLS: using mounted server.crt + server.key"
+elif [[ ! -f "$TLS_CRT" && ! -f "$TLS_KEY" ]]; then
+  echo "[uponlanxyz-init] TLS: generating self-signed cert"
+  openssl req -x509 -newkey rsa:2048 -nodes -days 825 \
+    -keyout "$TLS_KEY" -out "$TLS_CRT" \
+    -subj "/CN=uponlan.xyz" \
+    -addext "subjectAltName=DNS:uponlan.xyz,DNS:localhost,IP:127.0.0.1" >/dev/null 2>&1
+fi
+if [[ -f "$TLS_CRT" && -f "$TLS_KEY" ]]; then
   envsubst '${HTTPS_PORT} ${WEBAPP_HTTPS_PORT} ${WEB_APP_PORT}' \
     < /defaults/tls > /config/nginx/site-confs/tls
   echo "[uponlanxyz-init] TLS enabled: assets :${HTTPS_PORT}, webapp :${WEBAPP_HTTPS_PORT}"
 else
-  # Drop a stale TLS site-conf from a previous run so nginx never starts
-  # against a cert that is no longer mounted.
   rm -f /config/nginx/site-confs/tls
-  echo "[uponlanxyz-init] No /config/tls/server.crt + server.key — HTTPS disabled"
+  echo "[uponlanxyz-init] TLS: only one of server.crt/server.key present — HTTPS disabled"
 fi
 
 # Default endpoint when none is configured.

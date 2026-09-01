@@ -48,6 +48,7 @@ RUN apk add --no-cache \
     nghttp2-dev \
     nginx \
     nodejs \
+    openssl \
     py3-pip \
     python3 \
     shadow \

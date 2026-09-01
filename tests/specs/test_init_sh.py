@@ -41,11 +41,14 @@ class InitShUrlSpecs(unittest.TestCase):
         self.assertIn('Keeping existing /config/endpoints.yml (refresh failed)', self.init_sh)
 
     def test_tls_block(self):
-        # HTTPS is enabled only when a server cert+key are mounted; the site-conf
-        # is written from the TLS template with a shell-format list that leaves
+        # HTTPS is on by default: a mounted cert+key pair wins, otherwise a
+        # self-signed fallback is generated; a lone cert/key disables TLS.
+        # The site-conf is written with a shell-format list that leaves
         # nginx's own $host / $http_upgrade variables intact.
         self.assertIn('/config/tls/server.crt', self.init_sh)
         self.assertIn('/config/tls/server.key', self.init_sh)
+        self.assertIn('openssl req -x509 -newkey rsa:2048', self.init_sh)
+        self.assertIn('self-signed', self.init_sh)
         self.assertIn("envsubst '${HTTPS_PORT} ${WEBAPP_HTTPS_PORT} ${WEB_APP_PORT}'", self.init_sh)
         self.assertIn('/defaults/tls', self.init_sh)
         self.assertIn('/config/nginx/site-confs/tls', self.init_sh)

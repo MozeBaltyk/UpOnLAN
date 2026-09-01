@@ -26,12 +26,12 @@
 
 The shipped Nginx configuration listens on plain HTTP port `8080` for assets; the webapp is published on `3000/TCP`, and TFTP on `69/UDP`. Plain HTTP stays available because iPXE boot clients fetch menus/assets over HTTP on the trusted LAN.
 
-HTTPS termination is built in and optional: mount a server certificate + key at `/config/tls/server.crt` and `/config/tls/server.key` (in the host `./config` directory that the chart mounts at `/config`). `init.sh` then adds two TLS listeners:
+HTTPS termination is built in and on by default. `init.sh` uses a mounted server certificate + key at `/config/tls/server.crt` and `/config/tls/server.key` when present, and otherwise generates a self-signed fallback (valid for `uponlan.xyz`, `localhost`, `127.0.0.1`). Two TLS listeners are always added:
 
 - `8443/TCP` — the same asset content as `8080` (`/`, `/rom/`, `/status`).
 - `3443/TCP` — the webapp, reverse-proxied over TLS to the Node app (socket.io WebSocket upgrade included).
 
-Set `tls.enabled: true` in the chart values to also publish `8443`/`3443` as host ports in Pod mode, or leave it false and terminate TLS at an external reverse proxy instead.
+To use your own cert, drop it at those two paths (in the host `./config` directory that the chart mounts at `/config`) before deploying — a mounted pair is never overwritten. The self-signed cert is only a bootstrap fallback; replace it with a real cert (Let's Encrypt, internal CA) for anything beyond a homelab. `tls.enabled` (default `true`) publishes `8443`/`3443` as host ports in Pod mode; set it `false` to keep TLS in-container only or to terminate TLS at an external reverse proxy instead.
 
 - Restrict `69/UDP` to the PXE client network. Allow `8080/TCP` only where boot clients need HTTP assets and menus.
 - Restrict `3000/TCP` (and `3443/TCP` when enabled) to administrators, or place them behind a reverse proxy. Prefer the TLS listener over exposing the plain-HTTP webapp port to untrusted networks.

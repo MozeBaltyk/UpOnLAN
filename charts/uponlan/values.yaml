@@ -27,14 +27,15 @@ webAppPort: 3000
 tftpdOpts: "--tftp-single-port"
 
 ## HTTPS termination. nginx serves assets on httpsPort and reverse-proxies the
-## webapp on webAppHttpsPort when a cert+key are mounted at /config/tls/
-## (server.crt + server.key). Plain HTTP stays available for iPXE boot clients.
-## tls.enabled additionally publishes the two TLS hostPorts in Pod mode; leave
-## it false and terminate TLS at an external reverse proxy if you prefer.
+## webapp on webAppHttpsPort over TLS. A mounted cert+key at /config/tls/
+## (server.crt + server.key) is used when present; otherwise init.sh generates
+## a self-signed fallback. Plain HTTP stays available for iPXE boot clients.
+## tls.enabled publishes the two TLS hostPorts in Pod mode; set false to keep
+## TLS in-container only (or terminate TLS at an external reverse proxy).
 httpsPort: 8443
 webAppHttpsPort: 3443
 tls:
-  enabled: false
+  enabled: true
 
 ## Host libvirt socket mount. Node-local: the webapp's VM console shells out to
 ## `virsh` on the same host's qemu:///system. Disable on a real K8s cluster.

@@ -41,19 +41,18 @@ containers:
         {{- if eq .Values.deployAs "Pod" }}
         hostPort: {{ .Values.nginxPort }}
         {{- end }}
+      # Webapp listener is internal-only: the nginx TLS proxy reverse-proxies
+      # to 127.0.0.1:WEB_APP_PORT in the same container, so no hostPort here.
       - name: webapp
         containerPort: {{ .Values.webAppPort }}
-        {{- if eq .Values.deployAs "Pod" }}
-        hostPort: {{ .Values.webAppPort }}
-        {{- end }}
       - name: nginx-https
         containerPort: {{ .Values.httpsPort }}
-        {{- if and (eq .Values.deployAs "Pod") .Values.tls.enabled }}
+        {{- if eq .Values.deployAs "Pod" }}
         hostPort: {{ .Values.httpsPort }}
         {{- end }}
       - name: webapp-https
         containerPort: {{ .Values.webAppHttpsPort }}
-        {{- if and (eq .Values.deployAs "Pod") .Values.tls.enabled }}
+        {{- if eq .Values.deployAs "Pod" }}
         hostPort: {{ .Values.webAppHttpsPort }}
         {{- end }}
       - name: tftp

@@ -14,8 +14,9 @@ Quick checks and fixes for the most common problems. All container operations go
 
 | Port | Service |
 |------|---------|
-| 3000 | Node webapp (`WEB_APP_PORT`) |
-| 8080 | Nginx reverse proxy (`NGINX_PORT`) |
+| 8080 | Nginx asset server (`NGINX_PORT`) |
+| 8443 | Nginx asset server over TLS (`HTTPS_PORT`) |
+| 3443 | Webapp over TLS (`WEBAPP_HTTPS_PORT`) |
 | 69   | TFTP (UDP) |
 
 > TFTP on port 69 is the classic conflict: any other TFTP server on the same host/interface (e.g. a leftover KVM `dnsmasq` config) will block it. See [DHCP insights](Networks/02-DHCP.md).

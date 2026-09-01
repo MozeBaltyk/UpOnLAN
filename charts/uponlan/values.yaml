@@ -21,7 +21,8 @@ endpoint: https://github.com/mozebaltyk/uponlan
 ## specific version is required there.
 menuVersion: ""
 
-## Bound host ports. 69/udp (TFTP) is privileged.
+## Bound host ports. 69/udp (TFTP) is privileged. webAppPort is NOT published
+## — the webapp is reachable only through the nginx TLS proxy on webAppHttpsPort.
 nginxPort: 8080
 webAppPort: 3000
 tftpdOpts: "--tftp-single-port"
@@ -29,13 +30,11 @@ tftpdOpts: "--tftp-single-port"
 ## HTTPS termination. nginx serves assets on httpsPort and reverse-proxies the
 ## webapp on webAppHttpsPort over TLS. A mounted cert+key at /config/tls/
 ## (server.crt + server.key) is used when present; otherwise init.sh generates
-## a self-signed fallback. Plain HTTP stays available for iPXE boot clients.
-## tls.enabled publishes the two TLS hostPorts in Pod mode; set false to keep
-## TLS in-container only (or terminate TLS at an external reverse proxy).
+## a self-signed fallback. Plain HTTP 8080 stays available for iPXE boot
+## clients; the webapp is reachable only through the TLS proxy (no plain-HTTP
+## hostPort).
 httpsPort: 8443
 webAppHttpsPort: 3443
-tls:
-  enabled: true
 
 ## Host libvirt socket mount. Node-local: the webapp's VM console shells out to
 ## `virsh` on the same host's qemu:///system. Disable on a real K8s cluster.

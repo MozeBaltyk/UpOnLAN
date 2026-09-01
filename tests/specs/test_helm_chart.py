@@ -26,7 +26,7 @@ class HelmChartSpecs(unittest.TestCase):
 
     def test_deployment_knobs_present(self):
         for knob in ('image:', 'endpoint:', 'menuVersion:', 'libvirt:',
-                     'deployAs:', 'replicas:', 'tls:'):
+                     'deployAs:', 'replicas:', 'httpsPort:', 'webAppHttpsPort:'):
             self.assertIn(knob, self.values, f'missing {knob} knob')
 
     def test_pod_wrapper_is_gated_and_reuses_spec(self):
@@ -47,14 +47,19 @@ class HelmChartSpecs(unittest.TestCase):
     def test_podspec_templates_and_gates(self):
         for tpl in ('{{ .Values.image.repository }}', '{{ .Values.endpoint }}',
                     '{{ .Values.menuVersion }}', '{{ .Values.httpsPort }}',
-                    '{{ .Values.webAppHttpsPort }}'):
+                    '{{ .Values.webAppHttpsPort }}', '{{ .Values.webAppPort }}'):
             self.assertIn(tpl, self.podspec, f'missing template {tpl}')
         # Deployment mode must not carry podman hostPort / emptyDir.path bits:
         # the partial's else branch (Deployment) uses plain emptyDir, no path.
         self.assertIn('deployAs "Pod"', self.podspec)
         self.assertIn('{{- else }}', self.podspec)
         self.assertIn('emptyDir: {}', self.podspec)
-        self.assertIn('.Values.tls.enabled', self.podspec)
+
+    def test_webapp_has_no_hostport(self):
+        # The webapp is internal-only (nginx TLS proxy target); it must not be
+        # published as a hostPort in either mode.
+        self.assertIn('- name: webapp\n        containerPort: {{ .Values.webAppPort }}', self.podspec)
+        self.assertNotIn('hostPort: {{ .Values.webAppPort }}', self.podspec)
 
 
 if __name__ == '__main__':

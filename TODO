@@ -32,9 +32,9 @@ Ordered by priority. All remaining phases land on the `dev` branch, merged to `m
 - [x] **Wake-on-LAN** — show host status/IP + add a scheduler.
 
 ## Phase 4 — Platform hardening → `dev`
-- [ ] **Update Node.js** — the container pins an older runtime.
-- [ ] **HTTPS** — TLS termination (reverse proxy or in-nginx certs) for webapp + asset serving (plain HTTP 8080/3000 today).
-- [ ] **Kubernetes** — promote the chart's Pod → Deployment (replicas 1); rework node-local `hostPort` TFTP + `hostPath` libvirt socket.
+- [x] **Update Node.js** — Node 24 LTS (CI `20 → 24`; container already resolves 24.18.1; `engines: >=22 <27`).
+- [x] **HTTPS** — optional nginx TLS termination (`:8443` assets, `:3443` webapp proxy) when `/config/tls/server.{crt,key}` are mounted; plain HTTP 8080/3000 stays for iPXE.
+- [x] **Kubernetes** — chart renders `Deployment` (`deployAs: Deployment`, replicas 1) or the default `Pod`; Deployment mode drops `hostPort` + podman `emptyDir.path`; libvirt `hostPath` stays gated behind `libvirt.enabled`.
 
 ## Phase 5 — Polish → `dev`
 

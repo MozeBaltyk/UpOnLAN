@@ -1,0 +1,22 @@
+{{- if eq .Values.deployAs "Deployment" }}
+# Real-K8s mode: same pod spec as pod.yaml, wrapped in a Deployment with
+# replicas: 1. hostPort bindings and the podman `emptyDir.path` extension are
+# omitted (see _podspec.tpl); expose the service with a Service/Ingress.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uponlan
+  labels:
+    app.kubernetes.io/name: uponlan
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: uponlan
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: uponlan
+    spec:
+      {{- include "uponlan.podspec" . | nindent 6 }}
+{{- end }}

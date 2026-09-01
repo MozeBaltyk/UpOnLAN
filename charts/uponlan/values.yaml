@@ -1,3 +1,11 @@
+## Render target. `Pod` (default) keeps `podman play kube --replace`/`--down`
+## working by the stable `uponlan` name; `Deployment` is for a real K8s cluster
+## (adds replicas/selector, drops hostPort + the podman emptyDir.path extension).
+deployAs: Pod
+
+## Replica count — Deployment mode only.
+replicas: 1
+
 ## Image. Defaults to the published ghcr image; for local development set:
 ##   image.repository=localhost/uponlan  and  image.pullPolicy=Never
 image:
@@ -17,6 +25,16 @@ menuVersion: ""
 nginxPort: 8080
 webAppPort: 3000
 tftpdOpts: "--tftp-single-port"
+
+## HTTPS termination. nginx serves assets on httpsPort and reverse-proxies the
+## webapp on webAppHttpsPort when a cert+key are mounted at /config/tls/
+## (server.crt + server.key). Plain HTTP stays available for iPXE boot clients.
+## tls.enabled additionally publishes the two TLS hostPorts in Pod mode; leave
+## it false and terminate TLS at an external reverse proxy if you prefer.
+httpsPort: 8443
+webAppHttpsPort: 3443
+tls:
+  enabled: false
 
 ## Host libvirt socket mount. Node-local: the webapp's VM console shells out to
 ## `virsh` on the same host's qemu:///system. Disable on a real K8s cluster.

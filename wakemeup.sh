@@ -42,6 +42,7 @@ show_context() {
     echo -e "  ${C_BOLD}endpoint:${C_RESET} ${ENDPOINT_URL}"
     echo -e "  ${C_BOLD}menu:${C_RESET}     ${MENU_VERSION:-latest}"
     echo -e "  ${C_BOLD}ports:${C_RESET}    8080/tcp 3000/tcp 69/udp"
+    echo -e "  ${C_BOLD}tls:${C_RESET}      8443/tcp (assets) 3443/tcp (webapp) — enabled when /config/tls has server.crt+server.key"
     echo -e "  ${C_BOLD}libvirt:${C_RESET}  /var/run/libvirt/libvirt-sock"
     for v in asset_target IPXE_VERSION PXE_ROM_PATH; do
         [ -n "${!v:-}" ] && echo -e "  ${C_BOLD}env ${v}${C_RESET}=${!v}"

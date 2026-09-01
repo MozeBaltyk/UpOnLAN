@@ -24,11 +24,25 @@
 
 ### Security and network exposure
 
-The shipped Nginx configuration listens on plain HTTP port `8080`; it does not provide HTTPS. The webapp is also published on `3000/TCP`, and TFTP is published on `69/UDP`.
+The shipped Nginx configuration listens on plain HTTP port `8080` for assets; the webapp is published on `3000/TCP`, and TFTP on `69/UDP`. Plain HTTP stays available because iPXE boot clients fetch menus/assets over HTTP on the trusted LAN.
+
+HTTPS termination is built in and optional: mount a server certificate + key at `/config/tls/server.crt` and `/config/tls/server.key` (in the host `./config` directory that the chart mounts at `/config`). `init.sh` then adds two TLS listeners:
+
+- `8443/TCP` — the same asset content as `8080` (`/`, `/rom/`, `/status`).
+- `3443/TCP` — the webapp, reverse-proxied over TLS to the Node app (socket.io WebSocket upgrade included).
+
+Set `tls.enabled: true` in the chart values to also publish `8443`/`3443` as host ports in Pod mode, or leave it false and terminate TLS at an external reverse proxy instead.
 
 - Restrict `69/UDP` to the PXE client network. Allow `8080/TCP` only where boot clients need HTTP assets and menus.
-- Restrict `3000/TCP` to administrators, or place it behind a reverse proxy. Terminate TLS at that proxy when HTTPS is required; do not expose the shipped HTTP listener directly to untrusted networks.
+- Restrict `3000/TCP` (and `3443/TCP` when enabled) to administrators, or place them behind a reverse proxy. Prefer the TLS listener over exposing the plain-HTTP webapp port to untrusted networks.
 - Basic authentication is disabled unless **both** `WEBAPP_USER` and `WEBAPP_PASS` are set. For a protected deployment, add both environment variables to the container in the manifest before deploying. Treat the manifest and its secret values as sensitive.
+
+### Kubernetes deployment
+
+The chart renders either a bare `Pod` or a `Deployment` depending on `deployAs`:
+
+- `deployAs: Pod` (default) — for `podman play kube`; binds host ports `8080`, `3000`, `69/udp` and uses the podman `emptyDir.path` extension so data survives `--replace`.
+- `deployAs: Deployment` — for a real cluster; `replicas: 1` (set `replicas` as needed), no host ports, and plain `emptyDir` volumes (swap in `hostPath` or a PVC if config/assets/logs must persist). Expose the service with a `Service`/`Ingress`. The libvirt socket mount remains opt-in via `libvirt.enabled` and only works on the node that owns `/var/run/libvirt/libvirt-sock`.
 
 ### Release artifacts
 

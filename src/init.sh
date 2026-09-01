@@ -15,11 +15,29 @@ mkdir -p \
   /config/menus/local \
   /config/menus/rom
 
+# TLS ports (only used when a server cert+key are mounted, see below).
+export HTTPS_PORT="${HTTPS_PORT:-8443}"
+export WEBAPP_HTTPS_PORT="${WEBAPP_HTTPS_PORT:-3443}"
+
 # copy config files
 [[ ! -f /config/nginx/nginx.conf ]] && \
   cp /defaults/nginx.conf /config/nginx/nginx.conf
 [[ ! -f /config/nginx/site-confs/default ]] && \
   envsubst '${NGINX_PORT}' < /defaults/default > /config/nginx/site-confs/default
+
+# HTTPS termination: enable only when a server cert+key are mounted at
+# /config/tls/. The shell-format list restricts envsubst to the three ports so
+# nginx's own $host / $http_upgrade variables survive untouched.
+if [[ -f /config/tls/server.crt && -f /config/tls/server.key ]]; then
+  envsubst '${HTTPS_PORT} ${WEBAPP_HTTPS_PORT} ${WEB_APP_PORT}' \
+    < /defaults/tls > /config/nginx/site-confs/tls
+  echo "[uponlanxyz-init] TLS enabled: assets :${HTTPS_PORT}, webapp :${WEBAPP_HTTPS_PORT}"
+else
+  # Drop a stale TLS site-conf from a previous run so nginx never starts
+  # against a cert that is no longer mounted.
+  rm -f /config/nginx/site-confs/tls
+  echo "[uponlanxyz-init] No /config/tls/server.crt + server.key — HTTPS disabled"
+fi
 
 # Default endpoint when none is configured.
 if [[ -z "${ENDPOINT_URL:-}" ]]; then

@@ -11,7 +11,7 @@ Quick reference for the terms used across the docs. Grouped by theme; each entry
 - **next-server / filename** — DHCP options 66/67: the TFTP server address and the boot-file path a PXE client should fetch.
 - **dhcp-boot / dhcp-match** — dnsmasq directives that set the bootfile per client tag (`ipxe-bios`, `ipxe-efi`, `uefi-fw`).
 - **option 93 / option 175** — DHCP client-architecture (option 93, e.g. `7` = UEFI x86-64) and iPXE's vendor option (175) used to pick the right bootfile per firmware.
-- **option ROM** — a firmware extension a BIOS NIC loads at boot that provides the PXE client (e.g. the built e1000 iPXE ROM).
+- **option ROM** — a firmware extension a BIOS NIC loads at boot that provides the PXE client (e.g. a vendor's PXE ROM on a physical NIC).
 - **chain / chainloading** — an iPXE command that loads and hands off control to another program or script (`chain menu.ipxe`).
 - **BIOS / SeaBIOS** — legacy x86 firmware; a BIOS guest PXE-boots via a NIC **option ROM**.
 - **UEFI / OVMF** — modern firmware (OVMF = TianoCore's open UEFI for QEMU); UEFI has a native network boot stack driven by `dhcp-boot`/option 67.

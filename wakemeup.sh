@@ -44,7 +44,7 @@ show_context() {
     echo -e "  ${C_BOLD}ports:${C_RESET}    69/udp"
     echo -e "  ${C_BOLD}tls:${C_RESET}      8443/tcp (assets) 3443/tcp (webapp) — mounted cert or self-signed fallback"
     echo -e "  ${C_BOLD}libvirt:${C_RESET}  /var/run/libvirt/libvirt-sock"
-    for v in asset_target IPXE_VERSION PXE_ROM_PATH; do
+    for v in asset_target IPXE_VERSION; do
         [ -n "${!v:-}" ] && echo -e "  ${C_BOLD}env ${v}${C_RESET}=${!v}"
     done
     echo ""

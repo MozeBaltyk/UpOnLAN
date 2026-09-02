@@ -16,18 +16,26 @@ const BOOT_SERVER_IP = process.env.BOOT_SERVER_IP || '';
 // with the VM, so UpOnLAN never touches the host's other pools.
 const VM_STORAGE_POOL = process.env.VM_STORAGE_POOL || 'uponlan';
 const VM_STORAGE_POOL_PATH = process.env.VM_STORAGE_POOL_PATH || '/var/lib/libvirt/images/uponlan';
-// Host-side file QEMU loads as the NIC's option ROM. Without it the e1000 has
-// no PXE ROM on Ubuntu hosts (qemu no longer bundles one) and the guest never
-// attempts network boot. Built by scripts/build_ipxe_roms.sh.
-const PXE_ROM = process.env.PXE_ROM || '/usr/lib/ipxe/qemu/uponlan-e1000.rom';
-// Firmware used for VMs created via the UI (overrideable per-create). BIOS
-// boots iPXE through the e1000 PCI option ROM above; UEFI/OVMF uses its own
-// network stack and fetches rom/ipxe/uponlan.xyz.efi from the DHCP answer.
-const VM_FIRMWARE = process.env.VM_FIRMWARE || 'bios';
+// Default sizing for the diskless PXE test VM (the UI overrides per-create).
+const VM_DEFAULTS = { cpus: 2, memory: 2048 }; // memory in MiB
 
-// Guard: firmware flows into the XML but only ever takes two values.
-function normalizeFirmware(firmware) {
-  return firmware === 'efi' ? 'efi' : 'bios';
+// The VM is UEFI/OVMF only: its network stack fetches rom/ipxe/uponlan.xyz.efi
+// directly from the DHCP answer, so no host-side PCI option ROM is involved.
+// BIOS was removed — it depended on a stale-prone /usr/lib/ipxe/qemu/uponlan-e1000.rom
+// that the container could never refresh.
+
+// Coerce user-supplied VM sizing into safe integers (they flow into the domain
+// XML, so anything non-numeric or out of range falls back to a sane default).
+function sanitizeVmOpts(opts = {}) {
+  const clamp = (n, min, max, fallback) => {
+    const v = Number(n);
+    return Number.isInteger(v) && v >= min && v <= max ? v : fallback;
+  };
+  return {
+    cpus: clamp(opts.cpus, 1, 32, VM_DEFAULTS.cpus),
+    memory: clamp(opts.memory, 512, 65536, VM_DEFAULTS.memory),
+    graphics: opts.graphics === true,
+  };
 }
 
 // virsh subcommands the virsh-safe wrapper allows (restart is a power cycle —
@@ -108,29 +116,20 @@ async function removeStoragePool() {
 }
 
 // Minimal diskless network-boot domain: it is a PXE client, not a storage
-// target, so no disk, no graphics. `<boot dev='network'/>` is what makes it
-// actually PXE-boot (virt-install's default left the old VM on `hd`).
+// target, so no disk and (by default) no graphics — serial console only.
+// `<boot dev='network'/>` is what makes it actually PXE-boot (virt-install's
+// default left the old VM on `hd`). The guest is always UEFI/OVMF: its network
+// stack PXE-boots and fetches rom/ipxe/uponlan.xyz.efi from the DHCP answer, so
+// no PCI option ROM is attached.
 //
-// firmware 'bios' (default): SeaBIOS -> custom e1000 PCI option ROM
-//   (uponlan-e1000.rom, built by scripts/build_ipxe_roms.sh) -> full iPXE.
-//   The PCI option-ROM mechanism only applies to legacy BIOS, so the
-//   `<rom file>` element is emitted for BIOS only.
-// firmware 'efi': UEFI/OVMF. OVMF's built-in network stack performs PXE and
-//   loads the bootloader the DHCP answer advertises (rom/ipxe/uponlan.xyz.efi),
-//   so no PCI option ROM is attached. `<os firmware='efi'>` makes libvirt
-//   pick OVMF and manage the NVRAM automatically.
-function buildDomainXml(name, network, firmware, diskPath) {
-  const fw = normalizeFirmware(firmware);
-  const osTag = fw === 'efi' ? "<os firmware='efi'>" : '<os>';
-  const nic = fw === 'efi'
-    ? `<interface type='network'>
+// opts.cpus / opts.memory (MiB) / opts.graphics are the per-create knobs; a
+// graphics toggle adds a VNC display + VGA video for GUI installers (the webapp
+// console itself remains the serial pty).
+function buildDomainXml(name, network, diskPath, opts = {}) {
+  const { cpus, memory, graphics } = sanitizeVmOpts(opts);
+  const nic = `<interface type='network'>
       <source network='${network}'/>
       <model type='e1000'/>
-    </interface>`
-    : `<interface type='network'>
-      <source network='${network}'/>
-      <model type='e1000'/>
-      <rom file='${PXE_ROM}'/>
     </interface>`;
   // Optional: attach a qcow2 disk so a PXE install has somewhere to write to.
   const disk = diskPath
@@ -140,11 +139,18 @@ function buildDomainXml(name, network, firmware, diskPath) {
       <target dev='vda' bus='virtio'/>
     </disk>`
     : '';
+  // Optional: graphical console (VNC) for GUI installers, on top of serial.
+  const video = graphics
+    ? `<graphics type='vnc' port='-1' autoport='yes'/>
+    <video>
+      <model type='vga' heads='1' primary='yes'/>
+    </video>`
+    : '';
   return `<domain type='kvm'>
   <name>${name}</name>
-  <memory unit='KiB'>2097152</memory>
-  <vcpu placement='static'>2</vcpu>
-  ${osTag}
+  <memory unit='MiB'>${memory}</memory>
+  <vcpu placement='static'>${cpus}</vcpu>
+  <os firmware='efi'>
     <type arch='x86_64'>hvm</type>
     <boot dev='network'/>
   </os>
@@ -160,6 +166,7 @@ function buildDomainXml(name, network, firmware, diskPath) {
     <emulator>/usr/bin/qemu-system-x86_64</emulator>
     ${nic}
     ${disk}
+    ${video}
     <serial type='pty'>
       <target type='isa-serial' port='0'>
         <model name='isa-serial'/>
@@ -262,8 +269,8 @@ module.exports = function registerVmHandlers(socket) {
   // define + start via the whitelisted virsh subcommands only. If the boot
   // network does not exist on the host it is defined first.
   socket.on('vm:create', async (payload) => {
-    const opts = typeof payload === 'string' ? { firmware: payload } : (payload || {});
-    const fw = normalizeFirmware(opts.firmware);
+    const opts = (payload && typeof payload === 'object') ? payload : {};
+    const spec = sanitizeVmOpts(opts);
     const diskSize = Math.max(0, Number(opts.disk) || 0);
     const state = await getVmState();
     if (state !== 'not found') {
@@ -314,7 +321,7 @@ module.exports = function registerVmHandlers(socket) {
     }
     const xmlPath = `/tmp/uponlan-${VM_NAME}.xml`;
     try {
-      fs.writeFileSync(xmlPath, buildDomainXml(VM_NAME, VM_NETWORK, fw, diskPath));
+      fs.writeFileSync(xmlPath, buildDomainXml(VM_NAME, VM_NETWORK, diskPath, spec));
       const res = await runVirsh(['define', xmlPath]);
       if (!res.ok) {
         socket.emit('vm:action:result', { action: 'create', ok: false, message: `virsh define failed: ${res.err}` });
@@ -325,7 +332,7 @@ module.exports = function registerVmHandlers(socket) {
         action: 'create',
         ok: boot.ok,
         message: boot.ok
-          ? `VM '${VM_NAME}' (${fw} firmware${diskSize > 0 ? `, ${diskSize}G disk` : ', diskless'}) created${netCreated ? ` (network '${VM_NETWORK}' recreated)` : ''} and booting (network PXE) — console will show the menu shortly`
+          ? `VM '${VM_NAME}' (${spec.cpus} vCPU, ${spec.memory} MiB RAM${spec.graphics ? ', graphical console' : ', serial console'}${diskSize > 0 ? `, ${diskSize}G disk` : ', diskless'}) created${netCreated ? ` (network '${VM_NETWORK}' recreated)` : ''} and booting (network PXE) — console will show the menu shortly`
           : `VM defined but start failed: ${boot.err}`,
       });
     } catch (e) {
@@ -347,7 +354,7 @@ module.exports = function registerVmHandlers(socket) {
     if (state === 'running') await runVirsh(['destroy', VM_NAME]);
     // --nvram: a UEFI/OVMF guest leaves /var/lib/libvirt/qemu/nvram/<name>_VARS.fd
     // behind; without it, `virsh undefine` fails with "cannot undefine domain
-    // with nvram" and re-create is blocked forever. Harmless for BIOS guests.
+    // with nvram" and re-create is blocked forever.
     const res = await runVirsh(['undefine', '--nvram', VM_NAME]);
     let msg = res.ok ? `VM '${VM_NAME}' destroyed` : `virsh undefine failed: ${res.err}`;
     if (res.ok) {
@@ -438,4 +445,4 @@ module.exports.isValidVmName = isValidVmName;
 module.exports.isInactivePoolInfo = isInactivePoolInfo;
 module.exports.buildDomainXml = buildDomainXml;
 module.exports.buildNetworkXml = buildNetworkXml;
-module.exports.normalizeFirmware = normalizeFirmware;
+module.exports.sanitizeVmOpts = sanitizeVmOpts;

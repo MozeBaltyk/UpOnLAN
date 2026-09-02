@@ -183,9 +183,9 @@ On every save, `layermenu()` copies `remote/` first, then `local/` on top, into 
 
 1. **Edit** — open **Menus**, click a file in the left panel (opens the ACE editor). Files marked `- custom` are your overrides; the rest are the shipped base.
 2. **Save** — **Save Config** writes the file to `/config/menus/local/<file>` and re-layers it into `/config/menus/` (the TFTP root) immediately.
-3. **Test** — create / power-on the test VM (**Console** tab) and watch the serial console. The chain is: option ROM → `dhcp` → `chain menu.ipxe` → `boot.cfg` → `version.ipxe` → your menu.
+3. **Test** — create / power-on the test VM (**Console** tab) and watch the serial console. The chain is: OVMF network stack → `dhcp` → `chain menu.ipxe` → `boot.cfg` → `version.ipxe` → your menu.
 4. **Revert** — **Revert/Delete** (only on `- custom` files) removes the `local/` override, restoring the shipped base.
 
 > ⚠️ **Edits are instant on disk, not on a running VM.** Saving re-layers `/config/menus/` right away, but the VM fetched `menu.ipxe` **once at boot**. The on-screen countdown re-renders the *in-memory* menu — it does **not** re-fetch. To see a change, power-cycle the VM (or re-`chain`) so it pulls the fresh file over TFTP.
 
-See [ROM Build](iPXE/03-ROM-Build.md) for why the option ROM is required to run any menu, [Deployment](UpOnLAN.xyz/02-Deployment.md) for the diskless test VM, and [Assets](03-Assets.md) for wiring a menu entry to its boot files.
+See [ROM Build](iPXE/03-ROM-Build.md) for why the VM must load an iPXE binary before any menu can render, [Deployment](UpOnLAN.xyz/02-Deployment.md) for the diskless test VM, and [Assets](03-Assets.md) for wiring a menu entry to its boot files.

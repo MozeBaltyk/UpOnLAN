@@ -23,7 +23,7 @@ TFTP server -- iPXE boot program --> client
 - **HTTPS server:** serves menus and larger boot/install content after iPXE starts.
 - **Assets:** the kernels, initrds, installers, and other files selected by a menu entry.
 
-> The menu is a *script*, not an executable — it only renders after an iPXE binary is running and fetches it. See [ROM Build](iPXE/03-ROM-Build.md) for why a libvirt VM must load an iPXE binary (`CONSOLE_SERIAL`) from an option ROM (BIOS) or the OVMF network stack (UEFI) before it can show the menu on the serial console.
+> The menu is a *script*, not an executable — it only renders after an iPXE binary is running and fetches it. See [ROM Build](iPXE/03-ROM-Build.md) for why a libvirt VM must load an iPXE binary (`CONSOLE_SERIAL`) over OVMF's network stack before it can show the menu on the serial console.
 
 ### UpOnLAN's boundary
 

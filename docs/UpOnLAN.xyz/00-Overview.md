@@ -13,7 +13,7 @@ This web app aims to:
 - Documentation about iPXE and UpOnLAN
 - Provide logs and live system metrics (TFTP, usage, boot activity, etc.)
 - Mirror menus and assets for local testing (`release/output` → `menu/` + `assets/`)
-- Create and manage a diskless KVM test VM with an interactive serial console (BIOS/UEFI)
+- Create and manage a diskless KVM test VM (UEFI/OVMF) with CPU/RAM sizing, optional disk, a graphical console toggle, and an interactive serial console
 - Build serial-enabled iPXE ROMs and boot media
 
 ---

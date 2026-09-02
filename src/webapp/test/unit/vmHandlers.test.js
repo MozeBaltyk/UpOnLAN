@@ -38,22 +38,26 @@ describe('vmHandlers.isInactivePoolInfo', () => {
 describe('vmHandlers.buildDomainXml', () => {
   const xml = vmHandlers.buildDomainXml('uponlan-client', 'uponlan');
 
-  it('is a PXE network-boot domain with a serial console and no disk', () => {
+  it('is a PXE network-boot UEFI domain with a serial console and no disk', () => {
     // Structural contract, not just substring presence: a template that was
     // truncated or reordered would fail these.
     expect(xml.startsWith("<domain type='kvm'>")).toBe(true);
     expect(xml.endsWith('</domain>\n')).toBe(true);
     expect(xml).toContain("<name>uponlan-client</name>");
+    expect(xml).toContain("<os firmware='efi'>");
     expect(xml).toContain("<boot dev='network'/>");
     expect(xml).not.toContain("<boot dev='hd'/>");
     expect(xml).toContain("<source network='uponlan'/>");
     expect(xml).toContain("<model type='e1000'/>");
-    expect(xml).toContain("<rom file='/usr/lib/ipxe/qemu/uponlan-e1000.rom'/>");
+    expect(xml).not.toContain('<rom file=');
     expect(xml).toContain('<emulator>/usr/bin/qemu-system-x86_64</emulator>');
     expect(xml).toContain("<target type='isa-serial' port='0'>");
     expect(xml).toContain("<console type='pty'>");
     expect(xml).not.toContain('<disk');
     expect(xml).not.toContain('<graphics');
+    // Default sizing: 2 vCPU, 2048 MiB RAM.
+    expect(xml).toContain("<memory unit='MiB'>2048</memory>");
+    expect(xml).toContain("<vcpu placement='static'>2</vcpu>");
     // Every non-void opening tag we emit must have a matching close.
     for (const tag of ['domain', 'os', 'features', 'devices', 'interface', 'serial', 'console']) {
       const open = (xml.match(new RegExp(`<${tag}[ >]`, 'g')) || []).length;
@@ -66,33 +70,33 @@ describe('vmHandlers.buildDomainXml', () => {
     expect(xml).not.toContain("<console type='serial'>");
     expect(xml).not.toContain('virtio-serial');
   });
+
+  it('never emits a BIOS PCI option ROM', () => {
+    expect(xml).not.toContain('<rom file=');
+    expect(xml).not.toContain('uponlan-e1000.rom');
+  });
 });
 
-describe('vmHandlers.buildDomainXml (UEFI)', () => {
-  const efi = vmHandlers.buildDomainXml('uponlan-client', 'uponlan', 'efi');
+describe('vmHandlers.buildDomainXml (sizing + graphics)', () => {
+  const big = vmHandlers.buildDomainXml('uponlan-client', 'uponlan', null, { cpus: 4, memory: 8192, graphics: true });
 
-  it('selects OVMF firmware and drops the BIOS PCI option ROM', () => {
-    expect(efi).toContain("<os firmware='efi'>");
-    expect(efi).not.toContain('<rom file=');
-    expect(efi).toContain("<boot dev='network'/>");
-    expect(efi).toContain("<model type='e1000'/>");
-    expect(efi).not.toContain('<disk');
-    expect(efi).not.toContain('<graphics');
-    expect(efi).toContain("<console type='pty'>");
+  it('honors the CPU/RAM/graphics knobs', () => {
+    expect(big).toContain("<memory unit='MiB'>8192</memory>");
+    expect(big).toContain("<vcpu placement='static'>4</vcpu>");
+    expect(big).toContain("<graphics type='vnc' port='-1' autoport='yes'/>");
+    expect(big).toContain("<model type='vga' heads='1' primary='yes'/>");
   });
 
-  it('defaults BIOS domain XML when firmware is unknown or omitted', () => {
-    expect(vmHandlers.buildDomainXml('v', 'n', 'bogus')).toContain("<rom file='");
-    expect(vmHandlers.buildDomainXml('v', 'n', undefined)).toContain("<rom file='");
-    expect(vmHandlers.normalizeFirmware('efi')).toBe('efi');
-    expect(vmHandlers.normalizeFirmware('bios')).toBe('bios');
-    expect(vmHandlers.normalizeFirmware('anything-else')).toBe('bios');
-    expect(vmHandlers.normalizeFirmware(undefined)).toBe('bios');
+  it('clamps out-of-range values to defaults', () => {
+    expect(vmHandlers.sanitizeVmOpts({ cpus: 999 })).toMatchObject({ cpus: 2 });
+    expect(vmHandlers.sanitizeVmOpts({ memory: 0 })).toMatchObject({ memory: 2048 });
+    expect(vmHandlers.sanitizeVmOpts({ cpus: 8, memory: 4096, graphics: true })).toMatchObject({ cpus: 8, memory: 4096, graphics: true });
+    expect(vmHandlers.sanitizeVmOpts({ graphics: 'yes' })).toMatchObject({ graphics: false });
   });
 });
 
 describe('vmHandlers.buildDomainXml (with disk)', () => {
-  const xml = vmHandlers.buildDomainXml('uponlan-client', 'uponlan', 'bios', '/var/lib/libvirt/images/uponlan-client.qcow2');
+  const xml = vmHandlers.buildDomainXml('uponlan-client', 'uponlan', '/var/lib/libvirt/images/uponlan-client.qcow2');
 
   it('attaches the qcow2 as a virtio disk', () => {
     expect(xml).toContain("<disk type='file' device='disk'>");

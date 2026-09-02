@@ -2,7 +2,7 @@
 # Build iPXE ROMs and boot media with a dhcp-first embedded chain -> menu.ipxe.
 #
 # Usage:
-#   build_ipxe_roms.sh                     # release set (TFTP binaries + e1000 option ROM)
+#   build_ipxe_roms.sh                     # release set (TFTP binaries)
 #   build_ipxe_roms.sh legacy,efi,iso,usb  # boot media (media mode)
 #   OUT_ROM=/path build_ipxe_roms.sh ...   # override the output dir (default release/menus/rom/ipxe)
 #   TRUST=ca.pem CERT=client.pem build_ipxe_roms.sh ...  # embed HTTPS trust (optional)
@@ -12,7 +12,6 @@
 #   bin/undionly.kpxe        -> uponlan.xyz-undionly.kpxe  (firmware PXE stage-1)
 #   bin/ipxe.pxe             -> uponlan.xyz.kpxe           (iPXE stage-2, dhcp-boot)
 #   bin-x86_64-efi/ipxe.efi  -> uponlan.xyz.efi            (UEFI clients)
-#   bin/8086100e.rom         -> uponlan.xyz-e1000.rom      (BIOS NIC option ROM)
 #
 # media mode (formats: legacy, efi, iso, usb):
 #   legacy: uponlan.xyz.{kpxe,dsk,pdsk,lkrn} + uponlan.xyz-undionly.kpxe
@@ -39,8 +38,6 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Output dir. release mode defaults to the runtime TFTP path (packed into
 # menus.tar.gz); the container's Build UI overrides OUT_ROM to /config/menus/rom/ipxe.
 OUT_ROM="${OUT_ROM:-$REPO_ROOT/release/menus/rom/ipxe}"
-# Host-side path QEMU reads as the NIC's option ROM (release mode installs here).
-PXE_ROM_PATH="${PXE_ROM_PATH:-/usr/lib/ipxe/qemu/uponlan-e1000.rom}"
 # Comma-separated formats: release (default) | legacy,efi,iso,usb
 FORMATS="${1:-release}"
 
@@ -146,14 +143,6 @@ if [ "$gen_iso" = 1 ] || [ "$gen_usb" = 1 ]; then
   add_efi "bin-x86_64-efi/ipxe.efi"
 fi
 
-# The e1000 PCI option ROM is a BIOS artifact libvirt attaches to the VM via
-# <rom file='/usr/lib/ipxe/qemu/uponlan-e1000.rom'/>. Include it whenever any
-# BIOS target is built so it is never silently skipped by a legacy/release build.
-if [ -n "$bios_targets" ]; then
-  add_bios "bin/8086100e.rom"
-  artifacts+=("bin/8086100e.rom:uponlan.xyz-e1000.rom")
-fi
-
 # shellcheck disable=SC2086
 # iPXE is C99-era code; gcc 14/15 defaults to C23, which (a) makes `()` mean
 # "no args" instead of "unspecified args" (breaking the DRIVER() macro's
@@ -206,42 +195,6 @@ if [ "$gen_usb" = 1 ]; then
   echo "[ipxe] generating USB image"
   "$REPO_ROOT/scripts/sources/genfsimg" -o "$OUT_ROM/uponlan.xyz.img" \
     bin-x86_64-efi/ipxe.efi bin/ipxe.lkrn
-fi
-
-# Install the built e1000 option ROM where QEMU loads it from (the domain XML
-# emitted by buildDomainXml references this exact path), then VERIFY the
-# installed bytes match what was built. Only runs when the host path is
-# reachable from the build environment: a host build can install it (with sudo
-# when needed); a container build has no /usr/lib/ipxe mount, so it reports a
-# warning instead of silently leaving a stale host option ROM in place.
-sync_host_option_rom() {
-  local src="$1" dest="$PXE_ROM_PATH" dir
-  dir="$(dirname "$dest")"
-  [ -d "$dir" ] || return 0
-
-  if [ -w "$dir" ]; then
-    cp "$src" "$dest"
-  elif sudo -n cp "$src" "$dest" 2>/dev/null; then
-    :
-  elif [ -f "$dest" ] && cmp -s "$src" "$dest"; then
-    : # already up to date, no write needed
-  else
-    echo "WARNING: host option ROM $dest not updated (need root). Install it with:" >&2
-    echo "  sudo cp $OUT_ROM/uponlan.xyz-e1000.rom $dest" >&2
-    return 1
-  fi
-
-  if ! cmp -s "$src" "$dest"; then
-    echo "ERROR: installed ROM at $dest does not match the freshly built ROM" >&2
-    return 1
-  fi
-  echo "[ipxe] installed + verified NIC option ROM -> $dest"
-}
-
-# The host option ROM is a side effect of the build, not a release-mode-only
-# step — sync it whenever we built the e1000 target (i.e. any BIOS build).
-if [[ " $bios_targets " == *" bin/8086100e.rom "* ]]; then
-  sync_host_option_rom "$WORK/ipxe/src/bin/8086100e.rom" || true
 fi
 
 echo "[ipxe] done -> $OUT_ROM"

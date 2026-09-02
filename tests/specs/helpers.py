@@ -53,7 +53,6 @@ ROM_ARTIFACTS = (
     'uponlan.xyz-undionly.kpxe',
     'uponlan.xyz.kpxe',
     'uponlan.xyz.efi',
-    'uponlan.xyz-e1000.rom',
 )
 
 

@@ -14,7 +14,7 @@ The **UpOnLAN WebApp** allows users to:
 
 ✅ Build serial-enabled iPXE ROMs and boot media (via `scripts/build_ipxe_roms.sh`)
 
-✅ Create and manage a diskless KVM test VM with an interactive serial console (BIOS/UEFI)
+✅ Create and manage a diskless KVM test VM (UEFI/OVMF) with CPU/RAM sizing, optional disk, a graphical console toggle, and an interactive serial console
 
 ✅ Author **provisioning profiles** — Kickstart (`ks.cfg`) and cloud-init (`user-data`/`meta-data`/`network-config`) — with a per-profile version field and a **Validate** action (`ksvalidator` for kickstart, `cloud-init schema`/YAML for cloud-init)
 

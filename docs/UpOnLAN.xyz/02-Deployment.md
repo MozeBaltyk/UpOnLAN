@@ -99,10 +99,9 @@ The full CI setup — test pipeline plus the three release workflows and their c
 
 ### Test-VM provisioning (diskless PXE guest)
 
-The web console's VM tab creates a diskless KVM guest (no disk, no VGA, PTY serial on port 0) on the `uponlan` libvirt network with a BIOS/UEFI firmware selector. The guest must load an iPXE **binary** before any menu can render: the VM firmware (SeaBIOS/OVMF) does not interpret iPXE scripts, and Ubuntu's QEMU ships no e1000 PXE option ROM, so without the ROM (BIOS) or the OVMF network stack fetch (UEFI) the guest never even DHCPs. See [ROM Build](iPXE/03-ROM-Build.md) for why the serial console additionally requires a `CONSOLE_SERIAL` ROM build.
+The web console's VM tab creates a diskless KVM guest on the `uponlan` libvirt network. The VM is always **UEFI/OVMF**; the creation dialog lets you set vCPU and RAM (for heavier installers), an optional qcow2 disk (0 = diskless), and a graphical-console toggle (VNC + VGA) for GUI installers — the serial console is always present. The guest must load an iPXE **binary** before any menu can render: OVMF's network stack PXE-boots and TFTPs `rom/ipxe/uponlan.xyz.efi` (delivered via `dhcp-boot`/option 67 matched on client arch option 93 = 7), then iPXE renders the serial menu. See [ROM Build](iPXE/03-ROM-Build.md) for why the serial console additionally requires a `CONSOLE_SERIAL` ROM build.
 
-- **BIOS**: attaches the iPXE e1000 option ROM (`/usr/lib/ipxe/qemu/uponlan-e1000.rom`) — SeaBIOS loads it, iPXE DHCPs, and chains the serial menu.
-- **UEFI**: `<os firmware='efi'>` — libvirt picks OVMF and manages a per-guest NVRAM. OVMF PXE-boots, TFTPs `rom/ipxe/uponlan.xyz.efi` (delivered via `dhcp-boot`/option 67 matched on client arch option 93 = 7), and iPXE renders the same serial menu.
+- **UEFI**: `<os firmware='efi'>` — libvirt picks OVMF and manages a per-guest NVRAM.
 - Destroying a UEFI guest removes its NVRAM (`virsh undefine --nvram`); without this, re-creating the VM is blocked by a stale NVRAM file.
 
 The Console tab streams the PTY serial console through xterm.js, with copy/paste, font sizing, autoscroll, and scrollback preserved across tab switches.

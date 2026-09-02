@@ -6,7 +6,7 @@ The iPXE binary is the first executable a machine loads; the menu is content it 
 
 Build a custom binary when the executable must carry an embedded wrapper or a custom default boot flow. Build media when the target must start iPXE from local/removable media rather than the existing network-boot path.
 
-## Why a VM must boot a ROM to show the menu
+## Why a VM must boot an iPXE binary to show the menu
 
 A common source of confusion is that the iPXE menu does not render "directly" on a libvirt VM — every boot still loads an iPXE **binary** first. The reason comes down to the difference between the *menu* and the *boot program*:
 
@@ -16,21 +16,22 @@ A common source of confusion is that the iPXE menu does not render "directly" on
 On power-on the path is therefore always two stages:
 
 ```text
-VM firmware (SeaBIOS / OVMF)                  no iPXE interpreter
+VM firmware (OVMF / UEFI)                 no iPXE interpreter
         │
         ▼
-iPXE binary (option ROM / e1000 ROM / efi)    the interpreter — DHCPs first
+iPXE binary (uponlan.xyz.efi)             the interpreter — DHCPs first
         │
         ▼
-menu.ipxe  (TFTP or HTTPS)                    the script — rendered by iPXE
+menu.ipxe  (TFTP or HTTPS)                the script — rendered by iPXE
 ```
 
-Two QEMU/libvirt details make this unavoidable in practice:
+The test VM is **UEFI/OVMF only**. OVMF's built-in network stack performs PXE: it TFTPs `rom/ipxe/uponlan.xyz.efi` from the DHCP answer, and that binary DHCPs again and chains `menu.ipxe`. (BIOS/SeaBIOS was removed — it required a host-side e1000 PCI option ROM the container could never refresh.)
 
-1. **Ubuntu's QEMU ships no e1000 PXE option ROM.** The emulated NIC therefore does nothing network-wise by default — the guest never even issues a DHCP request. SeaBIOS (BIOS) has no built-in PXE client either: it delegates PXE to the NIC's option ROM. So a `<rom file=.../>` pointing at a built iPXE option ROM is required, or the BIOS guest has no network boot path at all.
-2. **Stock iPXE ROMs are VGA-only.** The serial Console tab shows whatever iPXE writes to the serial port. The distro/`ipxe-qemu` binaries do not enable `CONSOLE_SERIAL`, so their menu output goes to a VGA framebuffer the serial console never sees. The ROM built by `scripts/build_ipxe_roms.sh` defines `CONSOLE_SERIAL`, which is what makes the menu text appear on the PTY serial console.
+One QEMU/libvirt detail matters in practice:
 
-So the menu is never rendered by libvirt directly — it is rendered *by the iPXE binary* that the ROM (or the UEFI network stack) puts into the guest. The "boot on ROM" step is simply loading that interpreter; building the ROM with `CONSOLE_SERIAL` is what routes its output to the serial console.
+**Stock iPXE ROMs are VGA-only.** The serial Console tab shows whatever iPXE writes to the serial port. The distro/`ipxe-qemu` binaries do not enable `CONSOLE_SERIAL`, so their menu output goes to a VGA framebuffer the serial console never sees. The ROM built by `scripts/build_ipxe_roms.sh` defines `CONSOLE_SERIAL`, which is what makes the menu text appear on the PTY serial console.
+
+So the menu is never rendered by libvirt directly — it is rendered *by the iPXE binary* that OVMF's network stack puts into the guest. The "boot an iPXE binary" step is simply loading that interpreter; building it with `CONSOLE_SERIAL` is what routes its output to the serial console.
 
 Choose output for the target. Each checkbox is a `build_ipxe_roms.sh` format that emits a fixed set of files:
 
@@ -64,15 +65,6 @@ Artifacts land in `/config/menus/rom/ipxe/`:
 - `uponlan.xyz-undionly.kpxe` — firmware PXE stage-1 (BIOS).
 - `uponlan.xyz.kpxe` — iPXE stage-2 (BIOS, dhcp-boot).
 - `uponlan.xyz.efi` — UEFI PXE binary served to OVMF guests over TFTP.
-
-## Host option ROM (BIOS VM console only)
-
-The webapp's BIOS firmware VM path attaches `/usr/lib/ipxe/qemu/uponlan-e1000.rom` on the **host** (a `<rom file=.../>`), which the container cannot install. Build and install it once on the host, separately from the container:
-
-```bash
-# host-side: builds all four artifacts and installs the e1000 option ROM
-sudo ./scripts/build_ipxe_roms.sh
-```
 
 The embedded script (`scripts/build_ipxe_roms.sh` → `embed.ipxe`) gives the binaries a serial console (`CONSOLE_SERIAL`) and a default flow: DHCP → `menu.ipxe` → `boot.cfg` → menu, with distinct recovery paths for DHCP failure, menu failure, and boot-config failure.
 

@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Build the full release pipeline in dependency order:
+# Build the local release pipeline in dependency order:
 #
-#   1. scripts/build_ipxe_roms.sh   - build the iPXE ROMs (menu server + option ROM)
-#   2. scripts/release_assets.sh     - mirror the boot assets (incremental)
-#   3. scripts/release_menu.sh       - pack menus.tar.gz (warns if the rom/ipxe artifacts are absent)
+#   1. scripts/release_assets.sh     - mirror the boot assets (incremental)
+#   2. scripts/release_menu.sh       - pack menus.tar.gz (no ROMs — they are
+#                                      built at deploy time by init.sh, so the
+#                                      tarball ships menus + provisioning only)
 #
-# Ordering is enforced here (ROM build before menu). release_menu.sh only warns
-# when the rom/ipxe artifacts are absent, so run it via this script for a full build.
+# iPXE ROMs are deliberately NOT built here: they must embed the deployment's
+# TLS cert, which only exists at deploy time. init.sh builds them into the TFTP
+# root on first boot; the webapp Build UI does the same on demand.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -16,7 +18,6 @@ cd "$REPO_ROOT"
 MENU_VERSION="${1:-$(sed -n 's/^set menu_version //p' release/menus/version.ipxe)}"
 echo "### build_release.sh: menu version ${MENU_VERSION} ###"
 
-bash scripts/build_ipxe_roms.sh
 bash scripts/release_assets.sh
 bash scripts/release_menu.sh "$MENU_VERSION"
 

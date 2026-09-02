@@ -79,6 +79,14 @@ class InitShUrlSpecs(unittest.TestCase):
         self.assertIn('./release/provisioning/. "$stage/provisioning"', release_menu)
         self.assertNotIn('--exclude=local-vars.ipxe .', release_menu)
 
+    def test_builds_roms_at_deploy_time(self):
+        # iPXE ROMs are built on first boot (embedding the TLS cert), not shipped
+        # in the release tarball. The build targets the TFTP root and passes TRUST.
+        self.assertIn('Building iPXE ROMs', self.init_sh)
+        self.assertIn('/scripts/build_ipxe_roms.sh legacy,efi', self.init_sh)
+        self.assertIn('OUT_ROM=/config/menus/rom/ipxe TRUST="$TLS_CRT"', self.init_sh)
+        self.assertIn('ls /config/menus/rom/ipxe/uponlan.xyz-*', self.init_sh)
+
 
 if __name__ == '__main__':
     unittest.main()

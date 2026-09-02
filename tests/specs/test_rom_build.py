@@ -47,18 +47,18 @@ class RomBuildSpecs(unittest.TestCase):
 
 
 class BuildReleaseSpecs(unittest.TestCase):
-    """build_release.sh runs the pipeline in dependency order and reports the
-    menu/ layout path."""
+    """build_release.sh runs the local release pipeline (assets -> menu) and
+    deliberately does NOT build iPXE ROMs (those embed the TLS cert at deploy
+    time)."""
 
     def setUp(self):
         self.script = (REPO_ROOT / 'scripts' / 'build_release.sh').read_text()
 
-    def test_runs_in_dependency_order(self):
-        # ROM build -> assets -> menu, in that order.
-        pos_rom = self.script.index('build_ipxe_roms.sh')
+    def test_assets_before_menu_and_no_rom_build(self):
+        # assets -> menu, in that order; no ROM build here.
+        self.assertNotIn('build_ipxe_roms.sh', self.script)
         pos_assets = self.script.index('release_assets.sh')
         pos_menu = self.script.index('release_menu.sh')
-        self.assertLess(pos_rom, pos_assets)
         self.assertLess(pos_assets, pos_menu)
 
     def test_reports_menu_layout_path(self):

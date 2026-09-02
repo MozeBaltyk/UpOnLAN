@@ -117,6 +117,18 @@ else
   cp -r /config/menus/remote/* /config/menus/
 fi
 
+# iPXE ROMs are no longer shipped in the release tarball — they must embed this
+# deployment's TLS cert (TRUST) so iPXE can fetch kernel/initrd over HTTPS. Build
+# them here on first boot, into the TFTP root. Foreground + once: subsequent
+# boots find the artifacts present and skip. A failure (e.g. no internet for the
+# iPXE source fetch) is non-fatal — PXE boot stays down until built via the webapp.
+if ! ls /config/menus/rom/ipxe/uponlan.xyz-* >/dev/null 2>&1; then
+  echo "[uponlanxyz-init] Building iPXE ROMs (embeds this TLS cert) — one-time, may take a few minutes"
+  OUT_ROM=/config/menus/rom/ipxe TRUST="$TLS_CRT" \
+    /scripts/build_ipxe_roms.sh legacy,efi \
+    || echo "[uponlanxyz-init] WARNING: iPXE ROM build failed — PXE boot will not answer until built via the webapp Build UI"
+fi
+
 # Refresh endpoints.yml from the configured origin on every startup. The asset
 # catalog is generated, not user-edited state, so a fresh fetch is correct and
 # picks up newly published entries (e.g. direct_file vendor-source catalog

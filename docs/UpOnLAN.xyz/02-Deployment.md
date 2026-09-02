@@ -31,7 +31,7 @@ HTTPS termination is built in and on by default. `init.sh` uses a mounted server
 - `8443/TCP` — asset serving (`/`, `/rom/`, `/status`).
 - `3443/TCP` — the webapp, reverse-proxied over TLS to the Node app (socket.io WebSocket upgrade included).
 
-iPXE boot clients fetch kernel/initrd over HTTPS (`${local_endpoint}` = `https://<boot-host>:8443/`), so the iPXE ROMs must embed this deployment's trust anchor: build them from the webapp (the Build UI defaults `TRUST` to `/config/tls/server.crt`) or with `TRUST=<your-ca.pem> scripts/build_ipxe_roms.sh`.
+iPXE boot clients fetch kernel/initrd over HTTPS (`${local_endpoint}` = `https://<boot-host>:8443/`), so the iPXE ROMs must embed this deployment's trust anchor. They are built automatically by `init.sh` on first boot (embedded `TRUST` = `/config/tls/server.crt`), or on demand via the webapp Build UI / `TRUST=<your-ca.pem> scripts/build_ipxe_roms.sh`.
 
 To use your own cert, drop it at those two paths (in the host `./config` directory that the chart mounts at `/config`) before deploying — a mounted pair is never overwritten. The self-signed cert is only a bootstrap fallback; replace it with a real cert (Let's Encrypt, internal CA) for anything beyond a homelab.
 
@@ -50,9 +50,9 @@ The chart renders either a bare `Pod` or a `Deployment` depending on `deployAs`:
 
 `./wakemeup.sh -a mirror-assets` runs `scripts/release_assets.sh` and recreates the asset side of `release/output`, under `release/output/assets/` (the `assets/endpoints.yml` catalog plus `assets/<asset-key>/` bundles). Set `asset_target=<os>` to build a single asset set, e.g. `asset_target=harvester ./wakemeup.sh -a mirror-assets`. A bare (untargeted) run wipes `release/output/assets/` and rebuilds every asset set in `release/assets/*/setting.sh`; a targeted run builds/refreshes only that one set on top of the existing mirror, so you can add asset sets incrementally (e.g. `asset_target=talos` after a full run adds only talos).
 
-`./scripts/release_menu.sh <version>` updates `release/menus/version.ipxe` and writes the menu layer under `release/output/menu/` (`menu/latest` + `menu/<version>/menus.tar.gz`). It **warns** — and no longer aborts — if the iPXE ROM artifacts (`release/menus/rom/ipxe/uponlan.xyz-undionly.kpxe`, `uponlan.xyz.kpxe`, `uponlan.xyz.efi`, `uponlan.xyz-e1000.rom`) are missing; build them first so the tarball carries them and `init.sh` can populate the container's TFTP root. The two layers live in sibling directories, so an asset mirror run never clobbers the menu release.
+`./scripts/release_menu.sh <version>` updates `release/menus/version.ipxe` and writes the menu layer under `release/output/menu/` (`menu/latest` + `menu/<version>/menus.tar.gz`). It ships menus + provisioning profiles only — the iPXE ROMs are **not** bundled, because they embed the deployment's TLS cert. `init.sh` builds them into the container's TFTP root on first boot (or the webapp Build UI does it on demand). The two layers live in sibling directories, so an asset mirror run never clobbers the menu release.
 
-The one-command release build is `scripts/build_release.sh <version>`: it runs the ROM build (`scripts/build_ipxe_roms.sh`), the asset mirror, and then `release_menu.sh` in that order, so the menu artifact can never be built against stale/missing ROMs.
+The one-command local release build is `scripts/build_release.sh <version>`: it runs the asset mirror and then `release_menu.sh` (ROMs are deliberately absent — built at deploy time).
 
 ### Release workflows
 
@@ -68,20 +68,19 @@ The release is split across **three independent, manually-triggered workflows** 
 
 ```bash
 ./wakemeup.sh -a mirror-assets            # asset layer: release/output/assets/{endpoints.yml,<key>/...}
-./scripts/build_release.sh 0.1.0          # ROMs + menu layer: release/output/menu/{latest,0.1.0/menus.tar.gz}
+./scripts/build_release.sh 0.1.0          # menu layer (no ROMs — built at deploy time)
 ./wakemeup.sh -a deploy --local           # serve release/output on :8899 and deploy the local manifest
 ```
 
-The local deployment then points `ENDPOINT_URL` at `http://host.containers.internal:8899`, so `init.sh` and the webapp consume the local mirror exactly like a remote endpoint — the menu tarball from `menu/<version>/menus.tar.gz` and the asset catalog from `assets/endpoints.yml`. On a fresh host, install the build toolchain and run the ROM build directly (no Ansible):
+The local deployment then points `ENDPOINT_URL` at `http://host.containers.internal:8899`, so `init.sh` and the webapp consume the local mirror exactly like a remote endpoint — the menu tarball from `menu/<version>/menus.tar.gz` and the asset catalog from `assets/endpoints.yml`. The iPXE ROMs are built in the container on first boot (`init.sh`) and embed the deployment's TLS cert.
 
 ```bash
-sudo apt-get install -y build-essential binutils liblzma-dev xz-utils ipxe-qemu ovmf qemu-system-x86
-./scripts/build_release.sh <version>   # runs build_ipxe_roms.sh (installs the host option ROM) + assets + menu
+./scripts/build_release.sh <version>   # assets + menu (ROMs are built at deploy time)
 ```
 
 **Repository (GitHub) workflow** — three `workflow_dispatch` jobs in `.github/workflows/`:
 
-- `release.yml` (menu): builds the iPXE ROMs (`build_ipxe_roms.sh`), packs `release_menu.sh <version>`, and uploads `menus.tar.gz` as the `<version>` release asset.
+- `release.yml` (menu): packs `release_menu.sh <version>` and uploads `menus.tar.gz` as the `<version>` release asset (no ROMs — those embed the per-deployment cert and are built at deploy time).
 - `assets.yml`: installs `yq` + `p7zip-full`, runs `MIRROR_LAYOUT=github scripts/release_assets.sh`, then creates one release per bundle whose **tag is the endpoint key** (`proxmox-ve-8.4-1-x86_64` → `releases/download/<key>/vmlinuz`). It also publishes `endpoints.yml` on a stable `assets` tag.
 - `image.yml`: builds the Containerfile and pushes the image to GHCR.
 

@@ -49,22 +49,32 @@ Choose output for the target. Each checkbox is a `build_ipxe_roms.sh` format tha
 
 > The build prints many `-Warray-bounds` / `-Wmaybe-uninitialized` / `-Wheader-guard` warnings and `ld: … LOAD segment with RWX permissions`. These come from iPXE's own legacy C code compiled by modern gcc and are **harmless** — the build still completes, because the script pins `NO_WERROR=1` plus `-Wno-error=…` for the handful of warnings that would otherwise fail.
 
-## UpOnLAN release ROM build
+## Deploy-time ROM build (the normal flow)
 
-The release pipeline builds the four iPXE artifacts the deployment consumes (BIOS option ROM, BIOS kpxe/undionly, and EFI):
+The iPXE ROMs embed the deployment's TLS cert, so they are **not** shipped in the menu release. `init.sh` builds them into the container's TFTP root (`/config/menus/rom/ipxe`) on first boot, and the webapp Build UI does the same on demand:
 
 ```bash
-./scripts/build_ipxe_roms.sh
+# what init.sh runs in-container (embeds the TLS cert so iPXE can fetch over HTTPS)
+OUT_ROM=/config/menus/rom/ipxe TRUST=/config/tls/server.crt /scripts/build_ipxe_roms.sh legacy,efi
 ```
 
-Requirements: `build-essential`, `binutils` (2.42 needs `scripts/sources/ipxe-gas242-binutils.patch` applied by the script), `liblzma-dev`/`xz-utils`, `curl`, `ipxe-qemu` (the `e1000` ROM template), and `sudo -n` for installing the host option ROM to `/usr/lib/ipxe/qemu/uponlan-e1000.rom`. `scripts/build_release.sh <version>` (or the release CI workflow) installs these and runs the build on a fresh host.
+Requirements (already in the container image): `build-base`, `xz`/`xz-dev` (`lzma`), `curl`, and the vendored `scripts/sources/ipxe-gas242-binutils.patch`. The build fetches the iPXE source from GitHub, so the first boot needs internet; a failure is non-fatal — PXE stays down until retried via the webapp Build UI.
 
-Artifacts land in `release/menus/rom/ipxe/`:
-- `uponlan.xyz-e1000.rom` — SeaBIOS/BIOS option ROM (installed into the guest via `<rom file=.../>`).
-- `uponlan.xyz-undionly.kpxe` / `uponlan.xyz.kpxe` — legacy BIOS PXE binaries (unused by the test-VM flow, kept for general netboot).
+Artifacts land in `/config/menus/rom/ipxe/`:
+- `uponlan.xyz-undionly.kpxe` — firmware PXE stage-1 (BIOS).
+- `uponlan.xyz.kpxe` — iPXE stage-2 (BIOS, dhcp-boot).
 - `uponlan.xyz.efi` — UEFI PXE binary served to OVMF guests over TFTP.
 
-The embedded script (`scripts/build_ipxe_roms.sh` → `embed.ipxe`) gives the binaries a serial console (`CONSOLE_SERIAL`) and a default flow: DHCP → `menu.ipxe` → `boot.cfg` → menu, with distinct recovery paths for DHCP failure, menu failure, and boot-config failure. `release_menu.sh` warns (but no longer blocks) if any of the four artifacts are missing.
+## Host option ROM (BIOS VM console only)
+
+The webapp's BIOS firmware VM path attaches `/usr/lib/ipxe/qemu/uponlan-e1000.rom` on the **host** (a `<rom file=.../>`), which the container cannot install. Build and install it once on the host, separately from the container:
+
+```bash
+# host-side: builds all four artifacts and installs the e1000 option ROM
+sudo ./scripts/build_ipxe_roms.sh
+```
+
+The embedded script (`scripts/build_ipxe_roms.sh` → `embed.ipxe`) gives the binaries a serial console (`CONSOLE_SERIAL`) and a default flow: DHCP → `menu.ipxe` → `boot.cfg` → menu, with distinct recovery paths for DHCP failure, menu failure, and boot-config failure.
 
 ## Build in the webapp
 

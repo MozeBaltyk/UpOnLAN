@@ -14,11 +14,12 @@ class ReleaseMenuWorkflowSpecs(TempDirTestCase):
         self.stub('release/menus/menu.ipxe', '#!ipxe\n:start\nexit\n')
         self.stub('release/menus/boot.cfg', '#!ipxe\n')
 
-    def test_warns_but_proceeds_without_rom_artifacts(self):
-        # No rom/ipxe artifacts -> release_menu.sh warns but still ships the menu.
+    def test_ships_menu_without_rom_artifacts(self):
+        # No rom/ipxe artifacts -> release_menu.sh still ships the menu. ROMs
+        # are built at deploy time (they embed the deployment's TLS cert).
         proc = self.run_cmd('bash', 'scripts/release_menu.sh', '0.0.2', check=False)
         self.assertEqual(proc.returncode, 0)
-        self.assertIn('iPXE artifact missing', proc.stdout + proc.stderr)
+        self.assertNotIn('iPXE artifact missing', proc.stdout + proc.stderr)
         tarball = self.tmp / 'release' / 'output' / 'menu' / '0.0.2' / 'menus.tar.gz'
         self.assertTrue(tarball.is_file(), 'menus.tar.gz not produced without ROM artifacts')
 

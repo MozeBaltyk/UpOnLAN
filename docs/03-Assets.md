@@ -203,6 +203,6 @@ Adding a brand-new boot entry is a two-sided change: an **asset recipe** (so the
 
 3. **Register the entry** in the parent menu so it appears in the menu tree. For a Linux installer, add an `item <os> <label>` to `release/menus/linux.ipxe` (and `linux-arm.ipxe` if it has an arm64 bundle). The main `menu.ipxe` chains `linux.ipxe` when the user selects *Linux Network Installs*.
 
-4. **Rebuild and redeploy.** Run `scripts/release_menu.sh <version>` (warns if the ROMs are missing — build them first so they're included) then `./wakemeup.sh -a redeploy --local`, or the one-shot `scripts/build_release.sh <version>`. The new entry appears on the next boot.
+4. **Rebuild and redeploy.** Run `scripts/release_menu.sh <version>` then `./wakemeup.sh -a redeploy --local`, or the one-shot `scripts/build_release.sh <version>`. The iPXE ROMs are built in the container on first boot, so no ROM rebuild is needed for a menu change. The new entry appears on the next boot.
 
 A working reference is `talos.ipxe` + `release/assets/talos/setting.sh`: the recipe lists `vmlinuz`/`initrd` vendor URLs for `<key> = talos-v1.13.8-<arch>`, and the menu boots `${local_endpoint}talos-v1.13.8-${arch}/vmlinuz` with a config-URL parameter item.

@@ -26,15 +26,11 @@ jobs:
             exit 1
           fi
 
-      - name: Install iPXE build dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential binutils liblzma-dev xz-utils curl
-
-      # Menu release only: build the iPXE ROMs (baked into menus.tar.gz by
-      # release_menu.sh) then pack the menus. Asset bundles are released
-      # independently by assets.yml; the menu just *points* at them.
-      - name: Build iPXE ROMs
-        run: ./scripts/build_ipxe_roms.sh
-
+      # Menu release only: pack the menu scripts (menus.tar.gz). The iPXE ROMs
+      # are NOT built here — they must embed the deployment's TLS cert, so they
+      # are built at deploy time (init.sh, or the webapp Build UI). Asset
+      # bundles are released independently by assets.yml; the menu just *points*
+      # at them.
       - name: Build Menu release
         run: ./scripts/release_menu.sh "${{ steps.version.outputs.tag }}"
 

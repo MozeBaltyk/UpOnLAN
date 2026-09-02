@@ -67,8 +67,11 @@ goto bootos_images
 
 :bootos_images
 imgfree
-kernel ${url}vmlinuz inst.repo=${repo} ${install_mode} ${params} ${ipparam} ${cmdline}
-initrd ${url}initrd
+# Our mirror saves Rocky's upstream `initrd.img` locally as plain `initrd`.
+# On this pinned iPXE build, pass the kernel the initrd image name it expects
+# and name the downloaded image to match.
+kernel ${url}vmlinuz initrd=initrd.img inst.repo=${repo} ${install_mode} ${params} ${ipparam} ${cmdline}
+initrd --name initrd.img ${url}initrd
 boot
 goto linux_menu
 

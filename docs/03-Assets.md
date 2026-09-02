@@ -84,6 +84,16 @@ iPXE menu (.ipxe)                      endpoint catalog (endpoints.yml)
 1. **`endpoints.yml`** declares a boot bundle: a `path` plus the `files` served under it (kernel, initrd, rootfs, checksums...). Its `path` is relative to the *asset origin*: `/assets/<key>/` for the local mirror, `/releases/download/<key>/` for GitHub release assets. `direct_file` entries also carry `build_type: direct_file` and `sources` (the vendor URLs, aligned with `files`); `iso_extraction` entries carry `build_type: iso_extraction` with no per-file vendor source.
 2. **The Assets tab** resolves each *Pull Selected* (`dlremote`) path: a `direct_file` entry downloads from its vendor `sources[index]` URL, an `iso_extraction` entry downloads from the configured origin (`origin + path`). Files land under `/assets/<key>/`, and nginx serves `/assets` as its web root over HTTPS, so every imported file is reachable at `https://<boot host>:8443/<key>/<file>`.
 3. **The iPXE menu** points `kernel` / `initrd` / rootfs at exactly those URLs, via the variables defined in `release/menus/boot.cfg`:
+
+   - In the common case, a plain `kernel <url>` + `initrd <url>` + `boot` is enough.
+   - If a local mirror saves the initrd under a different filename than the kernel command line should reference, name the downloaded initrd explicitly. Rocky is the in-repo example: the asset recipe stores upstream `initrd.img` locally as `/initrd`, so the menu uses:
+
+     ```ipxe
+     kernel ${url}vmlinuz initrd=initrd.img ...
+     initrd --name initrd.img ${url}initrd
+     ```
+
+   - On this repo's pinned iPXE `1.21.1` build, do **not** use `initrd=initrd.magic`; it is treated as a file fetch and fails.
    - `${local_endpoint}` — the local nginx origin for **`direct_file`** assets, default `https://192.168.7.1:8443/` (trailing slash included), overridable in `release/menus/local-vars.ipxe`.
    - `${mirror_endpoint}` / `${asset_path}` — the GitHub origin for **`iso_extraction`** assets. Defaults to `https://github.com/MozeBaltyk/UpOnLAN` + `/releases/download/`.
 

@@ -67,9 +67,23 @@ initrd http://${SERVER}/boot/ubuntu/initrd.img
 boot
 ```
 
-> ⚠️ **Use plain `kernel …` + `initrd …` + `boot`.** UpOnLAN removed two legacy conventions inherited from netboot.xyz that break on a stock iPXE build:
+> ⚠️ **Default pattern: `kernel …` + `initrd …` + `boot`.** UpOnLAN removed two legacy netboot.xyz conventions that break on this repo's pinned stock iPXE build:
 > - **`md5sum` / `MD5sums`** — not a stock iPXE command; it printed `command not found` and did nothing. Do not add it back.
-> - **`initrd=initrd.magic`** — iPXE treats that as a *file* to fetch and fails with `Failed to open file: initrd.magic` (it was a netboot.xyz-custom-build magic name). Load the initrd with the `initrd <url>` command only; iPXE hands it to the kernel via the Linux boot protocol.
+> - **`initrd=initrd.magic`** — on this repo's pinned iPXE `1.21.1` build it is treated as a *file to fetch* and fails with `Failed to open file: initrd.magic`. Do not use it here.
+
+Sometimes you still need to name the initrd explicitly on the **kernel command line**. This is not an extra iPXE fetch — it is just a Linux kernel argument telling the kernel which already-loaded initrd image name to use.
+
+That matters when the locally served initrd filename differs from the name the kernel command line should reference. Rocky is the current in-repo example: the mirror serves `/initrd`, but the loaded image is named `initrd.img` for the kernel:
+
+```ipxe
+kernel https://${SERVER}/rocky-8-x86_64/vmlinuz initrd=initrd.img inst.repo=https://download.rockylinux.org/pub/rocky/8/BaseOS/x86_64/os
+initrd --name initrd.img https://${SERVER}/rocky-8-x86_64/initrd
+boot
+```
+
+- `initrd=initrd.img` → Linux kernel argument
+- `initrd --name initrd.img ...` → iPXE image name for the downloaded initrd
+- `initrd.magic` → **not** valid for this repo's current pinned build
 
 ## 🔗 Chain iPXE scripts
 

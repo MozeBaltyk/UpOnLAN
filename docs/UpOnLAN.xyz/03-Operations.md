@@ -8,7 +8,7 @@ Use the Monitor tab for webapp, TFTP, and Nginx activity, or follow container ou
 ./wakemeup.sh -a logs
 ```
 
-For a shell in the running image, use `./wakemeup.sh -a connect`. Check port conflicts with `ss -tulpn`; TFTP uses `69/UDP`, while the chart publishes `8080/TCP` (assets HTTP), `8443/TCP` (assets HTTPS), and `3443/TCP` (webapp HTTPS).
+For a shell in the running image, use `./wakemeup.sh -a connect`. Check port conflicts with `ss -tulpn`; TFTP uses `69/UDP`, while the chart publishes `8443/TCP` (assets HTTPS) and `3443/TCP` (webapp HTTPS).
 
 ### Ephemeral storage and backups
 

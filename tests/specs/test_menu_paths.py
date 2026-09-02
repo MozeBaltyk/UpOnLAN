@@ -16,7 +16,7 @@ class MenuPathSpecs(unittest.TestCase):
         # GitHub origin (iso_extraction) + local nginx origin (direct_file).
         self.assertIn('set mirror_endpoint https://github.com/MozeBaltyk/UpOnLAN', cfg)
         self.assertIn('set asset_path /releases/download/', cfg)
-        self.assertIn('set local_endpoint http://192.168.7.1:8080/', cfg)
+        self.assertIn('set local_endpoint https://192.168.7.1:8443/', cfg)
 
     def test_menu_entries_use_local_endpoint_var(self):
         for f in ('talos.ipxe', 'harvester.ipxe', 'rockylinux.ipxe', 'proxmox.ipxe', 'ubuntu.ipxe'):
@@ -43,7 +43,7 @@ class MenuPathSpecs(unittest.TestCase):
 
     def test_local_vars_override(self):
         lv = (self.menus / 'local-vars.ipxe.example').read_text()
-        self.assertIn('set local_endpoint http://192.168.7.1:8080/', lv)
+        self.assertIn('set local_endpoint https://192.168.7.1:8443/', lv)
         self.assertIn('kickstart_url', lv)
         self.assertIn('cloud_init_url', lv)
 
@@ -64,7 +64,7 @@ class MenuPathSpecs(unittest.TestCase):
         # direct_file: local nginx origin (already carries the trailing slash).
         self.assertEqual(
             f'{local_endpoint}{key}/',
-            'http://192.168.7.1:8080/talos-v1.13.8-x86_64/',
+            'https://192.168.7.1:8443/talos-v1.13.8-x86_64/',
         )
 
 

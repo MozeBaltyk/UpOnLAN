@@ -16,17 +16,15 @@ mkdir -p \
   /config/menus/rom \
   /config/tls
 
-# TLS ports (only used when a server cert+key are mounted, see below).
+# TLS ports.
 export HTTPS_PORT="${HTTPS_PORT:-8443}"
 export WEBAPP_HTTPS_PORT="${WEBAPP_HTTPS_PORT:-3443}"
 
 # copy config files
 [[ ! -f /config/nginx/nginx.conf ]] && \
   cp /defaults/nginx.conf /config/nginx/nginx.conf
-[[ ! -f /config/nginx/site-confs/default ]] && \
-  envsubst '${NGINX_PORT}' < /defaults/default > /config/nginx/site-confs/default
 
-# HTTPS termination: use a mounted cert+key pair when present; generate a
+# TLS termination: use a mounted cert+key pair when present; generate a
 # self-signed fallback only when both are missing (never overwrite an
 # operator's real cert). A lone cert or key is a misconfiguration — skip TLS
 # rather than guess. The shell-format list restricts envsubst to the three
@@ -40,14 +38,16 @@ elif [[ ! -f "$TLS_CRT" && ! -f "$TLS_KEY" ]]; then
   openssl req -x509 -newkey rsa:2048 -nodes -days 825 \
     -keyout "$TLS_KEY" -out "$TLS_CRT" \
     -subj "/CN=uponlan.xyz" \
-    -addext "subjectAltName=DNS:uponlan.xyz,DNS:localhost,IP:127.0.0.1" >/dev/null 2>&1
+    -addext "subjectAltName=DNS:uponlan.xyz,DNS:localhost,IP:127.0.0.1,IP:192.168.7.1" >/dev/null 2>&1
 fi
 if [[ -f "$TLS_CRT" && -f "$TLS_KEY" ]]; then
+  # Single HTTPS site-conf: assets on HTTPS_PORT, webapp reverse-proxy on
+  # WEBAPP_HTTPS_PORT. No plain-HTTP listener.
   envsubst '${HTTPS_PORT} ${WEBAPP_HTTPS_PORT} ${WEB_APP_PORT}' \
-    < /defaults/tls > /config/nginx/site-confs/tls
+    < /defaults/default > /config/nginx/site-confs/default
   echo "[uponlanxyz-init] TLS enabled: assets :${HTTPS_PORT}, webapp :${WEBAPP_HTTPS_PORT}"
 else
-  rm -f /config/nginx/site-confs/tls
+  rm -f /config/nginx/site-confs/default
   echo "[uponlanxyz-init] TLS: only one of server.crt/server.key present — HTTPS disabled"
 fi
 

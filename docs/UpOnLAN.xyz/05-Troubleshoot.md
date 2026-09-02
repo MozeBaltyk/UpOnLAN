@@ -14,7 +14,6 @@ Quick checks and fixes for the most common problems. All container operations go
 
 | Port | Service |
 |------|---------|
-| 8080 | Nginx asset server (`NGINX_PORT`) |
 | 8443 | Nginx asset server over TLS (`HTTPS_PORT`) |
 | 3443 | Webapp over TLS (`WEBAPP_HTTPS_PORT`) |
 | 69   | TFTP (UDP) |
@@ -31,7 +30,7 @@ Walk the boot steps from [Networks summary](Networks/01-Overview.md):
 |------|---------|-------|
 | 1️⃣ DHCP assigns IP + iPXE path | No IP / no boot file offered | DHCP config (`next-server`/`filename`) — [DHCP insights](Networks/02-DHCP.md) |
 | 2️⃣ TFTP loads iPXE binary | TFTP timeout | Port 69 conflict; binaries present in `/var/lib/tftpboot` on the DHCP host |
-| 3️⃣ iPXE fetches menu via HTTP(S) | Menu not found | Nginx up (port 8080); menu file exists in the editor; `/logs/nginx/` |
+| 3️⃣ iPXE fetches menu via HTTPS | Menu not found | Nginx up (port 8443); menu file exists in the editor; `/logs/nginx/` |
 | 4️⃣ iPXE executes | Kernel/initrd 404 | Assets mirrored (Assets tab) and `endpoints.yml` points to the right URLs |
 
 The webapp **Monitor** tab tails Nginx, TFTP and webapp activity in real time — it is the first place to look during a failed boot.

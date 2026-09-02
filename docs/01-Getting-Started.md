@@ -3,7 +3,7 @@
 ### Prerequisites
 
 - Podman, with permission to run the `sudo podman` commands used below.
-- Available host ports `8443/TCP` (asset HTTPS), `3443/TCP` (webapp HTTPS), `8080/TCP` (boot HTTP), and `69/UDP` (TFTP). A KVM/virt-manager VM is optional for PXE testing.
+- Available host ports `8443/TCP` (asset HTTPS), `3443/TCP` (webapp HTTPS), and `69/UDP` (TFTP). A KVM/virt-manager VM is optional for PXE testing.
 - DHCP already configured by your network administrator to give PXE clients an address and the correct boot file. UpOnLAN does **not** configure DHCP; do not invent or run DHCP commands from this guide.
 
 ### First run

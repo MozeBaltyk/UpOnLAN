@@ -12,8 +12,6 @@ containers:
         value: "{{ .Values.menuVersion }}"
       - name: ENDPOINT_URL
         value: "{{ .Values.endpoint }}"
-      - name: NGINX_PORT
-        value: "{{ .Values.nginxPort }}"
       - name: WEB_APP_PORT
         value: "{{ .Values.webAppPort }}"
       - name: HTTPS_PORT
@@ -36,16 +34,12 @@ containers:
         mountPath: /var/run/libvirt/libvirt-sock
       {{- end }}
     ports:
-      - name: nginx
-        containerPort: {{ .Values.nginxPort }}
-        {{- if eq .Values.deployAs "Pod" }}
-        hostPort: {{ .Values.nginxPort }}
-        {{- end }}
       # Webapp listener is internal-only: the nginx TLS proxy reverse-proxies
       # to 127.0.0.1:WEB_APP_PORT in the same container, so no hostPort here.
       - name: webapp
         containerPort: {{ .Values.webAppPort }}
-      - name: nginx-https
+      # Assets over TLS (the sole asset listener — no plain-HTTP port).
+      - name: nginx
         containerPort: {{ .Values.httpsPort }}
         {{- if eq .Values.deployAs "Pod" }}
         hostPort: {{ .Values.httpsPort }}

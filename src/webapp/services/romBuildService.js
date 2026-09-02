@@ -60,9 +60,16 @@ function runBuild(formats, socket, progressCallback) {
   const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
   const args = formats ? [formats] : [];
+  const env = { ...process.env, OUT_ROM };
+  // Default TRUST to this deployment's own TLS cert so ROMs built in-container
+  // verify the asset server they'll boot from. An explicit TRUST env wins.
+  if (!env.TRUST) {
+    const cert = path.join(CONFIG_ROOT, 'tls', 'server.crt');
+    if (fs.existsSync(cert)) env.TRUST = cert;
+  }
   const proc = spawn(BUILD_SCRIPT, args, {
     detached: true,
-    env: { ...process.env, OUT_ROM },
+    env,
   });
 
   const promise = new Promise((resolve, reject) => {

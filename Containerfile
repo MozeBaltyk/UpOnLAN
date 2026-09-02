@@ -68,13 +68,11 @@ RUN apk add --no-cache \
 RUN pip install --no-cache-dir --break-system-packages pykickstart==3.78
 
 ENV TFTPD_OPTS=''
-ENV NGINX_PORT='8080'
 ENV WEB_APP_PORT='3000'
 ENV HTTPS_PORT='8443'
 ENV WEBAPP_HTTPS_PORT='3443'
 
 EXPOSE 69/udp
-EXPOSE 8080
 EXPOSE 3000
 EXPOSE 8443
 EXPOSE 3443

@@ -50,8 +50,8 @@ class InitShUrlSpecs(unittest.TestCase):
         self.assertIn('openssl req -x509 -newkey rsa:2048', self.init_sh)
         self.assertIn('self-signed', self.init_sh)
         self.assertIn("envsubst '${HTTPS_PORT} ${WEBAPP_HTTPS_PORT} ${WEB_APP_PORT}'", self.init_sh)
-        self.assertIn('/defaults/tls', self.init_sh)
-        self.assertIn('/config/nginx/site-confs/tls', self.init_sh)
+        self.assertIn('/defaults/default', self.init_sh)
+        self.assertIn('/config/nginx/site-confs/default', self.init_sh)
 
     def test_ca_trust_block(self):
         # A mounted corporate CA (TLS-inspecting proxy) is added to the system

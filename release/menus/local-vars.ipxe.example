@@ -10,7 +10,7 @@
 # served at <local_endpoint><key>/, so local_endpoint carries a trailing slash.
 # This only affects direct_file entries — iso_extraction still chains
 # ${mirror_endpoint}${asset_path} (the GitHub origin set in boot.cfg).
-set local_endpoint http://192.168.7.1:8080/
+set local_endpoint https://192.168.7.1:8443/
 
 # Provisioning profiles. Optional: override to point the menu at your own seeds.
 # Unset, boot.cfg falls back to the shipped example profiles under local_endpoint.

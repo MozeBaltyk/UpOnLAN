@@ -3,7 +3,7 @@
 ### Requirements
 
 - A Podman engine and permission to run the `sudo podman` commands used by `wakemeup.sh`.
-- Host ports `8080/TCP`, `8443/TCP`, `3443/TCP`, and `69/UDP` available. Port 69 is privileged and must not be occupied by another TFTP service.
+- Host ports `8443/TCP`, `3443/TCP`, and `69/UDP` available. Port 69 is privileged and must not be occupied by another TFTP service.
 - For `deploy --local`, Python 3 plus prepared `release/output` artifacts.
 
 ### Deploy modes
@@ -24,24 +24,26 @@
 
 ### Security and network exposure
 
-The shipped Nginx configuration listens on plain HTTP port `8080` for assets, and TFTP on `69/UDP`. The webapp has **no** plain-HTTP host port — it is reachable only through the TLS proxy. Plain HTTP stays available because iPXE boot clients fetch menus/assets over HTTP on the trusted LAN.
+The shipped Nginx configuration serves everything over TLS; there is no plain-HTTP listener. TFTP is on `69/UDP`. The webapp is reachable only through its TLS proxy on `3443/TCP`.
 
-HTTPS termination is built in and on by default. `init.sh` uses a mounted server certificate + key at `/config/tls/server.crt` and `/config/tls/server.key` when present, and otherwise generates a self-signed fallback (valid for `uponlan.xyz`, `localhost`, `127.0.0.1`). Two TLS listeners are always added:
+HTTPS termination is built in and on by default. `init.sh` uses a mounted server certificate + key at `/config/tls/server.crt` and `/config/tls/server.key` when present, and otherwise generates a self-signed fallback (valid for `uponlan.xyz`, `localhost`, `127.0.0.1`, and the default boot host `192.168.7.1`). Two TLS listeners are always added:
 
-- `8443/TCP` — the same asset content as `8080` (`/`, `/rom/`, `/status`).
+- `8443/TCP` — asset serving (`/`, `/rom/`, `/status`).
 - `3443/TCP` — the webapp, reverse-proxied over TLS to the Node app (socket.io WebSocket upgrade included).
+
+iPXE boot clients fetch kernel/initrd over HTTPS (`${local_endpoint}` = `https://<boot-host>:8443/`), so the iPXE ROMs must embed this deployment's trust anchor: build them from the webapp (the Build UI defaults `TRUST` to `/config/tls/server.crt`) or with `TRUST=<your-ca.pem> scripts/build_ipxe_roms.sh`.
 
 To use your own cert, drop it at those two paths (in the host `./config` directory that the chart mounts at `/config`) before deploying — a mounted pair is never overwritten. The self-signed cert is only a bootstrap fallback; replace it with a real cert (Let's Encrypt, internal CA) for anything beyond a homelab.
 
-- Restrict `69/UDP` to the PXE client network. Allow `8080/TCP` only where boot clients need HTTP assets and menus.
-- Restrict `3443/TCP` to administrators, or place it behind a reverse proxy. The webapp is TLS-only; do not add a plain-HTTP listener back for it.
+- Restrict `69/UDP` to the PXE client network. Allow `8443/TCP` only where boot clients need to fetch assets and menus.
+- Restrict `3443/TCP` to administrators, or place it behind a reverse proxy.
 - Basic authentication is disabled unless **both** `WEBAPP_USER` and `WEBAPP_PASS` are set. For a protected deployment, add both environment variables to the container in the manifest before deploying. Treat the manifest and its secret values as sensitive.
 
 ### Kubernetes deployment
 
 The chart renders either a bare `Pod` or a `Deployment` depending on `deployAs`:
 
-- `deployAs: Pod` (default) — for `podman play kube`; binds host ports `8080`, `8443`, `3443`, `69/udp` and uses the podman `emptyDir.path` extension so data survives `--replace`.
+- `deployAs: Pod` (default) — for `podman play kube`; binds host ports `8443`, `3443`, `69/udp` and uses the podman `emptyDir.path` extension so data survives `--replace`.
 - `deployAs: Deployment` — for a real cluster; `replicas: 1` (set `replicas` as needed), no host ports, and plain `emptyDir` volumes (swap in `hostPath` or a PVC if config/assets/logs must persist). Expose the service with a `Service`/`Ingress`. The libvirt socket mount remains opt-in via `libvirt.enabled` and only works on the node that owns `/var/run/libvirt/libvirt-sock`.
 
 ### Release artifacts

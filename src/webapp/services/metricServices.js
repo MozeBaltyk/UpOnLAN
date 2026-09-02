@@ -3,7 +3,13 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const { getLocalNginx } = require('./utilServices');
+
+// The /status stub_status endpoint is loopback-only and served over the
+// self-signed (or operator) TLS cert. Skip verification for that local scrape
+// rather than shipping the CA into the app's trust store.
+const LOOPBACK_AGENT = new https.Agent({ rejectUnauthorized: false });
 
 // Nginx Metrics Collection
 let previous = null;
@@ -46,7 +52,7 @@ function computeNginxDeltas(previousSample, sample) {
 async function collectNginxMetrics() {
   try {
     const nginxurl = getLocalNginx();
-    const { data } = await axios.get(nginxurl + '/status');
+    const { data } = await axios.get(nginxurl + '/status', { httpsAgent: LOOPBACK_AGENT });
     const lines = data.trim().split('\n');
     const active = parseInt(lines[0].split(':')[1].trim(), 10);
     const [accepts, handled, requests] = lines[2].trim().split(/\s+/).map(Number);

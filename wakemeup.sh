@@ -41,7 +41,7 @@ show_context() {
     echo -e "  ${C_BOLD}image:${C_RESET}    ${UPONLAN_IMAGE_REPO}:${UPONLAN_IMAGE_TAG} (${UPONLAN_PULL_POLICY})"
     echo -e "  ${C_BOLD}endpoint:${C_RESET} ${ENDPOINT_URL}"
     echo -e "  ${C_BOLD}menu:${C_RESET}     ${MENU_VERSION:-latest}"
-    echo -e "  ${C_BOLD}ports:${C_RESET}    8080/tcp 69/udp"
+    echo -e "  ${C_BOLD}ports:${C_RESET}    69/udp"
     echo -e "  ${C_BOLD}tls:${C_RESET}      8443/tcp (assets) 3443/tcp (webapp) — mounted cert or self-signed fallback"
     echo -e "  ${C_BOLD}libvirt:${C_RESET}  /var/run/libvirt/libvirt-sock"
     for v in asset_target IPXE_VERSION PXE_ROM_PATH; do
@@ -65,7 +65,7 @@ preflight() {
     local fail=0
     command -v podman >/dev/null || { echo -e "${C_RED}ERROR: 'podman' not found.${C_RESET}" >&2; fail=1; }
     command -v helm   >/dev/null || { echo -e "${C_RED}ERROR: 'helm' not found (needed to render the chart).${C_RESET}" >&2; fail=1; }
-    for pair in "8080 tcp" "8443 tcp" "3443 tcp" "69 udp"; do
+    for pair in "8443 tcp" "3443 tcp" "69 udp"; do
         set -- $pair
         if port_in_use "$1" "$2"; then
             echo -e "${C_YELLOW}WARN: port $1/$2 in use — uponlan may already be deployed (deploy will replace it).${C_RESET}" >&2

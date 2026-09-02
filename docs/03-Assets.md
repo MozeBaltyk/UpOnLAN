@@ -82,9 +82,9 @@ iPXE menu (.ipxe)                      endpoint catalog (endpoints.yml)
 ```
 
 1. **`endpoints.yml`** declares a boot bundle: a `path` plus the `files` served under it (kernel, initrd, rootfs, checksums...). Its `path` is relative to the *asset origin*: `/assets/<key>/` for the local mirror, `/releases/download/<key>/` for GitHub release assets. `direct_file` entries also carry `build_type: direct_file` and `sources` (the vendor URLs, aligned with `files`); `iso_extraction` entries carry `build_type: iso_extraction` with no per-file vendor source.
-2. **The Assets tab** resolves each *Pull Selected* (`dlremote`) path: a `direct_file` entry downloads from its vendor `sources[index]` URL, an `iso_extraction` entry downloads from the configured origin (`origin + path`). Files land under `/assets/<key>/`, and nginx serves `/assets` as its web root, so every imported file is reachable at `<boot host>:${NGINX_PORT}/<key>/<file>`.
+2. **The Assets tab** resolves each *Pull Selected* (`dlremote`) path: a `direct_file` entry downloads from its vendor `sources[index]` URL, an `iso_extraction` entry downloads from the configured origin (`origin + path`). Files land under `/assets/<key>/`, and nginx serves `/assets` as its web root over HTTPS, so every imported file is reachable at `https://<boot host>:8443/<key>/<file>`.
 3. **The iPXE menu** points `kernel` / `initrd` / rootfs at exactly those URLs, via the variables defined in `release/menus/boot.cfg`:
-   - `${local_endpoint}` — the local nginx origin for **`direct_file`** assets, default `http://192.168.7.1:8080/` (trailing slash included), overridable in `release/menus/local-vars.ipxe`.
+   - `${local_endpoint}` — the local nginx origin for **`direct_file`** assets, default `https://192.168.7.1:8443/` (trailing slash included), overridable in `release/menus/local-vars.ipxe`.
    - `${mirror_endpoint}` / `${asset_path}` — the GitHub origin for **`iso_extraction`** assets. Defaults to `https://github.com/MozeBaltyk/UpOnLAN` + `/releases/download/`.
 
 The full boot URL is `${local_endpoint}<key>/<file>` for `direct_file` (nginx maps `<key>/<file>` to `/assets/<key>/<file>`), and `${mirror_endpoint}${asset_path}<key>/<file>` for `iso_extraction`.

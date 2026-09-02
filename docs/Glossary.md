@@ -90,4 +90,4 @@ Quick reference for the terms used across the docs. Grouped by theme; each entry
 ## Networking / misc
 
 - **Wake-on-LAN (WOL)** — sending a magic packet to power on a machine by MAC address.
-- **Ports** — `69/UDP` TFTP, `67-68/UDP` DHCP, `80/443 TCP` HTTP(S), `8080`/`3000` the UpOnLAN asset/www listeners.
+- **Ports** — `69/UDP` TFTP, `67-68/UDP` DHCP, `8443/TCP` asset HTTPS, `3443/TCP` webapp HTTPS.

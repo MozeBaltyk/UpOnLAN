@@ -20,7 +20,7 @@
 - **`--build`** — builds `localhost/uponlan:latest` and deploys it against GitHub assets (local development).
 - **`--local`** — builds locally and serves `release/output` on `:8899`; requires `release/output/assets/endpoints.yml` and `release/output/menu/0.1.0/menus.tar.gz` (build them with `./wakemeup.sh -a mirror-assets` + `./scripts/release_menu.sh 0.1.0`); pins `MENU_VERSION` from `release/menus/version.ipxe`.
 
-`./wakemeup.sh -a preview` prints the resolved context (image / endpoint / menu version / ports) and runs preflight checks — host ports free, `podman` + `helm` present, and the libvirt socket — without deploying anything. `deploy` runs the same checks and aborts on a hard failure (missing `podman`/`helm`); a port already in use only warns, since `deploy` is idempotent (`--replace` recreates the running pod). The ghcr image is public, so no registry login is required.
+`./wakemeup.sh -a preview` prints the resolved context (image / endpoint / menu version / ports) and runs preflight checks — host ports free, `podman` + `helm` present, and the libvirt socket — without deploying anything. `deploy` runs the same checks and aborts on a hard failure (missing `podman`/`helm`); a port already in use only warns, since `deploy` is idempotent (`--replace` recreates the running pod). The ghcr image is public, so no registry login is required (for a private fork, `podman login ghcr.io` first).
 
 ### Security and network exposure
 
@@ -89,7 +89,7 @@ Two conventions keep the decoupled releases from colliding:
 1. **Asset releases are `--prerelease`.** GitHub's `releases/latest` (used by `init.sh` to resolve `MENU_VERSION` and by the dashboard's *remote menu version*) skips prereleases, so it stays pinned to the menu release even after asset bundles are published.
 2. **Menu versions are bare semver.** `fetchDevReleases` filters the release list to `^v?\d+\.\d+\.\d+$`, so asset tags never surface as "menu versions" in the endpoint browser.
 
-A deployment pointed at `ENDPOINT_URL=https://github.com/mozebaltyk/uponlan` fetches the menu tarball from `${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz` and the asset catalog from `${ENDPOINT_URL}/releases/download/assets/endpoints.yml` (`init.sh` switches on whether the endpoint is a GitHub URL — `releases/download/` for GitHub, `menu/` + `assets/` for a local mirror).
+The repository endpoint is declarable via the `ENDPOINT_URL` environment variable (default `https://github.com/mozebaltyk/uponlan`); it is surfaced to the webapp as `menu.origin` and drives menu + asset resolution. A deployment pointed at a GitHub repo fetches the menu tarball from `${ENDPOINT_URL}/releases/download/${MENU_VERSION}/menus.tar.gz` and the asset catalog from `${ENDPOINT_URL}/releases/download/assets/endpoints.yml` (`init.sh` switches on whether the endpoint is a GitHub URL — `releases/download/` for GitHub, `menu/` + `assets/` for a local mirror).
 
 The full CI setup — test pipeline plus the three release workflows and their conventions — is documented in [CI pipelines](UpOnLAN.xyz/04-CI.md).
 

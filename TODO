@@ -38,6 +38,6 @@ Ordered by priority. All remaining phases land on the `dev` branch, merged to `m
 
 ## Phase 5 — Polish → `dev`
 
-- [ ] **Prose brand sweep** — "UpOnLAN" → "UpOnLAN.xyz" in body text (titles/folder already done).
-- [ ] **Repository endpoint setable** - make the repo url possible to declare (default github). 
-- [ ] **Docs** — ghcr login note + any remaining release/deploy gaps.
+- [x] **Prose brand sweep** — "UpOnLAN" → "UpOnLAN.xyz" in body text (URLs, `uponlan`, package name, and auth realm left unchanged).
+- [x] **Repository endpoint setable** — documented `ENDPOINT_URL` (default `https://github.com/mozebaltyk/uponlan`) as the declarable repo endpoint (`menu.origin`).
+- [x] **Docs** — ghcr private-fork login note; documented HTTPS-only boot + `inst.noverifyssl` for self-signed install sources.

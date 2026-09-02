@@ -1,4 +1,4 @@
-## Assets in UpOnLAN
+## Assets in UpOnLAN.xyz
 
 iPXE gives you a menu, but the menu itself only defines where to boot from. At some point, you need to redirect the client to an actual bootable payload. This could be a public mirror on the Internet, or (in many cases) you'll want to host and serve these assets locally.
 
@@ -19,9 +19,9 @@ The general flow is:
 
 ---
 
-## 🚧 Why UpOnLAN Helps
+## 🚧 Why UpOnLAN.xyz Helps
 
-One of the key problems UpOnLAN solves is **making these three components available locally**, even when:
+One of the key problems UpOnLAN.xyz solves is **making these three components available locally**, even when:
 
 - The original vendor doesn’t provide stable HTTPS downloads.
 - The initramfs cannot verify HTTPS endpoints (due to missing CA certificates).
@@ -41,7 +41,7 @@ This allows you to fully control and serve all necessary assets locally, ensurin
 
 ## 🌍 Why re-host assets instead of pointing at the vendor
 
-UpOnLAN mirrors boot files for the same reason [netboot.xyz](https://netboot.xyz) does — captured in one line by netboot.xyz's `asset-mirror` repo: *"mirror for assets we are unable to reliably consume with iPXE."*
+UpOnLAN.xyz mirrors boot files for the same reason [netboot.xyz](https://netboot.xyz) does — captured in one line by netboot.xyz's `asset-mirror` repo: *"mirror for assets we are unable to reliably consume with iPXE."*
 
 - **Vendors publish ISOs, not iPXE-ready components.** iPXE needs a small kernel + initramfs (+ optional rootfs) it can fetch over HTTPS. Most vendors — Oracle and the whole RHEL-family included — only publish a full DVD ISO; the kernel/initrd inside are never extracted and offered as standalone downloads.
 - **iPXE doesn't boot ISOs directly.** A multi-gigabyte ISO can't be pulled into memory by a bootloader; you have to extract the small pieces and chain them.
@@ -60,7 +60,7 @@ There are two `BUILD_TYPE`s in `release/assets/`, and they now take **different 
 
 > ⚠️ **GitHub release-asset cap — 2 GB.** Release assets are limited to 2 GB. An `iso_extraction` recipe must delete the downloaded DVD after extracting it (`release/assets/build.sh` does this) — that is what made Oracle's ~10 GB image fail. The `proxmox.iso` fetched by `direct_file` works only while it stays under 2 GB, so watch it as Proxmox releases grow.
 
-netboot.xyz hosts its extracted files in `netbootxyz/asset-mirror` and documents the whole pipeline in `netbootxyz/build-pipelines` (a thorough write-up of the why and how: the 2 GB release-asset limit, the 302→S3 redirect, and the per-distro initrd patches for casper/live-boot/miso/dracut). UpOnLAN applies the same pattern locally through `release/assets/<os>/setting.sh` and `scripts/release_assets.sh`.
+netboot.xyz hosts its extracted files in `netbootxyz/asset-mirror` and documents the whole pipeline in `netbootxyz/build-pipelines` (a thorough write-up of the why and how: the 2 GB release-asset limit, the 302→S3 redirect, and the per-distro initrd patches for casper/live-boot/miso/dracut). UpOnLAN.xyz applies the same pattern locally through `release/assets/<os>/setting.sh` and `scripts/release_assets.sh`.
 
 ---
 
@@ -107,7 +107,7 @@ The consequence: **the `<key>` and file names in a menu must match an endpoint's
 
 ## ☁️ Provisioning profiles (Kickstart + cloud-init) as assets
 
-UpOnLAN manages two kinds of *provisioning* alongside boot assets, and the iPXE menu drives each with a different kernel parameter:
+UpOnLAN.xyz manages two kinds of *provisioning* alongside boot assets, and the iPXE menu drives each with a different kernel parameter:
 
 | Profile | Guest consumes it | Kernel param (menu) | Files |
 | --- | --- | --- | --- |
@@ -139,7 +139,7 @@ initrd ${url}initrd
 
 So a cloud-init seed is a `direct_file` asset whose `files` are `user-data` + `meta-data` instead of `vmlinuz`/`initrd`; its only real difference is that the guest consumes it mid-boot rather than as a menu entry — the "category" to surface in the Assets tab.
 
-Today UpOnLAN publishes provisioning files under `/assets/provisioning/...` in two ways:
+Today UpOnLAN.xyz publishes provisioning files under `/assets/provisioning/...` in two ways:
 
 - **Shipped examples** live in `release/provisioning/` and are bundled into `menus.tar.gz` (under `provisioning/`) by `scripts/release_menu.sh`; `init.sh` moves them out of the menu tree into `/assets/provisioning/...` at boot.
 - **Local edits** live in `/config/provisioning/local/...`; saving from the **Menus** page republishes the file to `/assets/provisioning/...` immediately.

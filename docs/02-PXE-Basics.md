@@ -16,7 +16,7 @@ TFTP server -- iPXE boot program --> client
 ### Components
 
 - **Firmware:** the BIOS or UEFI network-boot code that begins the PXE request.
-- **DHCP:** assigns network settings and identifies the boot target. It is external to UpOnLAN.
+- **DHCP:** assigns network settings and identifies the boot target. It is external to UpOnLAN.xyz.
 - **TFTP:** transfers the small initial iPXE boot program.
 - **iPXE:** the downloaded boot program; it loads the menu and later content over HTTPS.
 - **Boot menu:** iPXE instructions that present choices and chain to an operating-system installer or tool.
@@ -25,9 +25,9 @@ TFTP server -- iPXE boot program --> client
 
 > The menu is a *script*, not an executable — it only renders after an iPXE binary is running and fetches it. See [ROM Build](iPXE/03-ROM-Build.md) for why a libvirt VM must load an iPXE binary (`CONSOLE_SERIAL`) over OVMF's network stack before it can show the menu on the serial console.
 
-### UpOnLAN's boundary
+### UpOnLAN.xyz's boundary
 
-UpOnLAN manages and builds menus, serves TFTP/iPXE and HTTPS menus/assets, mirrors assets, and provides Wake-on-LAN and a web interface. It does not provide or configure DHCP, and it does not make a network boot target trustworthy by itself.
+UpOnLAN.xyz manages and builds menus, serves TFTP/iPXE and HTTPS menus/assets, mirrors assets, and provides Wake-on-LAN and a web interface. It does not provide or configure DHCP, and it does not make a network boot target trustworthy by itself.
 
 ### Firmware compatibility
 

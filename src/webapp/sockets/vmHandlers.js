@@ -15,7 +15,7 @@ const VM_NETWORK = process.env.VM_NETWORK || 'uponlan';
 // server's own address.
 const BOOT_SERVER_IP = process.env.BOOT_SERVER_IP || '';
 // Dedicated storage pool for the test VM's disks — created on demand, removed
-// with the VM, so UpOnLAN never touches the host's other pools.
+// with the VM, so UpOnLAN.xyz never touches the host's other pools.
 const VM_STORAGE_POOL = process.env.VM_STORAGE_POOL || 'uponlan';
 const VM_STORAGE_POOL_PATH = process.env.VM_STORAGE_POOL_PATH || '/var/lib/libvirt/images/uponlan';
 // Default sizing for the diskless PXE test VM (the UI overrides per-create).

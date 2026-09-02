@@ -22,14 +22,14 @@ This is more of a roadmap or wish list than a finalized feature set — but it s
 - [x] Support custom endpoint URLs
 - [x] Web app displays logs and live metrics
 - [x] Test **PXE boot** with a KVM VM via the web console (UEFI/OVMF, serial console)
-- [x] Display iPXE and UpOnLAN documentation in the web app
+- [x] Display iPXE and UpOnLAN.xyz documentation in the web app
 - [x] Build 🔄 serial-enabled iPXE ROMs and boot media (`scripts/build_ipxe_roms.sh`)
 - [x] Automated test suite: webapp Vitest (unit / integration / e2e / smoke) + release specs (`tests/specs`)
 - [x] Release menus, assets, and container images (`.github/workflows/{image,release,assets}.yml`)
 - [x] List **Cloud-init** assets 📝 (with a "category" column)
-- [x] Provide a fully local UpOnLAN menu (endpoint-layout assets for every entry):
+- [x] Provide a fully local UpOnLAN.xyz menu (endpoint-layout assets for every entry):
   - [x] Harvester, Talos Linux, Proxmox (PBS/PMG/VE), Ubuntu (subiquity), Rocky Linux (8/9)
-- [x] Build and publish 🔁 UpOnLAN container images via CI pipeline (`ghcr.io/mozebaltyk/uponlan`)
+- [x] Build and publish 🔁 UpOnLAN.xyz container images via CI pipeline (`ghcr.io/mozebaltyk/uponlan`)
 - [x] Provide a 🌐 **Wake-On-LAN** service with web GUI:
   - [x] Add/delete entries
   - [x] Send WOL signals

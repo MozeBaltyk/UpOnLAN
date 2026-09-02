@@ -1,12 +1,12 @@
 ## Code Architecture & Design
 
-This documentation act as a PRD (Product Requirements Document) describing the technical design, user-facing behavior, and development guidelines for the **UpOnLAN Web Application**, which provides an interface for managing iPXE boot menus, assets, and system builds.
+This documentation act as a PRD (Product Requirements Document) describing the technical design, user-facing behavior, and development guidelines for the **UpOnLAN.xyz Web Application**, which provides an interface for managing iPXE boot menus, assets, and system builds.
 
 ---
 
 #### 🖥️ Functional Overview
 
-The **UpOnLAN WebApp** allows users to:
+The **UpOnLAN.xyz WebApp** allows users to:
 
 ✅ Manage PXE boot menus with layered local/remote configuration
 
@@ -51,7 +51,7 @@ tree -L 2
 ├── Containerfile     # Build UpOnLAN.xyz image
 ├── docs              # Markdown docs displayed in the webapp
 ├── manifests         # K8s manifests to deploy with podman kube play or on K8s platform.
-├── release           # Default menus (menus/) and asset recipes (assets/) shipped with UpOnLAN
+├── release           # Default menus (menus/) and asset recipes (assets/) shipped with UpOnLAN.xyz
 ├── scripts           # Release/build scripts: iPXE ROMs, asset mirror, menu tarball
 ├── src
 │   ├── defaults      # Default config used by init.sh during deployment

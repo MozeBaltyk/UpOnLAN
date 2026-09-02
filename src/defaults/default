@@ -1,4 +1,4 @@
-# Single HTTPS site — written by init.sh. UpOnLAN serves assets and the webapp
+# Single HTTPS site — written by init.sh. UpOnLAN.xyz serves assets and the webapp
 # over TLS only; there is no plain-HTTP listener. iPXE boot clients fetch
 # kernel/initrd over HTTPS via ${local_endpoint} (https://<host>:8443/), so the
 # ROMs must embed this deployment's cert/CA as trust (see TRUST= in

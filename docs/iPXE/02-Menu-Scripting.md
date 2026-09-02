@@ -67,7 +67,7 @@ initrd http://${SERVER}/boot/ubuntu/initrd.img
 boot
 ```
 
-> ⚠️ **Default pattern: `kernel …` + `initrd …` + `boot`.** UpOnLAN removed two legacy netboot.xyz conventions that break on this repo's pinned stock iPXE build:
+> ⚠️ **Default pattern: `kernel …` + `initrd …` + `boot`.** UpOnLAN.xyz removed two legacy netboot.xyz conventions that break on this repo's pinned stock iPXE build:
 > - **`md5sum` / `MD5sums`** — not a stock iPXE command; it printed `command not found` and did nothing. Do not add it back.
 > - **`initrd=initrd.magic`** — on this repo's pinned iPXE `1.21.1` build it is treated as a *file to fetch* and fails with `Failed to open file: initrd.magic`. Do not use it here.
 
@@ -84,6 +84,18 @@ boot
 - `initrd=initrd.img` → Linux kernel argument
 - `initrd --name initrd.img ...` → iPXE image name for the downloaded initrd
 - `initrd.magic` → **not** valid for this repo's current pinned build
+
+### HTTPS install sources and `inst.noverifyssl`
+
+Boot assets (kernel/initrd) and the menu are served over **HTTPS only**, and the endpoint terminates TLS with a **self-signed cert** by default. iPXE is fine with that once the boot ROM embeds the deployment cert ([Deployment](UpOnLAN.xyz/02-Deployment.md)), but an **Anaconda-based installer** (Rocky/RHEL) runs its own HTTPS client when it fetches the Kickstart or a local package repo — and it has no trust path to that self-signed cert.
+
+If `inst.ks=` (or a local `inst.repo=`) points at the self-signed endpoint, add `inst.noverifyssl` so Anaconda skips cert verification for those install sources (scoped to the installer's own fetches, not the whole menu):
+
+```ipxe
+kernel ${url}vmlinuz initrd=initrd.img inst.repo=${repo} inst.ks=${kickstart_url} inst.noverifyssl ...
+```
+
+Drop `inst.noverifyssl` once the endpoint uses a cert the installer already trusts (a real cert, or an internal CA you distribute to clients). The shipped Rocky menu already adds it on its two Kickstart paths.
 
 ## 🔗 Chain iPXE scripts
 

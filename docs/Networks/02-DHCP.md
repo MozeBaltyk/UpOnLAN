@@ -35,7 +35,7 @@ dhcp-boot=undionly.0,192.168.122.1
 | `tftp-root` | Where the iPXE binaries live (see [iPXE Quick Start](iPXE/01-Quick-Start.md)) |
 | `dhcp-boot=undionly.0,192.168.122.1` | `filename` + `next-server` in one line |
 
-Once iPXE is loaded it fetches the menu over HTTP(S) from the UpOnLAN webapp (step 3️⃣).
+Once iPXE is loaded it fetches the menu over HTTP(S) from the UpOnLAN.xyz webapp (step 3️⃣).
 
 ---
 
@@ -43,13 +43,13 @@ Once iPXE is loaded it fetches the menu over HTTP(S) from the UpOnLAN webapp (st
 
 TFTP is bound to UDP port **69** — only one TFTP server can run on a given host/interface at a time.
 
-> If you tested a local KVM dnsmasq TFTP config and left it running, it will conflict with the UpOnLAN webapp container, which also listens on port 69. Stop the local dnsmasq TFTP before deploying UpOnLAN.
+> If you tested a local KVM dnsmasq TFTP config and left it running, it will conflict with the UpOnLAN.xyz webapp container, which also listens on port 69. Stop the local dnsmasq TFTP before deploying UpOnLAN.xyz.
 
 ---
 
 ## 🧭 ProxyDHCP
 
-iPXE supports **ProxyDHCP**: the existing corporate DHCP keeps handing out IPs as usual, and a second DHCP server only advertises the boot file (`dhcp-boot` / options 66-67) without answering the address request (`dhcp-range` omitted). Clients get an IP from the main server and the PXE pointer from the proxy. This is how UpOnLAN can provide boot files on a network whose DHCP is not controlled by you.
+iPXE supports **ProxyDHCP**: the existing corporate DHCP keeps handing out IPs as usual, and a second DHCP server only advertises the boot file (`dhcp-boot` / options 66-67) without answering the address request (`dhcp-range` omitted). Clients get an IP from the main server and the PXE pointer from the proxy. This is how UpOnLAN.xyz can provide boot files on a network whose DHCP is not controlled by you.
 
 ```bash
 # dnsmasq as a *proxy* DHCP: no dhcp-range → no address is leased

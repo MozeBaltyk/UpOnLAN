@@ -5,7 +5,7 @@ Quick reference for the terms used across the docs. Grouped by theme; each entry
 ## Boot fundamentals
 
 - **PXE** — *Preboot eXecution Environment*. A standard (Intel, 1999) that lets a NIC fetch a boot program over the network using **DHCP** (to get an address + the boot-file pointer) then **TFTP** (to fetch it). The original, limited predecessor to iPXE.
-- **iPXE** — an open-source bootloader that extends PXE. It can boot over HTTP(S), run iPXE **scripts**, and chain to a menu. The interpreter UpOnLAN's whole menu depends on.
+- **iPXE** — an open-source bootloader that extends PXE. It can boot over HTTP(S), run iPXE **scripts**, and chain to a menu. The interpreter UpOnLAN.xyz's whole menu depends on.
 - **TFTP** — *Trivial File Transfer Protocol* (UDP/69). Delivers the initial boot binary; iPXE then switches to HTTP for speed.
 - **DHCP** — *Dynamic Host Configuration Protocol* (UDP 67/68). Hands the client an IP and, for PXE, the boot file to load.
 - **next-server / filename** — DHCP options 66/67: the TFTP server address and the boot-file path a PXE client should fetch.
@@ -37,7 +37,7 @@ Quick reference for the terms used across the docs. Grouped by theme; each entry
 - **kernel / initrd / boot** — iPXE commands to load a kernel + initrd and boot them.
 - **ipparam / cmdline** — extra kernel command-line parameters appended to a boot.
 
-## UpOnLAN asset model
+## UpOnLAN.xyz asset model
 
 - **endpoint** — one entry in `endpoints.yml`: a `<key>`, a `path`, and the `files` served under it — a bootable bundle's contract.
 - **endpoints.yml** — the catalog the webapp/`init.sh` reads to know which asset bundles exist and where.
@@ -50,7 +50,7 @@ Quick reference for the terms used across the docs. Grouped by theme; each entry
 - **mirror-assets** — the `wakemeup.sh` action that runs `release_assets.sh` to build `release/output/assets/`.
 - **local-vars.ipxe** — a per-deployment override of `mirror_endpoint`/`asset_path`; never baked into a release tarball.
 - **release/output** — the local build output (`menu/` + `assets/`), the source for `deploy --local`.
-- **GHCR** — *GitHub Container Registry*, where the UpOnLAN container image is published (`ghcr.io/…/uponlan`).
+- **GHCR** — *GitHub Container Registry*, where the UpOnLAN.xyz container image is published (`ghcr.io/…/uponlan`).
 
 ## Deployment
 
@@ -80,12 +80,12 @@ Quick reference for the terms used across the docs. Grouped by theme; each entry
 - **Anaconda** — the RHEL/Rocky/Fedora family installer; driven by `inst.repo` and a stage-2 `install.img`.
 - **Kickstart (`ks.cfg`)** — an Anaconda automation file that answers install-time questions (partitioning, packages, users); fetched via `inst.ks=<url>`.
 - **ksvalidator** — `pykickstart`'s syntax checker for `ks.cfg`; backs the webapp's Kickstart Validate action.
-- **inst.repo=** — an Anaconda kernel argument pointing at the package repository (kept vendor-direct in UpOnLAN menus).
+- **inst.repo=** — an Anaconda kernel argument pointing at the package repository (kept vendor-direct in UpOnLAN.xyz menus).
 - **dracut** — the initramfs framework behind the RHEL/Rocky family's early boot.
 - **Casper** — Ubuntu's live-system boot hook.
 - **debian-installer (d-i)** — the classic Debian/Ubuntu installer.
-- **subiquity** — Ubuntu's newer server installer (used by the UpOnLAN `ubuntu.ipxe` entry); driven by `autoinstall` / NoCloud.
-- **provisioning profile** — a Kickstart file or cloud-init seed the UpOnLAN menus build follows; edited in Menus, served under `/assets/provisioning/`.
+- **subiquity** — Ubuntu's newer server installer (used by the UpOnLAN.xyz `ubuntu.ipxe` entry); driven by `autoinstall` / NoCloud.
+- **provisioning profile** — a Kickstart file or cloud-init seed the UpOnLAN.xyz menus build follows; edited in Menus, served under `/assets/provisioning/`.
 
 ## Networking / misc
 

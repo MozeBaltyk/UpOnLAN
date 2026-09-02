@@ -10,7 +10,7 @@ This web app aims to:
 - Author Kickstart and cloud-init provisioning profiles with built-in validation
 - Serve menus, assets, and the webapp over HTTPS (self-signed fallback cert, or mount your own)
 - Manage Wake-on-LAN hosts with live status/IP and a wake scheduler
-- Documentation about iPXE and UpOnLAN
+- Documentation about iPXE and UpOnLAN.xyz
 - Provide logs and live system metrics (TFTP, usage, boot activity, etc.)
 - Mirror menus and assets for local testing (`release/output` → `menu/` + `assets/`)
 - Create and manage a diskless KVM test VM (UEFI/OVMF) with CPU/RAM sizing, optional disk, a graphical console toggle, and an interactive serial console
@@ -18,9 +18,9 @@ This web app aims to:
 
 ---
 
-## 🔀 UpOnLAN vs netboot.xyz
+## 🔀 UpOnLAN.xyz vs netboot.xyz
 
-UpOnLAN started as a **cold fork of [netboot.xyz](https://netboot.xyz)** — it keeps the iPXE-menu concept but is a different kind of tool.
+UpOnLAN.xyz started as a **cold fork of [netboot.xyz](https://netboot.xyz)** — it keeps the iPXE-menu concept but is a different kind of tool.
 
 | | **netboot.xyz** | **UpOnLAN.xyz** |
 | --- | --- | --- |

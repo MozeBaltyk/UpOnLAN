@@ -4,7 +4,7 @@
 
 - Podman, with permission to run the `sudo podman` commands used below.
 - Available host ports `8443/TCP` (asset HTTPS), `3443/TCP` (webapp HTTPS), and `69/UDP` (TFTP). A KVM/virt-manager VM is optional for PXE testing.
-- DHCP already configured by your network administrator to give PXE clients an address and the correct boot file. UpOnLAN does **not** configure DHCP; do not invent or run DHCP commands from this guide.
+- DHCP already configured by your network administrator to give PXE clients an address and the correct boot file. UpOnLAN.xyz does **not** configure DHCP; do not invent or run DHCP commands from this guide.
 
 ### First run
 
@@ -26,7 +26,7 @@ sudo podman pod ps
 ./wakemeup.sh -a logs
 ```
 
-Expect an UpOnLAN pod/container in the first command and container logs in the second. For a PXE client, a successful boot reaches TFTP for iPXE and then retrieves its menu/assets over HTTPS; use a test VM only after DHCP points it at the appropriate boot file.
+Expect an UpOnLAN.xyz pod/container in the first command and container logs in the second. For a PXE client, a successful boot reaches TFTP for iPXE and then retrieves its menu/assets over HTTPS; use a test VM only after DHCP points it at the appropriate boot file.
 
 ### Safe next steps
 

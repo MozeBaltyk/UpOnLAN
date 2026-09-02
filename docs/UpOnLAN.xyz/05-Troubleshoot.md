@@ -1,4 +1,4 @@
-## 🔧 Troubleshooting UpOnLAN
+## 🔧 Troubleshooting UpOnLAN.xyz
 
 Quick checks and fixes for the most common problems. All container operations go through `./wakemeup.sh`.
 
@@ -10,7 +10,7 @@ Quick checks and fixes for the most common problems. All container operations go
 2. Still down → `./wakemeup.sh -a logs` and look for a crash on startup.
 3. Restart with `./wakemeup.sh -a redeploy` (rebuilds and re-creates the container).
 
-**Ports used by UpOnLAN** — check nothing else occupies them:
+**Ports used by UpOnLAN.xyz** — check nothing else occupies them:
 
 | Port | Service |
 |------|---------|
@@ -37,8 +37,8 @@ The webapp **Monitor** tab tails Nginx, TFTP and webapp activity in real time �
 
 If iPXE shows `0216eb8f` / `No usable certificates` while fetching `https://<boot-host>:8443/...`, do **not** read that as an HTTP permission problem. It means TLS validation failed in iPXE. The most common local cause is a **stale guest session after redeploy**:
 
-- UpOnLAN generated or changed `/config/tls/server.crt`
-- UpOnLAN rebuilt trusted iPXE ROMs
+- UpOnLAN.xyz generated or changed `/config/tls/server.crt`
+- UpOnLAN.xyz rebuilt trusted iPXE ROMs
 - the VM was already running or booted before that change
 
 Fix: restart or recreate the VM so it reloads the current trusted ROM and guest clock state.

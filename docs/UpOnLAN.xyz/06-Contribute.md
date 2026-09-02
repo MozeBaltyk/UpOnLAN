@@ -26,14 +26,14 @@ This is more of a roadmap or wish list than a finalized feature set — but it s
 - [x] Build 🔄 serial-enabled iPXE ROMs and boot media (`scripts/build_ipxe_roms.sh`)
 - [x] Automated test suite: webapp Vitest (unit / integration / e2e / smoke) + release specs (`tests/specs`)
 - [x] Release menus, assets, and container images (`.github/workflows/{image,release,assets}.yml`)
-- [ ] List **Cloud-init** assets 📝 (with a "category" column)
+- [x] List **Cloud-init** assets 📝 (with a "category" column)
 - [x] Provide a fully local UpOnLAN menu (endpoint-layout assets for every entry):
   - [x] Harvester, Talos Linux, Proxmox (PBS/PMG/VE), Ubuntu (subiquity), Rocky Linux (8/9)
 - [x] Build and publish 🔁 UpOnLAN container images via CI pipeline (`ghcr.io/mozebaltyk/uponlan`)
 - [x] Provide a 🌐 **Wake-On-LAN** service with web GUI:
   - [x] Add/delete entries
   - [x] Send WOL signals
-  - [ ] 🕵️ Display status/IP of hosts
-  - [ ] 🗓️ Add a scheduler
+  - [x] 🕵️ Display status/IP of hosts
+  - [x] 🗓️ Add a scheduler
 
 ---

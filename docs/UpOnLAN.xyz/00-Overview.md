@@ -7,7 +7,10 @@ With UpOnLAN.xyz I want an all-in-one solution to developp iPXE menu. A tools to
 This web app aims to:
 - Serve a PXE menu via iPXE with real-time edits
 - Serve Assets during PXE install
-- Documentation about iPXE and UpOnLAN 
+- Author Kickstart and cloud-init provisioning profiles with built-in validation
+- Serve menus, assets, and the webapp over HTTPS (self-signed fallback cert, or mount your own)
+- Manage Wake-on-LAN hosts with live status/IP and a wake scheduler
+- Documentation about iPXE and UpOnLAN
 - Provide logs and live system metrics (TFTP, usage, boot activity, etc.)
 - Mirror menus and assets for local testing (`release/output` → `menu/` + `assets/`)
 - Create and manage a diskless KVM test VM with an interactive serial console (BIOS/UEFI)

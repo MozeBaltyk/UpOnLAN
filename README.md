@@ -12,16 +12,17 @@ This webapp aims to:
 - Serve the PXE menu with real-time edits and local overrides
 - Serve install assets during PXE boot
 - Author Kickstart (`ks.cfg`) and cloud-init (`user-data`/`meta-data`) provisioning profiles, with a distro/version field and built-in syntax validation
-- Manage Wake-on-LAN entries
+- Serve menus, assets, and the webapp over **HTTPS** (self-signed fallback cert generated on first boot, or mount your own)
+- Manage Wake-on-LAN entries with live status/IP and a wake scheduler
 - Show logs and live metrics
 - Provide built-in docs for iPXE and UpOnLAN
 - Support local testing/mirroring of releases and assets
 - Create and manage a diskless KVM test VM with an interactive serial console (BIOS/UEFI)
-- Build serial-enabled iPXE ROMs and boot media
+- Build serial-enabled iPXE ROMs and boot media (offline, in the container — no external toolchain needed)
 
 ## Documentation goals
 
-The documentation covers both **using and operating UpOnLAN** and the **PXE/iPXE knowledge needed to deploy it safely**. Start with [Getting Started](docs/01-Getting-Started.md), then [PXE Basics](docs/02-PXE-Basics.md) to understand the DHCP, TFTP, iPXE, HTTP, firmware, and asset flow. The remaining guides explain UpOnLAN menu editing, ROM builds, deployment, operations, and troubleshooting.
+The documentation covers both **using and operating UpOnLAN** and the **PXE/iPXE knowledge needed to deploy it safely**. Start with [Getting Started](docs/01-Getting-Started.md), then [PXE Basics](docs/02-PXE-Basics.md) to understand the DHCP, TFTP, iPXE, HTTPS, firmware, and asset flow. The remaining guides explain UpOnLAN menu editing, ROM builds, deployment, operations, and troubleshooting.
 
 UpOnLAN serves the boot environment; it does not configure DHCP. Network-boot setup therefore requires coordinating the documented UpOnLAN service with your network's DHCP configuration and testing the correct BIOS or UEFI boot target.
 
@@ -97,4 +98,4 @@ See [Deployment](docs/UpOnLAN.xyz/02-Deployment.md) for remote and local deploym
 
 Editing a served iPXE menu does not normally require a new ROM: an existing iPXE boot binary can chain to the menu. Build when the boot binary itself must embed UpOnLAN's wrapper or start a custom default boot flow, or when you need boot media for a machine that cannot use the existing network-boot path.
 
-In the webapp, open **Menus**, expand **ROM Files**, then select **Build**. Choose the required firmware/media options, provide the site name, boot domain, and boot version, then select **Run**. The existing playbook builds the selected custom iPXE binaries and, when selected, hybrid ISO or USB image media; generated files appear in the ROM Files list. See [ROM Build](docs/iPXE/03-ROM-Build.md) for firmware and media selection guidance.
+In the webapp, open **Menus**, expand **ROM Files**, then select **Build**. Choose the required firmware/media options (Legacy, EFI, ISO, USB) and select **Run**. `scripts/build_ipxe_roms.sh` builds the selected custom iPXE binaries and, when selected, hybrid ISO or USB image media — offline, using the iPXE source vendored into the container image; generated files appear in the ROM Files list. See [ROM Build](docs/iPXE/03-ROM-Build.md) for firmware and media selection guidance.

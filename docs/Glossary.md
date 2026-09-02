@@ -73,7 +73,7 @@ Quick reference for the terms used across the docs. Grouped by theme; each entry
 - **meta-data** — instance identity (hostname, `instance-id`).
 - **network-config** — optional cloud-init network configuration.
 - **config drive / cidata** — a disk/ISO labeled `cidata` carrying `meta-data` + `user-data`.
-- **ds=nocloud;s=URL** — a kernel command-line argument telling cloud-init to fetch its seed over HTTP — the standard way to pair cloud-init with PXE.
+- **ds=nocloud;s=URL** — a kernel command-line argument telling cloud-init to fetch its seed over HTTP(S) — the standard way to pair cloud-init with PXE.
 
 ## Installer / first-boot tooling
 

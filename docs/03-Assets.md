@@ -30,7 +30,7 @@ One of the key problems UpOnLAN solves is **making these three components availa
 This is why the **Assets** tab exists in the web app:
 
 - ✅ Mirror LiveCDs locally.
-- ✅ Serve these assets over the configured Nginx HTTP port. Put a TLS-capable reverse proxy in front if HTTPS is required.
+- ✅ Serve these assets over HTTPS (nginx on `8443`, self-signed fallback or your own cert).
 - ✅ Provide helper scripts to extract kernel, initramfs, and squashfs directly from ISO files.
 - ✅ Automatically populate an `endpoints.yml` configuration file for your iPXE menus.
 - ✅ Surface published provisioning files (`/assets/provisioning/...`) alongside boot assets, with a simple **All / Boot / Provisioning** filter and copy/open-editor actions.
@@ -43,7 +43,7 @@ This allows you to fully control and serve all necessary assets locally, ensurin
 
 UpOnLAN mirrors boot files for the same reason [netboot.xyz](https://netboot.xyz) does — captured in one line by netboot.xyz's `asset-mirror` repo: *"mirror for assets we are unable to reliably consume with iPXE."*
 
-- **Vendors publish ISOs, not iPXE-ready components.** iPXE needs a small kernel + initramfs (+ optional rootfs) it can fetch over HTTP. Most vendors — Oracle and the whole RHEL-family included — only publish a full DVD ISO; the kernel/initrd inside are never extracted and offered as standalone downloads.
+- **Vendors publish ISOs, not iPXE-ready components.** iPXE needs a small kernel + initramfs (+ optional rootfs) it can fetch over HTTPS. Most vendors — Oracle and the whole RHEL-family included — only publish a full DVD ISO; the kernel/initrd inside are never extracted and offered as standalone downloads.
 - **iPXE doesn't boot ISOs directly.** A multi-gigabyte ISO can't be pulled into memory by a bootloader; you have to extract the small pieces and chain them.
 - **The initramfs usually can't speak HTTPS.** The pre-boot environment ships without CA certificates (or a working `wget`/`curl`) in most distros, and GitHub Releases are HTTPS endpoints that 302-redirect to S3. So an initrd often needs patching before it can pull a rootfs over the network.
 
@@ -66,7 +66,7 @@ netboot.xyz hosts its extracted files in `netbootxyz/asset-mirror` and documents
 
 ## 🔗 How menus link to assets
 
-A menu entry boots an OS by fetching its kernel, initramfs, and rootfs over HTTP. Nothing "links" the two — the iPXE script and the endpoint catalog must simply agree on the URL layout:
+A menu entry boots an OS by fetching its kernel, initramfs, and rootfs over HTTPS. Nothing "links" the two — the iPXE script and the endpoint catalog must simply agree on the URL layout:
 
 ```text
 iPXE menu (.ipxe)                      endpoint catalog (endpoints.yml)
@@ -108,13 +108,13 @@ UpOnLAN manages two kinds of *provisioning* alongside boot assets, and the iPXE 
 
 [cloud-init](https://cloudinit.readthedocs.io/) does post-boot provisioning — hostname, users/SSH keys, network, packages, run-commands — and it's independent of *how* the machine booted, so it composes cleanly with PXE: PXE delivers the kernel + initrd, cloud-init configures the OS that comes up.
 
-The bridge is cloud-init's **NoCloud** datasource, which fetches its seed over HTTP from a URL passed on the **kernel command line**:
+The bridge is cloud-init's **NoCloud** datasource, which fetches its seed over HTTPS from a URL passed on the **kernel command line**:
 
 ```ipxe
-ds=nocloud;s=http://<server>/<path>/
+ds=nocloud;s=https://<server>/<path>/
 ```
 
-cloud-init then GETs `<path>/user-data` and `<path>/meta-data`. A seed is therefore just two files the guest pulls over HTTP *at boot time* — exactly like a kernel or initrd — which is why it belongs in the asset model rather than as a separate mechanism:
+cloud-init then GETs `<path>/user-data` and `<path>/meta-data`. A seed is therefore just two files the guest pulls over HTTPS *at boot time* — exactly like a kernel or initrd — which is why it belongs in the asset model rather than as a separate mechanism:
 
 - **Same transport** — served from the same `${local_endpoint}` origin the menu already uses.
 - **Versioned** — a specific `user-data` per deployment, not "whatever is on the host today".

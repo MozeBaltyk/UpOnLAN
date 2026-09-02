@@ -22,7 +22,7 @@ VM firmware (SeaBIOS / OVMF)                  no iPXE interpreter
 iPXE binary (option ROM / e1000 ROM / efi)    the interpreter — DHCPs first
         │
         ▼
-menu.ipxe  (TFTP or HTTP)                     the script — rendered by iPXE
+menu.ipxe  (TFTP or HTTPS)                    the script — rendered by iPXE
 ```
 
 Two QEMU/libvirt details make this unavoidable in practice:
@@ -79,7 +79,7 @@ The embedded script (`scripts/build_ipxe_roms.sh` → `embed.ipxe`) gives the bi
 ## Build in the webapp
 
 1. Open **Menus**, expand **ROM Files**, and select **Build**.
-2. Select the firmware and media outputs needed, then enter the site name, boot domain, and boot version.
+2. Select the firmware/media outputs needed (Legacy, EFI, ISO, USB).
 3. Select **Run** and wait for the build result.
 
-The webapp runs its existing ROM-build playbook. It creates the selected custom iPXE outputs (Legacy and/or EFI) and, when selected, hybrid ISO and USB image files. The build can also generate the configured index, checksums, and signatures; completed ROM/media files are listed under **ROM Files**.
+The webapp runs `scripts/build_ipxe_roms.sh` (no Ansible playbook) inside the container, offline from the vendored iPXE source. It creates the selected iPXE outputs (Legacy and/or EFI) and, when selected, hybrid ISO and USB image files; completed ROM/media files are listed under **ROM Files**.

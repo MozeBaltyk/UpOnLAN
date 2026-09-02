@@ -26,7 +26,7 @@ sudo podman pod ps
 ./wakemeup.sh -a logs
 ```
 
-Expect an UpOnLAN pod/container in the first command and container logs in the second. For a PXE client, a successful boot reaches TFTP for iPXE and then retrieves its menu/assets over HTTP; use a test VM only after DHCP points it at the appropriate boot file.
+Expect an UpOnLAN pod/container in the first command and container logs in the second. For a PXE client, a successful boot reaches TFTP for iPXE and then retrieves its menu/assets over HTTPS; use a test VM only after DHCP points it at the appropriate boot file.
 
 ### Safe next steps
 

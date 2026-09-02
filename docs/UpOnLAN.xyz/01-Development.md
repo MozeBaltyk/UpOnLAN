@@ -149,7 +149,7 @@ Ensure no user-provided paths are directly passed to `fs` methods — always san
 
 ## ROM / boot-media build runner
 
-The webapp's **Build** button (Menus → ROM Files) runs `scripts/build_ipxe_roms.sh` directly — there is no Ansible. `romBuildService.js` (`/services/`) shells out to the script, which fetches the iPXE source, applies the binutils patch, enables `CONSOLE_SERIAL`, embeds the dhcp→menu chain, and `make`s the requested formats (legacy/efi/iso/usb) into `/config/menus/rom/ipxe/`.
+The webapp's **Build** button (Menus → ROM Files) runs `scripts/build_ipxe_roms.sh` directly — there is no Ansible. `romBuildService.js` (`/services/`) shells out to the script, which unpacks the vendored iPXE source (offline), applies the binutils patch, enables `CONSOLE_SERIAL`, embeds the dhcp→menu chain, and `make`s the requested formats (legacy/efi/iso/usb) into `/config/menus/rom/ipxe/`.
 
 - Builds run detached so they never block the Node.js event loop
 - Real-time progress is streamed via Socket.IO (`buildProgress` events, parsed from the script's `[ipxe] ...` lines)

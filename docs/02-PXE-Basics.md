@@ -8,7 +8,7 @@ PXE firmware
     v
 TFTP server -- iPXE boot program --> client
                                       |
-                                      | HTTP: menu and boot/install assets
+                                      | HTTPS: menu and boot/install assets
                                       v
                                   iPXE boot menu
 ```
@@ -18,16 +18,16 @@ TFTP server -- iPXE boot program --> client
 - **Firmware:** the BIOS or UEFI network-boot code that begins the PXE request.
 - **DHCP:** assigns network settings and identifies the boot target. It is external to UpOnLAN.
 - **TFTP:** transfers the small initial iPXE boot program.
-- **iPXE:** the downloaded boot program; it loads the menu and later content over HTTP.
+- **iPXE:** the downloaded boot program; it loads the menu and later content over HTTPS.
 - **Boot menu:** iPXE instructions that present choices and chain to an operating-system installer or tool.
-- **HTTP server:** serves menus and larger boot/install content after iPXE starts.
+- **HTTPS server:** serves menus and larger boot/install content after iPXE starts.
 - **Assets:** the kernels, initrds, installers, and other files selected by a menu entry.
 
 > The menu is a *script*, not an executable — it only renders after an iPXE binary is running and fetches it. See [ROM Build](iPXE/03-ROM-Build.md) for why a libvirt VM must load an iPXE binary (`CONSOLE_SERIAL`) from an option ROM (BIOS) or the OVMF network stack (UEFI) before it can show the menu on the serial console.
 
 ### UpOnLAN's boundary
 
-UpOnLAN manages and builds menus, serves TFTP/iPXE and HTTP menus/assets, mirrors assets, and provides Wake-on-LAN and a web interface. It does not provide or configure DHCP, and it does not make a network boot target trustworthy by itself.
+UpOnLAN manages and builds menus, serves TFTP/iPXE and HTTPS menus/assets, mirrors assets, and provides Wake-on-LAN and a web interface. It does not provide or configure DHCP, and it does not make a network boot target trustworthy by itself.
 
 ### Firmware compatibility
 
@@ -35,6 +35,6 @@ BIOS and UEFI need compatible iPXE boot files. Configure DHCP to select the corr
 
 ### Trusted-network caution
 
-PXE can deliver executable code and installation content. Use it only on trusted networks, restrict TFTP and boot HTTP to intended clients, and protect administrator access to the webapp. See [Deployment](UpOnLAN.xyz/02-Deployment.md) for deployment-specific ports and authentication guidance.
+PXE can deliver executable code and installation content. Use it only on trusted networks, restrict TFTP and boot HTTPS to intended clients, and protect administrator access to the webapp. See [Deployment](UpOnLAN.xyz/02-Deployment.md) for deployment-specific ports and authentication guidance.
 
 > See the [Glossary](Glossary.md) for concise definitions of the terms used in these guides (PXE, iPXE, TFTP, DHCP, option ROM, CONSOLE_SERIAL, and more).

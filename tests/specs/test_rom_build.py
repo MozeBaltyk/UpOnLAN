@@ -53,6 +53,13 @@ class RomBuildSpecs(unittest.TestCase):
         self.assertIn('$SSL_ARGS', self.script)
         self.assertIn('bios_targets EMBED="$WORK/embed.ipxe"', self.script)
 
+    def test_enables_https_download_protocol(self):
+        # iPXE defaults to `#undef DOWNLOAD_PROTO_HTTPS`; without it https:// URLs
+        # fail with "Operation not supported". The build must define it via a
+        # config/local/general.h override.
+        self.assertIn('config/local/general.h', self.script)
+        self.assertIn('#define DOWNLOAD_PROTO_HTTPS', self.script)
+
 
 class BuildReleaseSpecs(unittest.TestCase):
     """build_release.sh runs the local release pipeline (assets -> menu) and

@@ -75,7 +75,12 @@ patch -p1 -f < "$REPO_ROOT/scripts/sources/ipxe-gas242-binutils.patch"
 # config/local/console.h is written per-phase below: CONSOLE_SERIAL for BIOS
 # (SeaBIOS has no serial console), empty for UEFI (OVMF already writes serial —
 # a second serial writer doubles every character on the UEFI console).
+# config/local/general.h enables the HTTPS download protocol (default iPXE has
+# it #undef'd), which the TLS-only asset server requires.
 mkdir -p config/local
+cat > config/local/general.h <<'EOF'
+#define DOWNLOAD_PROTO_HTTPS
+EOF
 
 cat > "$WORK/embed.ipxe" <<'EOF'
 #!ipxe

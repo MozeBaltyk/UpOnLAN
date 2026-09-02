@@ -83,8 +83,28 @@ describe('vmHandlers.buildDomainXml (sizing + graphics)', () => {
   it('honors the CPU/RAM/graphics knobs', () => {
     expect(big).toContain("<memory unit='MiB'>8192</memory>");
     expect(big).toContain("<vcpu placement='static'>4</vcpu>");
-    expect(big).toContain("<graphics type='vnc' port='-1' autoport='yes'/>");
+    // VNC graphics: bound to all interfaces so the container can reach it,
+    // with a password attribute (the random value is supplied at create time).
+    expect(big).toContain("<graphics type='vnc' port='-1' autoport='yes' listen='0.0.0.0' passwd=''>");
     expect(big).toContain("<model type='vga' heads='1' primary='yes'/>");
+  });
+
+  it('embeds a supplied VNC password in the graphics element', () => {
+    const xml = vmHandlers.buildDomainXml('uponlan-client', 'uponlan', null, { graphics: true, vncPassword: 'deadbeef' });
+    expect(xml).toContain("passwd='deadbeef'");
+  });
+
+  it('omits graphics + password when graphics is off', () => {
+    const xml = vmHandlers.buildDomainXml('uponlan-client', 'uponlan');
+    expect(xml).not.toContain('<graphics');
+    expect(xml).not.toContain('passwd=');
+  });
+
+  it('parses a VNC port from domdisplay output', () => {
+    expect(vmHandlers.parseVncPort('vnc://127.0.0.1:5901')).toBe(5901);
+    expect(vmHandlers.parseVncPort('vnc://0.0.0.0:5999')).toBe(5999);
+    expect(vmHandlers.parseVncPort('spice://127.0.0.1:5900')).toBe(0);
+    expect(vmHandlers.parseVncPort('')).toBe(0);
   });
 
   it('clamps out-of-range values to defaults', () => {

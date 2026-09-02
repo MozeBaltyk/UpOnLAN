@@ -16,7 +16,7 @@ is_name() {
 cmd="${1:-}"; shift
 
 case "$cmd" in
-  start|destroy|domstate|dumpxml)
+  start|destroy|domstate|dumpxml|domdisplay)
     is_name "${1:-}" || fail
     ;;
   undefine)

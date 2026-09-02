@@ -104,6 +104,6 @@ The web console's VM tab creates a diskless KVM guest on the `uponlan` libvirt n
 - **UEFI**: `<os firmware='efi'>` — libvirt picks OVMF and manages a per-guest NVRAM.
 - Destroying a UEFI guest removes its NVRAM (`virsh undefine --nvram`); without this, re-creating the VM is blocked by a stale NVRAM file.
 
-The Console tab streams the PTY serial console through xterm.js, with copy/paste, font sizing, autoscroll, and scrollback preserved across tab switches.
+The Console tab streams the PTY serial console through xterm.js, with copy/paste, font sizing, autoscroll, and scrollback preserved across tab switches. A **VNC** button opens a graphical console (noVNC) for GUI installers: the webapp generates a random VNC password at VM creation, sets it on the QEMU VNC display (`listen='0.0.0.0'` so the container can reach it), and bridges it through a WebSocket proxy at `/novnc/ws` — noVNC completes the VNC auth with that password, so the raw VNC port isn't left open to the LAN.
 
 The network's dnsmasq intentionally has **no `pxe-service`/`pxe-prompt` lines**: dnsmasq's PXE processing (enabled only by those) injects option 60 `PXEClient` + option 43 into every offer, which makes EDK2/OVMF abort with `PXE-E21: Remote boot cancelled` before any TFTP. Boot files are advertised solely via `dhcp-boot` tags (`ipxe-bios`/`ipxe-efi` on option 175, `uefi-fw` on option 93).

@@ -1,7 +1,9 @@
 // ../sockets/vmHandlers.js
 'use strict';
 const fs = require('fs');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
+const { mintVncToken } = require('./vncProxy');
 
 // Test VM the Console tab manages (overridable, e.g. VM_NAME=pxetest).
 const VM_NAME = process.env.VM_NAME || 'uponlan-client';
@@ -18,6 +20,10 @@ const VM_STORAGE_POOL = process.env.VM_STORAGE_POOL || 'uponlan';
 const VM_STORAGE_POOL_PATH = process.env.VM_STORAGE_POOL_PATH || '/var/lib/libvirt/images/uponlan';
 // Default sizing for the diskless PXE test VM (the UI overrides per-create).
 const VM_DEFAULTS = { cpus: 2, memory: 2048 }; // memory in MiB
+// Where the generated VNC password is persisted so the webapp can hand it to
+// noVNC on later visits (the domain XML stores it too, but only as a one-way
+// hash in the running QEMU; this file is the plaintext source of truth).
+const VNC_PASSWORD_FILE = (process.env.UPONLAN_CONFIG || '/config') + '/vm-vnc-password';
 
 // The VM is UEFI/OVMF only: its network stack fetches rom/ipxe/uponlan.xyz.efi
 // directly from the DHCP answer, so no host-side PCI option ROM is involved.
@@ -36,6 +42,12 @@ function sanitizeVmOpts(opts = {}) {
     memory: clamp(opts.memory, 512, 65536, VM_DEFAULTS.memory),
     graphics: opts.graphics === true,
   };
+}
+
+// 8-char alphanumeric VNC password (classic VNC auth keys on 8 bytes, so a
+// hex/random string truncated to 8 is the safe ceiling).
+function generateVncPassword() {
+  return crypto.randomBytes(4).toString('hex');
 }
 
 // virsh subcommands the virsh-safe wrapper allows (restart is a power cycle —
@@ -61,6 +73,23 @@ function runVirsh(args) {
     proc.on('close', (code) => resolve({ ok: code === 0, out: out.trim(), err: err.trim() }));
     proc.on('error', (e) => resolve({ ok: false, out: '', err: String(e) }));
   });
+}
+
+// VNC password persisted at create time (null when the VM is serial-only).
+function getVncPassword() {
+  try {
+    const p = fs.readFileSync(VNC_PASSWORD_FILE, 'utf8').trim();
+    return /^[a-zA-Z0-9]{8}$/.test(p) ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+// Parse `virsh domdisplay` output ("vnc://host:5901" or "spice://…") into a
+// port; returns 0 when there's no graphical display or the output is unexpected.
+function parseVncPort(domdisplay) {
+  const m = /^vnc:\/\/[^:]+:(\d+)$/.exec(domdisplay);
+  return m ? Number(m[1]) : 0;
 }
 
 async function getVmState() {
@@ -140,8 +169,13 @@ function buildDomainXml(name, network, diskPath, opts = {}) {
     </disk>`
     : '';
   // Optional: graphical console (VNC) for GUI installers, on top of serial.
+  // listen='0.0.0.0' so the container can reach QEMU's VNC via the podman
+  // bridge (host.containers.internal); the random password (persisted at
+  // create time) is what stops the raw VNC port from being open to the LAN.
   const video = graphics
-    ? `<graphics type='vnc' port='-1' autoport='yes'/>
+    ? `<graphics type='vnc' port='-1' autoport='yes' listen='0.0.0.0' passwd='${opts.vncPassword || ''}'>
+      <listen type='address' address='0.0.0.0'/>
+    </graphics>
     <video>
       <model type='vga' heads='1' primary='yes'/>
     </video>`
@@ -223,6 +257,16 @@ module.exports = function registerVmHandlers(socket) {
 
   socket.on('vm:status', sendStatus);
 
+  // VNC connection info for the graphical console: the port QEMU bound and the
+  // generated password. The browser connects to /novnc/ws (the Node proxy)
+  // which forwards to host:port; noVNC does the VNC auth with this password.
+  socket.on('vm:vnc:info', async () => {
+    const disp = await runVirsh(['domdisplay', VM_NAME]);
+    const port = disp.ok ? parseVncPort(disp.out) : 0;
+    const password = port > 0 ? getVncPassword() : null;
+    socket.emit('vm:vnc:info', { port, password, token: port > 0 ? mintVncToken() : null });
+  });
+
   socket.on('vm:power', async (action) => {
     // 'restart' is a power cycle: destroy (if running) then start. The guest
     // boots into the iPXE menu, where there is no OS to ACPI-reboot, so a clean
@@ -272,6 +316,13 @@ module.exports = function registerVmHandlers(socket) {
     const opts = (payload && typeof payload === 'object') ? payload : {};
     const spec = sanitizeVmOpts(opts);
     const diskSize = Math.max(0, Number(opts.disk) || 0);
+    // Fresh random VNC password per create, persisted so noVNC can read it back.
+    if (spec.graphics) {
+      spec.vncPassword = generateVncPassword();
+      try { fs.writeFileSync(VNC_PASSWORD_FILE, spec.vncPassword); } catch (e) {
+        console.warn('Failed to persist VNC password:', e.message);
+      }
+    }
     const state = await getVmState();
     if (state !== 'not found') {
       socket.emit('vm:action:result', { action: 'create', ok: false, message: `VM '${VM_NAME}' already exists (${state})` });
@@ -446,3 +497,5 @@ module.exports.isInactivePoolInfo = isInactivePoolInfo;
 module.exports.buildDomainXml = buildDomainXml;
 module.exports.buildNetworkXml = buildNetworkXml;
 module.exports.sanitizeVmOpts = sanitizeVmOpts;
+module.exports.getVncPassword = getVncPassword;
+module.exports.parseVncPort = parseVncPort;

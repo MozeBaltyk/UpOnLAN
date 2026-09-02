@@ -12,6 +12,7 @@ const io = require('socket.io')(http, { path: (process.env.SUBFOLDER || '/') + '
 
 const baseRoutes = require('./routes/baseRoutes');
 const socketHandlers = require('./sockets/socketHandlers');
+const { attachVncProxy, isValidVncToken } = require('./sockets/vncProxy');
 const { disablesigs } = require('./services/menuServices');
 
 // Disable boot menu signatures
@@ -80,6 +81,16 @@ app.use(process.env.SUBFOLDER || '/', baseRoutes);
 
 // Register socket.io handlers
 socketHandlers(io);
+
+// VNC WebSocket proxy (noVNC -> QEMU VNC). Auth is token-based: the browser's
+// raw WebSocket can't carry the Basic auth header, so the (already-authed)
+// socket.io channel mints a short-lived token via mintVncToken and noVNC sends
+// it back in the URL. When auth is disabled, the proxy is open.
+attachVncProxy(http, (req) => {
+  if (!authEnabled) return true;
+  const url = new URL(req.url, 'http://localhost');
+  return isValidVncToken(url.searchParams.get('token'));
+});
 
 // Export components so tests can boot the server on their own port.
 module.exports = { app, http, io };

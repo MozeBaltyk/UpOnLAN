@@ -85,11 +85,14 @@ function getVncPassword() {
   }
 }
 
-// Parse `virsh domdisplay` output ("vnc://host:5901" or "spice://…") into a
-// port; returns 0 when there's no graphical display or the output is unexpected.
+// Parse `virsh domdisplay` output into the TCP port. VNC reports a *display
+// number* ("vnc://host:0" = port 5900), spice a port. Some libvirt builds emit
+// the port directly for VNC, so accept both: values < 5900 are display numbers.
 function parseVncPort(domdisplay) {
-  const m = /^vnc:\/\/[^:]+:(\d+)$/.exec(domdisplay);
-  return m ? Number(m[1]) : 0;
+  const m = /^(?:vnc|spice):\/\/[^:]+:(\d+)$/.exec(domdisplay);
+  if (!m) return 0;
+  const n = Number(m[1]);
+  return n >= 5900 ? n : 5900 + n;
 }
 
 async function getVmState() {

@@ -101,10 +101,14 @@ describe('vmHandlers.buildDomainXml (sizing + graphics)', () => {
   });
 
   it('parses a VNC port from domdisplay output', () => {
-    expect(vmHandlers.parseVncPort('vnc://127.0.0.1:5901')).toBe(5901);
-    expect(vmHandlers.parseVncPort('vnc://0.0.0.0:5999')).toBe(5999);
-    expect(vmHandlers.parseVncPort('spice://127.0.0.1:5900')).toBe(0);
+    // VNC reports a display number ("vnc://host:0" = port 5900); spice a port.
+    expect(vmHandlers.parseVncPort('vnc://127.0.0.1:0')).toBe(5900);
+    expect(vmHandlers.parseVncPort('vnc://localhost:1')).toBe(5901);
+    expect(vmHandlers.parseVncPort('vnc://0.0.0.0:5902')).toBe(5902); // port form
+    expect(vmHandlers.parseVncPort('spice://127.0.0.1:5903')).toBe(5903);
+    expect(vmHandlers.parseVncPort('spice://127.0.0.1:0')).toBe(5900);
     expect(vmHandlers.parseVncPort('')).toBe(0);
+    expect(vmHandlers.parseVncPort('vnc://host')).toBe(0);
   });
 
   it('clamps out-of-range values to defaults', () => {

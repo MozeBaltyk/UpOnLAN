@@ -181,6 +181,12 @@ if [ -n "$efi_targets" ]; then
 fi
 
 mkdir -p "$OUT_ROM"
+# Remove stale artifacts from a previous build so a removed target (e.g. the
+# old e1000 option ROM) can't linger in the TFTP root and get advertised.
+rm -f "$OUT_ROM"/uponlan.xyz-*.rom "$OUT_ROM"/uponlan.xyz-*.kpxe \
+      "$OUT_ROM"/uponlan.xyz-*.efi "$OUT_ROM"/uponlan.xyz-*.dsk \
+      "$OUT_ROM"/uponlan.xyz-*.pdsk "$OUT_ROM"/uponlan.xyz-*.lkrn \
+      "$OUT_ROM"/uponlan.xyz-*.iso "$OUT_ROM"/uponlan.xyz-*.img
 for pair in "${artifacts[@]}"; do
   src="${pair%%:*}"; dst="${pair##*:}"
   cp "$src" "$OUT_ROM/$dst"

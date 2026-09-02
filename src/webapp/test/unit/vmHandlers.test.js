@@ -203,6 +203,21 @@ describe('vmHandlers.isTrustStale', () => {
     expect(h.isTrustStale()).toBe(true);
   });
 
+  it('flags stale when only the cert moved (no ROM built)', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uponlan-trust-'));
+    const tlsDir = path.join(dir, 'tls');
+    fs.mkdirSync(tlsDir, { recursive: true });
+    const cert = path.join(tlsDir, 'server.crt');
+    fs.writeFileSync(cert, 'x');
+    const now = new Date();
+    fs.utimesSync(cert, now, now);
+    fs.writeFileSync(path.join(dir, 'vm-boot-stamp.json'), JSON.stringify({ bootedAt: Date.now() - 60_000 }));
+
+    vi.stubEnv('UPONLAN_CONFIG', dir);
+    const h = await load();
+    expect(h.isTrustStale()).toBe(true);
+  });
+
   it('returns false when the ROM predates the recorded boot', async () => {
     const { dir, rom } = stage();
     const past = new Date(Date.now() - 60_000);

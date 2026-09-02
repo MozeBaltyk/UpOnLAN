@@ -1929,12 +1929,25 @@ function fitVmConsole() {
 window.addEventListener('resize', fitVmConsole);
 
 // Module-level socket listeners (registered once, like the other pages).
+function vmStateColor(state) {
+  switch (state) {
+    case 'running': return '#28a745';      // green
+    case 'paused': return '#ffc107';       // amber
+    case 'shut off':
+    case 'crashed':
+    case 'pmsuspended': return '#dc3545';  // red
+    default: return '#6c757d';             // grey (not found / unknown)
+  }
+}
+
 socket.on('vm:status', function(data) {
   let note = '';
   if (data.hasConsole === false) note = ' (no pty serial console configured)';
   if (data.state === 'not found') note = ' (VM not defined on host)';
   const stateEl = $('#vm-state');
-  stateEl.text(data.name + ': ' + data.state + note);
+  stateEl.empty()
+    .append($('<span></span>').css({ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: vmStateColor(data.state), marginRight: '6px', verticalAlign: 'middle' }))
+    .append(document.createTextNode(data.name + ': ' + data.state + note));
   if (data.trustStale) {
     stateEl.append(' <span class="text-warning">— ' + (data.trustMessage || 'PXE boot trust changed — restart the VM') + '</span>');
   }
@@ -1944,6 +1957,7 @@ socket.on('vm:action:result', function(res) {
   if (res.ok && (res.action === 'on' || res.action === 'create' || res.action === 'restart')) {
     // VM booted/created/restarted — force re-attach (the old console session
     // may have raced the destroy and not yet emitted vm:console:close).
+    if (res.warning) showToast(res.warning, 'warning');
     setTimeout(function() { startVmConsole(true); }, 2000);
   } else if (res.ok && res.action === 'off') {
     stopVmConsole();
@@ -1989,7 +2003,9 @@ function renderconsole() {
           <label class="small mb-0 mr-1" title="Auto-scroll to bottom on new output">
             <input type="checkbox" id="vm-autoscroll" checked onchange="vmAutoScroll = this.checked;"> Autoscroll
           </label>
-          <span id="vm-state" class="text-muted ml-2"></span>
+        </div>
+        <div class="mb-2">
+          <span id="vm-state" class="text-muted"></span>
         </div>
         <div id="vm-console" style="height:66vh; min-height:420px; background:#000;"></div>
         <div id="vm-vnc" class="d-none" style="height:66vh; min-height:420px; background:#000;"></div>

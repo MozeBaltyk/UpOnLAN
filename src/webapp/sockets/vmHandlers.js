@@ -28,11 +28,14 @@ const VNC_PASSWORD_FILE = (process.env.UPONLAN_CONFIG || '/config') + '/vm-vnc-p
 // Boot-trust drift guardrail: a running VM can outlive a redeploy that
 // regenerates the TLS cert and rebuilds the trusted ROMs, leaving it on a stale
 // in-memory iPXE session (HTTPS boot then fails 0216eb8f "No usable
-// certificates"). We stamp when the managed VM last booted and, on vm:status,
-// compare it to the ROM's mtime so the operator sees "restart me" instead of a
-// cryptic cert error.
+// certificates"). We stamp when the managed VM last booted and compare it to the
+// cert/ROM mtimes so the operator gets an active "restart me" warning (console
+// open + power actions), not just passive status text.
+const TLS_CRT = `${process.env.UPONLAN_CONFIG || '/config'}/tls/server.crt`;
 const ROM_EFI = `${process.env.UPONLAN_CONFIG || '/config'}/menus/rom/ipxe/uponlan.xyz.efi`;
 const VM_BOOT_STAMP = `${process.env.UPONLAN_CONFIG || '/config'}/vm-boot-stamp.json`;
+const TRUST_WARNING = 'PXE boot trust may be out of date — restart the VM to reload the current certificate/ROM.';
+const TRUST_RELOADED = 'Reloaded boot trust — the previous VM session was on an older certificate/ROM.';
 
 // The VM is UEFI/OVMF only: its network stack fetches rom/ipxe/uponlan.xyz.efi
 // directly from the DHCP answer, so no host-side PCI option ROM is involved.
@@ -129,11 +132,15 @@ function recordVmBootTime() {
   }
 }
 
-// ponytail: trust freshness is derived from the ROM file mtime, not a persisted
-// generation — init.sh couples cert regeneration to a ROM rebuild, so a newer
-// ROM always means fresh trust. If that coupling ever breaks (cert regenerated
-// without rebuilding ROMs), switch to a generation counter written by
-// init.sh/romBuildService on every change.
+// Trust freshness is derived from the cert + ROM file mtimes (not a persisted
+// generation). Both are read independently and a missing side contributes 0, so
+// a redeploy that regenerates the cert but leaves ROMs untouched still flags a
+// running VM as stale. If mtime proves unreliable (cp -p on deploy, skewed
+// clocks), switch to a generation counter written on every cert/ROM change.
+function mtimeMs(file) {
+  try { return fs.statSync(file).mtimeMs; } catch { return 0; }
+}
+
 function isTrustStale() {
   let bootedAt = NaN;
   try {
@@ -141,17 +148,14 @@ function isTrustStale() {
   } catch {
     /* no stamp yet — handled below */
   }
+  const trustMs = Math.max(mtimeMs(TLS_CRT), mtimeMs(ROM_EFI));
   if (Number.isFinite(bootedAt)) {
-    try {
-      return fs.statSync(ROM_EFI).mtimeMs > bootedAt;
-    } catch {
-      return false; // ROM not built yet (fresh deploy) — nothing to flag
-    }
+    return trustMs > bootedAt; // nothing bootable yet => trustMs 0 => false
   }
-  // No boot stamp. A running VM reaches this only when it booted before tracking
-  // existed (or was started outside the webapp), so its ROM-load time is unknown.
-  // Assume stale when a ROM exists — one restart records a stamp and re-fetches it.
-  return fs.existsSync(ROM_EFI);
+  // No boot stamp: a running VM reaches this only when it booted before tracking
+  // existed (or was started outside the webapp), so its boot time is unknown.
+  // Assume stale when trust material exists — one restart records a stamp.
+  return trustMs > 0;
 }
 
 // `virsh pool-info` prints "State: inactive" for a defined-but-not-started
@@ -301,7 +305,7 @@ module.exports = function registerVmHandlers(socket) {
     const status = { name: VM_NAME, state, hasConsole: await getVmHasConsole() };
     if (state === 'running' && isTrustStale()) {
       status.trustStale = true;
-      status.trustMessage = 'PXE boot trust may be out of date — restart the VM to reload the current certificate/ROM.';
+      status.trustMessage = TRUST_WARNING;
     }
     socket.emit('vm:status', status);
   };
@@ -329,6 +333,7 @@ module.exports = function registerVmHandlers(socket) {
         sendStatus();
         return;
       }
+      const wasStale = state === 'running' && isTrustStale();
       if (state === 'running') {
         const d = await runVirsh(['destroy', VM_NAME]);
         if (!d.ok) {
@@ -339,7 +344,12 @@ module.exports = function registerVmHandlers(socket) {
       }
       const s = await runVirsh(['start', VM_NAME]);
       if (s.ok) recordVmBootTime();
-      socket.emit('vm:action:result', { action, ok: s.ok, message: s.ok ? `VM '${VM_NAME}' restarted` : s.err });
+      socket.emit('vm:action:result', {
+        action,
+        ok: s.ok,
+        message: s.ok ? `VM '${VM_NAME}' restarted` : s.err,
+        warning: s.ok && wasStale ? TRUST_RELOADED : undefined,
+      });
       sendStatus();
       return;
     }
@@ -355,9 +365,15 @@ module.exports = function registerVmHandlers(socket) {
     } else if (action !== 'on' && state !== 'running') {
       socket.emit('vm:action:result', { action, ok: false, message: `VM '${VM_NAME}' is not running (${state})` });
     } else {
+      const wasStale = action === 'on' && isTrustStale();
       const res = await runVirsh([virshAction, VM_NAME]);
       if (action === 'on' && res.ok) recordVmBootTime();
-      socket.emit('vm:action:result', { action, ok: res.ok, message: res.ok ? res.out : res.err });
+      socket.emit('vm:action:result', {
+        action,
+        ok: res.ok,
+        message: res.ok ? res.out : res.err,
+        warning: res.ok && wasStale ? TRUST_RELOADED : undefined,
+      });
     }
     sendStatus();
   });
@@ -507,6 +523,9 @@ module.exports = function registerVmHandlers(socket) {
     if (state !== 'running') {
       socket.emit('vm:console:data', `\r\n[VM '${VM_NAME}' is not running (${state}) — power it on first]\r\n`);
       return;
+    }
+    if (isTrustStale()) {
+      socket.emit('vm:console:data', `\r\n[warning] ${TRUST_WARNING}\r\n`);
     }
 
     // `virsh console` refuses to run without a controlling TTY; `script`

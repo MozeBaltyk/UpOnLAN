@@ -81,10 +81,12 @@ class InitShUrlSpecs(unittest.TestCase):
 
     def test_builds_roms_at_deploy_time(self):
         # iPXE ROMs are built on first boot (embedding the TLS cert), not shipped
-        # in the release tarball. The build targets the TFTP root and passes TRUST.
+        # in the release tarball. The build is backgrounded (nohup) so nginx/
+        # webapp/dnsmasq start immediately; it targets the TFTP root with TRUST.
         self.assertIn('Building iPXE ROMs', self.init_sh)
         self.assertIn('/scripts/build_ipxe_roms.sh legacy,efi', self.init_sh)
-        self.assertIn('OUT_ROM=/config/menus/rom/ipxe TRUST="$TLS_CRT"', self.init_sh)
+        self.assertIn('OUT_ROM=/config/menus/rom/ipxe TRUST="$1"', self.init_sh)
+        self.assertIn('nohup sh -c', self.init_sh)
         self.assertIn('ls /config/menus/rom/ipxe/uponlan.xyz-*', self.init_sh)
 
 

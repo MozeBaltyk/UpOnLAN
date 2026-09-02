@@ -119,14 +119,16 @@ fi
 
 # iPXE ROMs are no longer shipped in the release tarball — they must embed this
 # deployment's TLS cert (TRUST) so iPXE can fetch kernel/initrd over HTTPS. Build
-# them here on first boot, into the TFTP root. Foreground + once: subsequent
-# boots find the artifacts present and skip. A failure (e.g. no internet for the
-# iPXE source fetch) is non-fatal — PXE boot stays down until built via the webapp.
+# them into the TFTP root on first boot, in the background so nginx/webapp/dnsmasq
+# start immediately. Subsequent boots find the artifacts present and skip. A
+# failure (e.g. no internet for the iPXE source fetch) is non-fatal — PXE stays
+# down until retried via the webapp Build UI.
 if ! ls /config/menus/rom/ipxe/uponlan.xyz-* >/dev/null 2>&1; then
-  echo "[uponlanxyz-init] Building iPXE ROMs (embeds this TLS cert) — one-time, may take a few minutes"
-  OUT_ROM=/config/menus/rom/ipxe TRUST="$TLS_CRT" \
-    /scripts/build_ipxe_roms.sh legacy,efi \
-    || echo "[uponlanxyz-init] WARNING: iPXE ROM build failed — PXE boot will not answer until built via the webapp Build UI"
+  echo "[uponlanxyz-init] Building iPXE ROMs in the background (webapp starts immediately)"
+  nohup sh -c '
+    OUT_ROM=/config/menus/rom/ipxe TRUST="$1" /scripts/build_ipxe_roms.sh legacy,efi &&
+    chown -R nbxyz:nbxyz /config/menus/rom/ipxe
+  ' _ "$TLS_CRT" >>/logs/rom/init-build.log 2>&1 &
 fi
 
 # Refresh endpoints.yml from the configured origin on every startup. The asset

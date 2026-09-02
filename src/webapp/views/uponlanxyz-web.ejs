@@ -114,6 +114,7 @@ $(document).on('click', '[data-asset-provisioning-open]', function () {
 // Highlight active nav item and switch pages
 function navTo(page, navId) {
   setActiveNav(navId);
+  vmDisposeVnc(); // leaving a page may abandon the console: free QEMU's single VNC client
   window[page]();
 }
 
@@ -838,7 +839,7 @@ if ($('#vmFirmwareModal').length === 0) {
             </div>
             <div class="form-group">
               <label for="vmMemory">RAM (MiB)</label>
-              <input type="number" id="vmMemory" class="form-control" min="512" max="65536" step="512" value="2048">
+              <input type="number" id="vmMemory" class="form-control" min="512" max="65536" step="512" value="4096">
             </div>
             <div class="form-group">
               <label for="vmDiskSize">Disk size (GiB, 0 = diskless)</label>
@@ -863,7 +864,7 @@ if ($('#vmFirmwareModal').length === 0) {
 
 $(document).on('click', '#vmCreateBtn', function () {
   const cpus = Math.min(32, Math.max(1, parseInt($('#vmCpu').val(), 10) || 2));
-  const memory = Math.min(65536, Math.max(512, parseInt($('#vmMemory').val(), 10) || 2048));
+  const memory = Math.min(65536, Math.max(512, parseInt($('#vmMemory').val(), 10) || 4096));
   const disk = Math.max(0, parseInt($('#vmDiskSize').val(), 10) || 0);
   const graphics = $('#vmGraphics').is(':checked');
   $('#vmFirmwareModal').modal('hide');
@@ -1932,7 +1933,11 @@ socket.on('vm:status', function(data) {
   let note = '';
   if (data.hasConsole === false) note = ' (no pty serial console configured)';
   if (data.state === 'not found') note = ' (VM not defined on host)';
-  $('#vm-state').text(data.name + ': ' + data.state + note);
+  const stateEl = $('#vm-state');
+  stateEl.text(data.name + ': ' + data.state + note);
+  if (data.trustStale) {
+    stateEl.append(' <span class="text-warning">— ' + (data.trustMessage || 'PXE boot trust changed — restart the VM') + '</span>');
+  }
   if (data.error) showToast(data.error, 'danger');
 });
 socket.on('vm:action:result', function(res) {
@@ -2058,9 +2063,11 @@ function vmDestroy() {
 
 //// Graphical console (noVNC over the /novnc/ws proxy) ////
 let vmRfb = null;
+let vncGen = 0; // bumped on dispose so an in-flight noVNC connect is discarded
 
-// Ask the server for the VNC port + generated password, then connect noVNC.
+// Tear down any prior session, then ask the server for the current VNC port.
 function vmShowVnc() {
+  vmDisposeVnc();
   socket.emit('vm:vnc:info');
 }
 
@@ -2069,6 +2076,7 @@ socket.on('vm:vnc:info', function(info) {
     showToast('No graphical console — the VM has no VNC display (create it with the graphical option)', 'warning');
     return;
   }
+  const gen = vncGen;
   const wsUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') +
     window.location.host + '/novnc/ws?port=' + info.port +
     (info.token ? '&token=' + encodeURIComponent(info.token) : '');
@@ -2077,6 +2085,7 @@ socket.on('vm:vnc:info', function(info) {
   $('#vm-vnc').removeClass('d-none');
 
   import('<%= baseurl %>public/vendor/novnc/core/rfb.js').then(function(mod) {
+    if (gen !== vncGen) return; // console re-rendered while loading — drop stale connect
     const RFB = mod.default;
     vmRfb = new RFB(document.getElementById('vm-vnc'), wsUrl, {
       credentials: { password: info.password || '' },
@@ -2089,7 +2098,9 @@ socket.on('vm:vnc:info', function(info) {
   });
 });
 
-// Dispose noVNC when the console view is re-rendered (tab switch/close).
+// Dispose noVNC when the console view is re-rendered or the page navigates away.
+// Bumping `gen` also abandons any connect still loading its rfb.js module.
 function vmDisposeVnc() {
+  vncGen++;
   if (vmRfb) { try { vmRfb.disconnect(); } catch (e) {} vmRfb = null; }
 }

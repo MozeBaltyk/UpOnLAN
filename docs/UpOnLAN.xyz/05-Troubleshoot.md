@@ -35,6 +35,20 @@ Walk the boot steps from [Networks summary](Networks/01-Overview.md):
 
 The webapp **Monitor** tab tails Nginx, TFTP and webapp activity in real time — it is the first place to look during a failed boot.
 
+If iPXE shows `0216eb8f` / `No usable certificates` while fetching `https://<boot-host>:8443/...`, do **not** read that as an HTTP permission problem. It means TLS validation failed in iPXE. The most common local cause is a **stale guest session after redeploy**:
+
+- UpOnLAN generated or changed `/config/tls/server.crt`
+- UpOnLAN rebuilt trusted iPXE ROMs
+- the VM was already running or booted before that change
+
+Fix: restart or recreate the VM so it reloads the current trusted ROM and guest clock state.
+
+If the error persists after a clean reboot:
+
+- verify the guest is really booting `rom/ipxe/uponlan.xyz.efi`
+- check the iPXE clock with `show unixtime:int32`
+- if available, inspect embedded trust with `certstat`
+
 ## 🧱 Menu build fails in the webapp
 
 The webapp's Build button runs `scripts/build_ipxe_roms.sh` directly inside the container (no Ansible); logs land in `/logs/rom/build_*.log`. Use `./wakemeup.sh -a logs` or the Monitor tab to inspect the webapp and build output.

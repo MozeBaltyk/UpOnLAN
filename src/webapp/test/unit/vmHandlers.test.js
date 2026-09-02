@@ -1,5 +1,8 @@
 // Unit tests: VM name validation (the guard in front of `sudo virsh` argv).
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import vmHandlers from '../../sockets/vmHandlers.js';
 
 describe('vmHandlers.isValidVmName', () => {
@@ -48,15 +51,15 @@ describe('vmHandlers.buildDomainXml', () => {
     expect(xml).toContain("<boot dev='network'/>");
     expect(xml).not.toContain("<boot dev='hd'/>");
     expect(xml).toContain("<source network='uponlan'/>");
-    expect(xml).toContain("<model type='e1000'/>");
+    expect(xml).toContain("<model type='virtio'/>");
     expect(xml).not.toContain('<rom file=');
     expect(xml).toContain('<emulator>/usr/bin/qemu-system-x86_64</emulator>');
     expect(xml).toContain("<target type='isa-serial' port='0'>");
     expect(xml).toContain("<console type='pty'>");
     expect(xml).not.toContain('<disk');
     expect(xml).not.toContain('<graphics');
-    // Default sizing: 2 vCPU, 2048 MiB RAM.
-    expect(xml).toContain("<memory unit='MiB'>2048</memory>");
+    // Default sizing: 2 vCPU, 4096 MiB RAM.
+    expect(xml).toContain("<memory unit='MiB'>4096</memory>");
     expect(xml).toContain("<vcpu placement='static'>2</vcpu>");
     // Every non-void opening tag we emit must have a matching close.
     for (const tag of ['domain', 'os', 'features', 'devices', 'interface', 'serial', 'console']) {
@@ -113,7 +116,7 @@ describe('vmHandlers.buildDomainXml (sizing + graphics)', () => {
 
   it('clamps out-of-range values to defaults', () => {
     expect(vmHandlers.sanitizeVmOpts({ cpus: 999 })).toMatchObject({ cpus: 2 });
-    expect(vmHandlers.sanitizeVmOpts({ memory: 0 })).toMatchObject({ memory: 2048 });
+    expect(vmHandlers.sanitizeVmOpts({ memory: 0 })).toMatchObject({ memory: 4096 });
     expect(vmHandlers.sanitizeVmOpts({ cpus: 8, memory: 4096, graphics: true })).toMatchObject({ cpus: 8, memory: 4096, graphics: true });
     expect(vmHandlers.sanitizeVmOpts({ graphics: 'yes' })).toMatchObject({ graphics: false });
   });
@@ -162,5 +165,68 @@ describe('vmHandlers.buildNetworkXml', () => {
     const noIp = vmHandlers.buildNetworkXml('uponlan', '');
     expect(noIp).not.toContain(',,;');
     expect(noIp).toContain("dhcp-boot=tag:ipxe-bios,rom/ipxe/uponlan.xyz.kpxe");
+  });
+});
+
+describe('vmHandlers.isTrustStale', () => {
+  // The guardrail reads fixed paths derived from UPONLAN_CONFIG, so each case
+  // stages a temp tree and re-imports the module with the env stubbed. The
+  // default export is the registerVmHandlers function with the helpers attached
+  // as static properties, matching the module's own `module.exports` pattern.
+  const load = async () => {
+    vi.resetModules();
+    return (await import('../../sockets/vmHandlers.js')).default;
+  };
+
+  const stage = () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uponlan-trust-'));
+    const romDir = path.join(dir, 'menus', 'rom', 'ipxe');
+    fs.mkdirSync(romDir, { recursive: true });
+    const rom = path.join(romDir, 'uponlan.xyz.efi');
+    fs.writeFileSync(rom, 'x');
+    return { dir, rom };
+  };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('flags stale trust when the ROM is newer than the recorded boot', async () => {
+    const { dir, rom } = stage();
+    fs.writeFileSync(path.join(dir, 'vm-boot-stamp.json'), JSON.stringify({ bootedAt: Date.now() - 60_000 }));
+    const now = new Date();
+    fs.utimesSync(rom, now, now);
+
+    vi.stubEnv('UPONLAN_CONFIG', dir);
+    const h = await load();
+    expect(h.isTrustStale()).toBe(true);
+  });
+
+  it('returns false when the ROM predates the recorded boot', async () => {
+    const { dir, rom } = stage();
+    const past = new Date(Date.now() - 60_000);
+    fs.utimesSync(rom, past, past);
+    fs.writeFileSync(path.join(dir, 'vm-boot-stamp.json'), JSON.stringify({ bootedAt: Date.now() }));
+
+    vi.stubEnv('UPONLAN_CONFIG', dir);
+    const h = await load();
+    expect(h.isTrustStale()).toBe(false);
+  });
+
+  it('treats a running VM with no boot stamp as stale (ROM exists)', async () => {
+    const { dir } = stage();
+
+    vi.stubEnv('UPONLAN_CONFIG', dir);
+    const h = await load();
+    expect(h.isTrustStale()).toBe(true);
+  });
+
+  it('returns false when neither a stamp nor a ROM exists (fresh deploy)', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uponlan-trust-'));
+
+    vi.stubEnv('UPONLAN_CONFIG', dir);
+    const h = await load();
+    expect(h.isTrustStale()).toBe(false);
   });
 });

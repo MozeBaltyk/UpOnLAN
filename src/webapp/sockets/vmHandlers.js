@@ -19,11 +19,20 @@ const BOOT_SERVER_IP = process.env.BOOT_SERVER_IP || '';
 const VM_STORAGE_POOL = process.env.VM_STORAGE_POOL || 'uponlan';
 const VM_STORAGE_POOL_PATH = process.env.VM_STORAGE_POOL_PATH || '/var/lib/libvirt/images/uponlan';
 // Default sizing for the diskless PXE test VM (the UI overrides per-create).
-const VM_DEFAULTS = { cpus: 2, memory: 2048 }; // memory in MiB
+const VM_DEFAULTS = { cpus: 2, memory: 4096 }; // memory in MiB
 // Where the generated VNC password is persisted so the webapp can hand it to
 // noVNC on later visits (the domain XML stores it too, but only as a one-way
 // hash in the running QEMU; this file is the plaintext source of truth).
 const VNC_PASSWORD_FILE = (process.env.UPONLAN_CONFIG || '/config') + '/vm-vnc-password';
+
+// Boot-trust drift guardrail: a running VM can outlive a redeploy that
+// regenerates the TLS cert and rebuilds the trusted ROMs, leaving it on a stale
+// in-memory iPXE session (HTTPS boot then fails 0216eb8f "No usable
+// certificates"). We stamp when the managed VM last booted and, on vm:status,
+// compare it to the ROM's mtime so the operator sees "restart me" instead of a
+// cryptic cert error.
+const ROM_EFI = `${process.env.UPONLAN_CONFIG || '/config'}/menus/rom/ipxe/uponlan.xyz.efi`;
+const VM_BOOT_STAMP = `${process.env.UPONLAN_CONFIG || '/config'}/vm-boot-stamp.json`;
 
 // The VM is UEFI/OVMF only: its network stack fetches rom/ipxe/uponlan.xyz.efi
 // directly from the DHCP answer, so no host-side PCI option ROM is involved.
@@ -112,6 +121,39 @@ async function getVmHasConsole() {
   return res.ok && /<console[^>]*type=['"]pty['"]/.test(res.out);
 }
 
+function recordVmBootTime() {
+  try {
+    fs.writeFileSync(VM_BOOT_STAMP, JSON.stringify({ bootedAt: Date.now() }));
+  } catch (e) {
+    console.warn('Failed to persist VM boot stamp:', e.message);
+  }
+}
+
+// ponytail: trust freshness is derived from the ROM file mtime, not a persisted
+// generation — init.sh couples cert regeneration to a ROM rebuild, so a newer
+// ROM always means fresh trust. If that coupling ever breaks (cert regenerated
+// without rebuilding ROMs), switch to a generation counter written by
+// init.sh/romBuildService on every change.
+function isTrustStale() {
+  let bootedAt = NaN;
+  try {
+    bootedAt = Number(JSON.parse(fs.readFileSync(VM_BOOT_STAMP, 'utf8')).bootedAt);
+  } catch {
+    /* no stamp yet — handled below */
+  }
+  if (Number.isFinite(bootedAt)) {
+    try {
+      return fs.statSync(ROM_EFI).mtimeMs > bootedAt;
+    } catch {
+      return false; // ROM not built yet (fresh deploy) — nothing to flag
+    }
+  }
+  // No boot stamp. A running VM reaches this only when it booted before tracking
+  // existed (or was started outside the webapp), so its ROM-load time is unknown.
+  // Assume stale when a ROM exists — one restart records a stamp and re-fetches it.
+  return fs.existsSync(ROM_EFI);
+}
+
 // `virsh pool-info` prints "State: inactive" for a defined-but-not-started
 // dir pool; only an active pool accepts vol-create-as.
 function isInactivePoolInfo(poolInfoOut) {
@@ -161,7 +203,7 @@ function buildDomainXml(name, network, diskPath, opts = {}) {
   const { cpus, memory, graphics } = sanitizeVmOpts(opts);
   const nic = `<interface type='network'>
       <source network='${network}'/>
-      <model type='e1000'/>
+      <model type='virtio'/>
     </interface>`;
   // Optional: attach a qcow2 disk so a PXE install has somewhere to write to.
   const disk = diskPath
@@ -255,7 +297,13 @@ function buildNetworkXml(name, bootServerIp) {
 
 module.exports = function registerVmHandlers(socket) {
   const sendStatus = async () => {
-    socket.emit('vm:status', { name: VM_NAME, state: await getVmState(), hasConsole: await getVmHasConsole() });
+    const state = await getVmState();
+    const status = { name: VM_NAME, state, hasConsole: await getVmHasConsole() };
+    if (state === 'running' && isTrustStale()) {
+      status.trustStale = true;
+      status.trustMessage = 'PXE boot trust may be out of date — restart the VM to reload the current certificate/ROM.';
+    }
+    socket.emit('vm:status', status);
   };
 
   socket.on('vm:status', sendStatus);
@@ -290,6 +338,7 @@ module.exports = function registerVmHandlers(socket) {
         }
       }
       const s = await runVirsh(['start', VM_NAME]);
+      if (s.ok) recordVmBootTime();
       socket.emit('vm:action:result', { action, ok: s.ok, message: s.ok ? `VM '${VM_NAME}' restarted` : s.err });
       sendStatus();
       return;
@@ -307,6 +356,7 @@ module.exports = function registerVmHandlers(socket) {
       socket.emit('vm:action:result', { action, ok: false, message: `VM '${VM_NAME}' is not running (${state})` });
     } else {
       const res = await runVirsh([virshAction, VM_NAME]);
+      if (action === 'on' && res.ok) recordVmBootTime();
       socket.emit('vm:action:result', { action, ok: res.ok, message: res.ok ? res.out : res.err });
     }
     sendStatus();
@@ -382,6 +432,7 @@ module.exports = function registerVmHandlers(socket) {
         return;
       }
       const boot = await runVirsh(['start', VM_NAME]);
+      if (boot.ok) recordVmBootTime();
       socket.emit('vm:action:result', {
         action: 'create',
         ok: boot.ok,
@@ -502,3 +553,4 @@ module.exports.buildNetworkXml = buildNetworkXml;
 module.exports.sanitizeVmOpts = sanitizeVmOpts;
 module.exports.getVncPassword = getVncPassword;
 module.exports.parseVncPort = parseVncPort;
+module.exports.isTrustStale = isTrustStale;

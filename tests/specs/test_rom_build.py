@@ -60,6 +60,15 @@ class RomBuildSpecs(unittest.TestCase):
         self.assertIn('config/local/general.h', self.script)
         self.assertIn('#define DOWNLOAD_PROTO_HTTPS', self.script)
 
+    def test_e1000_option_rom_is_built_and_synced(self):
+        # The BIOS VM loads a host-side option ROM; it must be built on every
+        # BIOS build (not release-only) and synced/warned against the host path.
+        self.assertIn('add_bios "bin/8086100e.rom"', self.script)
+        self.assertIn('artifacts+=("bin/8086100e.rom:uponlan.xyz-e1000.rom")', self.script)
+        self.assertIn('sync_host_option_rom()', self.script)
+        self.assertIn('installed + verified NIC option ROM', self.script)
+        self.assertIn('host option ROM', self.script)
+
 
 class BuildReleaseSpecs(unittest.TestCase):
     """build_release.sh runs the local release pipeline (assets -> menu) and

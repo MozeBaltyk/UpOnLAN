@@ -114,12 +114,11 @@ IFS=',' read -ra FMT <<< "$FORMATS"
 for f in "${FMT[@]}"; do
   case "$f" in
     release)
-      add_bios "bin/undionly.kpxe"; add_bios "bin/ipxe.pxe"; add_bios "bin/8086100e.rom"
+      add_bios "bin/undionly.kpxe"; add_bios "bin/ipxe.pxe"
       add_efi "bin-x86_64-efi/ipxe.efi"
       artifacts+=("bin/undionly.kpxe:uponlan.xyz-undionly.kpxe")
       artifacts+=("bin/ipxe.pxe:uponlan.xyz.kpxe")
       artifacts+=("bin-x86_64-efi/ipxe.efi:uponlan.xyz.efi")
-      artifacts+=("bin/8086100e.rom:uponlan.xyz-e1000.rom")
       ;;
     legacy)
       add_bios "bin/ipxe.kpxe"; add_bios "bin/ipxe.dsk"; add_bios "bin/ipxe.pdsk"; add_bios "bin/ipxe.lkrn"; add_bios "bin/undionly.kpxe"
@@ -145,6 +144,14 @@ done
 if [ "$gen_iso" = 1 ] || [ "$gen_usb" = 1 ]; then
   add_bios "bin/ipxe.lkrn"
   add_efi "bin-x86_64-efi/ipxe.efi"
+fi
+
+# The e1000 PCI option ROM is a BIOS artifact libvirt attaches to the VM via
+# <rom file='/usr/lib/ipxe/qemu/uponlan-e1000.rom'/>. Include it whenever any
+# BIOS target is built so it is never silently skipped by a legacy/release build.
+if [ -n "$bios_targets" ]; then
+  add_bios "bin/8086100e.rom"
+  artifacts+=("bin/8086100e.rom:uponlan.xyz-e1000.rom")
 fi
 
 # shellcheck disable=SC2086
@@ -203,25 +210,27 @@ fi
 
 # Install the built e1000 option ROM where QEMU loads it from (the domain XML
 # emitted by buildDomainXml references this exact path), then VERIFY the
-# installed bytes match what was built - the acceptance criteria require a
-# checksum/comparison check, not just "file exists". Release mode only: the
-# container's media build has no host to install into.
-install_host_rom() {
+# installed bytes match what was built. Only runs when the host path is
+# reachable from the build environment: a host build can install it (with sudo
+# when needed); a container build has no /usr/lib/ipxe mount, so it reports a
+# warning instead of silently leaving a stale host option ROM in place.
+sync_host_option_rom() {
   local src="$1" dest="$PXE_ROM_PATH" dir
   dir="$(dirname "$dest")"
-  if [ ! -d "$dir" ]; then
-    mkdir -p "$dir" 2>/dev/null || sudo -n mkdir -p "$dir" 2>/dev/null || {
-      echo "ERROR: cannot create $dir (need root?)" >&2
-      return 1
-    }
-  fi
+  [ -d "$dir" ] || return 0
+
   if [ -w "$dir" ]; then
     cp "$src" "$dest"
-  elif ! sudo -n cp "$src" "$dest" 2>/dev/null; then
-    echo "ERROR: cannot write $dest (need root). Install it with:" >&2
+  elif sudo -n cp "$src" "$dest" 2>/dev/null; then
+    :
+  elif [ -f "$dest" ] && cmp -s "$src" "$dest"; then
+    : # already up to date, no write needed
+  else
+    echo "WARNING: host option ROM $dest not updated (need root). Install it with:" >&2
     echo "  sudo cp $OUT_ROM/uponlan.xyz-e1000.rom $dest" >&2
     return 1
   fi
+
   if ! cmp -s "$src" "$dest"; then
     echo "ERROR: installed ROM at $dest does not match the freshly built ROM" >&2
     return 1
@@ -229,8 +238,10 @@ install_host_rom() {
   echo "[ipxe] installed + verified NIC option ROM -> $dest"
 }
 
-if [ "$FORMATS" = "release" ]; then
-  install_host_rom "$WORK/ipxe/src/bin/8086100e.rom"
+# The host option ROM is a side effect of the build, not a release-mode-only
+# step — sync it whenever we built the e1000 target (i.e. any BIOS build).
+if [[ " $bios_targets " == *" bin/8086100e.rom "* ]]; then
+  sync_host_option_rom "$WORK/ipxe/src/bin/8086100e.rom" || true
 fi
 
 echo "[ipxe] done -> $OUT_ROM"

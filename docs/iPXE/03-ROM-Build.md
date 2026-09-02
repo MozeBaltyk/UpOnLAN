@@ -58,7 +58,7 @@ The iPXE ROMs embed the deployment's TLS cert, so they are **not** shipped in th
 OUT_ROM=/config/menus/rom/ipxe TRUST=/config/tls/server.crt /scripts/build_ipxe_roms.sh legacy,efi
 ```
 
-Requirements (already in the container image): `build-base`, `xz`/`xz-dev` (`lzma`), `curl`, and the vendored `scripts/sources/ipxe-gas242-binutils.patch`. The build fetches the iPXE source from GitHub, so the first boot needs internet; a failure is non-fatal — PXE stays down until retried via the webapp Build UI.
+Requirements (already in the container image): `build-base`, `xz`/`xz-dev` (`lzma`), `curl`, the vendored `scripts/sources/ipxe-gas242-binutils.patch`, and the vendored iPXE source tarball at `/opt/ipxe/ipxe-<ver>.tar.gz`. The build is **offline** — it unpacks the vendored source instead of fetching from GitHub (it only falls back to a GitHub fetch if the tarball is absent, e.g. a version override). A failure is non-fatal — PXE stays down until retried via the webapp Build UI.
 
 Artifacts land in `/config/menus/rom/ipxe/`:
 - `uponlan.xyz-undionly.kpxe` — firmware PXE stage-1 (BIOS).

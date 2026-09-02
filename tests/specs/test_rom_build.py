@@ -37,6 +37,14 @@ class RomBuildSpecs(unittest.TestCase):
     def test_default_ipxe_version(self):
         self.assertIn('IPXE_VERSION="${IPXE_VERSION:-1.21.1}"', self.script)
 
+    def test_vendored_source_fallback(self):
+        # Prefer a vendored tarball (offline) at /opt/ipxe/ipxe-<ver>.tar.gz,
+        # falling back to a GitHub fetch only when it's absent.
+        self.assertIn('IPXE_TARBALL="${IPXE_TARBALL:-/opt/ipxe/ipxe-${IPXE_VERSION}.tar.gz}"', self.script)
+        self.assertIn('using vendored iPXE source', self.script)
+        self.assertIn('fetching iPXE v$IPXE_VERSION', self.script)
+        self.assertIn('cp "$IPXE_TARBALL" "$WORK/ipxe.tar.gz"', self.script)
+
     def test_optional_https_trust_knobs(self):
         # TRUST/CERT are optional and off by default; when set they must be
         # passed to make and validated to exist.

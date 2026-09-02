@@ -92,6 +92,15 @@ COPY scripts/sources/ipxe-gas242-binutils.patch /scripts/sources/ipxe-gas242-bin
 COPY scripts/sources/genfsimg /scripts/sources/genfsimg
 RUN chmod +x /scripts/build_ipxe_roms.sh /scripts/sources/genfsimg
 
+# Vendored iPXE source so the deploy-time ROM build works offline (no GitHub
+# fetch at runtime). Keep IPXE_VERSION in sync with the default in
+# scripts/build_ipxe_roms.sh; the script falls back to GitHub if this is absent.
+ARG IPXE_VERSION=1.21.1
+ENV IPXE_VERSION=${IPXE_VERSION}
+RUN mkdir -p /opt/ipxe && \
+    curl -fsSL -o "/opt/ipxe/ipxe-${IPXE_VERSION}.tar.gz" \
+      "https://github.com/ipxe/ipxe/archive/refs/tags/v${IPXE_VERSION}.tar.gz"
+
 #### VM console support (host libvirt socket mounted at /var/run/libvirt)
 # util-linux provides `script`, which allocates the controlling TTY `virsh console` requires.
 RUN apk add --no-cache libvirt-client util-linux

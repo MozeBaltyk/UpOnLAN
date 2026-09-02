@@ -6,6 +6,7 @@
 #   build_ipxe_roms.sh legacy,efi,iso,usb  # boot media (media mode)
 #   OUT_ROM=/path build_ipxe_roms.sh ...   # override the output dir (default release/menus/rom/ipxe)
 #   TRUST=ca.pem CERT=client.pem build_ipxe_roms.sh ...  # embed HTTPS trust (optional)
+#   IPXE_TARBALL=/path build_ipxe_roms.sh ...  # use a vendored iPXE source tarball (offline)
 #
 # release set:
 #   bin/undionly.kpxe        -> uponlan.xyz-undionly.kpxe  (firmware PXE stage-1)
@@ -53,8 +54,17 @@ if ! command -v lzma >/dev/null; then
   exit 1
 fi
 
-echo "[ipxe] fetching iPXE v$IPXE_VERSION"
-curl -fsSL -o "$WORK/ipxe.tar.gz" "https://github.com/ipxe/ipxe/archive/refs/tags/v${IPXE_VERSION}.tar.gz"
+# Source tarball: prefer a vendored copy (the container ships one at
+# /opt/ipxe/ipxe-<ver>.tar.gz so the deploy-time build works offline), falling
+# back to GitHub for host builds / version overrides.
+IPXE_TARBALL="${IPXE_TARBALL:-/opt/ipxe/ipxe-${IPXE_VERSION}.tar.gz}"
+if [[ -f "$IPXE_TARBALL" ]]; then
+  echo "[ipxe] using vendored iPXE source $IPXE_TARBALL (offline)"
+  cp "$IPXE_TARBALL" "$WORK/ipxe.tar.gz"
+else
+  echo "[ipxe] fetching iPXE v$IPXE_VERSION"
+  curl -fsSL -o "$WORK/ipxe.tar.gz" "https://github.com/ipxe/ipxe/archive/refs/tags/v${IPXE_VERSION}.tar.gz"
+fi
 mkdir -p "$WORK/ipxe"
 tar -xzf "$WORK/ipxe.tar.gz" -C "$WORK/ipxe" --strip-components=1
 cd "$WORK/ipxe/src"

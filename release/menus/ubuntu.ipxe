@@ -32,7 +32,7 @@ goto mirrorcfg
 
 :older_release
 set older_release true
-set ubuntu_mirror http://old-releases.ubuntu.com
+set ubuntu_mirror https://old-releases.ubuntu.com
 echo Setting mirror to ${ubuntu_mirror}
 clear ubuntu_version
 echo -n Please set enter code name of release: ${} && read ubuntu_version
@@ -114,8 +114,8 @@ goto sub_boot
 
 :sub_boot
 imgfree
-iseq ${os_arch} amd64 && set ubuntu_iso_url http://releases.ubuntu.com/${codename}/ubuntu-${version_number}-live-server-${os_arch}.iso ||
-iseq ${os_arch} arm64 && set ubuntu_iso_url http://cdimage.ubuntu.com/releases/${version_number}/release/ubuntu-${version_number}-live-server-${os_arch}.iso ||
+iseq ${os_arch} amd64 && set ubuntu_iso_url https://releases.ubuntu.com/${codename}/ubuntu-${version_number}-live-server-${os_arch}.iso ||
+iseq ${os_arch} arm64 && set ubuntu_iso_url https://cdimage.ubuntu.com/releases/${version_number}/release/ubuntu-${version_number}-live-server-${os_arch}.iso ||
 isset ${dhcp-server} && set netboot_params ip=dhcp url=${ubuntu_iso_url} || set netboot_params
 echo Loading Ubuntu Subiquity Network Installer...
 kernel ${kernel_url}vmlinuz root=/dev/ram0 ramdisk_size=3500000 cloud-config-url=/dev/null ${netboot_params} ${install_params} ${cmdline}

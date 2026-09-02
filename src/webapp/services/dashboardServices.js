@@ -26,8 +26,10 @@ async function getDashboardInfo() {
 
   dashinfo.cpu = await si.cpu();
   dashinfo.mem = await si.mem();
+  // systeminformation returns camelCase fields (currentLoad/currentLoadUser);
+  // currentLoad is the overall host CPU utilization, which is what the gauge shows.
   const load = await si.currentLoad();
-  dashinfo.CPUpercent = load.currentload_user;
+  dashinfo.CPUpercent = load.currentLoad;
   dashinfo.tftpversion = await execCommand('/usr/sbin/dnsmasq --version | head -n1 | cut -d " " -f1-3');
   dashinfo.nginxversion = await execCommand('/usr/sbin/nginx -v');
   dashinfo.wolversion = await execCommand('/usr/bin/awake --version');

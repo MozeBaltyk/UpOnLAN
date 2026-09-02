@@ -56,12 +56,16 @@ goto bootos_images
 
 :kickstart
 echo -n Specify kickstart URL for ${os} ${osversion}: && read ks_url
-set params inst.ks=${ks_url} ||
+set params inst.ks=${ks_url} inst.noverifyssl ||
 clear bt
 goto boottype
 
 :kickstart_example
-set params inst.ks=${kickstart_url} ||
+# ks.cfg is served over the self-signed local HTTPS endpoint, so Anaconda has
+# no trust path for it — inst.noverifyssl lets it fetch the ks (and any
+# self-signed inst.repo) without validating that cert. Drop it once a real or
+# internal-CA cert replaces the endpoint.
+set params inst.ks=${kickstart_url} inst.noverifyssl ||
 clear bt
 goto bootos_images
 

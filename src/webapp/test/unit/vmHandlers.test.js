@@ -49,6 +49,7 @@ describe('vmHandlers.buildDomainXml', () => {
     expect(xml).toContain("<name>uponlan-client</name>");
     expect(xml).toContain("<os firmware='efi'>");
     expect(xml).toContain("<boot dev='network'/>");
+    expect(xml).not.toContain("<boot dev='disk'/>");
     expect(xml).not.toContain("<boot dev='hd'/>");
     expect(xml).toContain("<source network='uponlan'/>");
     expect(xml).toContain("<model type='virtio'/>");
@@ -130,7 +131,9 @@ describe('vmHandlers.buildDomainXml (with disk)', () => {
     expect(xml).toContain("<driver name='qemu' type='qcow2'/>");
     expect(xml).toContain("<source file='/var/lib/libvirt/images/uponlan-client.qcow2'/>");
     expect(xml).toContain("<target dev='vda' bus='virtio'/>");
+    expect(xml).toContain("<boot dev='disk'/>");
     expect(xml).toContain("<boot dev='network'/>");
+    expect(xml.indexOf("<boot dev='disk'/>")).toBeLessThan(xml.indexOf("<boot dev='network'/>"));
     expect(xml).toContain("<console type='pty'>");
   });
 });

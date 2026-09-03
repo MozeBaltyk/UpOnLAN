@@ -217,6 +217,13 @@ function buildDomainXml(name, network, diskPath, opts = {}) {
       <target dev='vda' bus='virtio'/>
     </disk>`
     : '';
+  // Boot order: with a disk attached, boot it first and fall back to network, so
+  // a finished install reboots into the OS instead of the PXE menu. A diskless
+  // VM keeps network as its only boot target.
+  const bootOrder = diskPath
+    ? `    <boot dev='disk'/>
+    <boot dev='network'/>`
+    : `    <boot dev='network'/>`;
   // Optional: graphical console (VNC) for GUI installers, on top of serial.
   // listen='0.0.0.0' so the container can reach QEMU's VNC via the podman
   // bridge (host.containers.internal); the random password (persisted at
@@ -235,7 +242,7 @@ function buildDomainXml(name, network, diskPath, opts = {}) {
   <vcpu placement='static'>${cpus}</vcpu>
   <os firmware='efi'>
     <type arch='x86_64'>hvm</type>
-    <boot dev='network'/>
+    ${bootOrder}
   </os>
   <features>
     <acpi/>

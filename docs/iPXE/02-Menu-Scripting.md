@@ -97,6 +97,8 @@ kernel ${url}vmlinuz initrd=initrd.img inst.repo=${repo} inst.ks=${kickstart_url
 
 Drop `inst.noverifyssl` once the endpoint uses a cert the installer already trusts (a real cert, or an internal CA you distribute to clients). The shipped Rocky menu already adds it on its two Kickstart paths.
 
+Ubuntu's **cloud-init (NoCloud)** seed has **no** `inst.noverifyssl`-style flag: cloud-init verifies the TLS certificate when it fetches `user-data`/`meta-data` from `ds=nocloud-net;s=<https url>`, so a self-signed seed fails. There is no boot argument to skip that verification — the clean fixes are to serve the seed from a certificate the installer already trusts (real cert or internal CA), or to serve the provisioning seed path over plain HTTP on the trusted LAN.
+
 ## 🔗 Chain iPXE scripts
 
 Example of chain usage with  `main.ipxe` Menu:

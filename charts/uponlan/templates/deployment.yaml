@@ -10,6 +10,8 @@ metadata:
     app.kubernetes.io/name: uponlan
 spec:
   replicas: {{ .Values.replicas }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: uponlan
@@ -18,5 +20,7 @@ spec:
       labels:
         app.kubernetes.io/name: uponlan
     spec:
+      securityContext:
+        fsGroup: 911
       {{- include "uponlan.podspec" . | nindent 6 }}
 {{- end }}

@@ -4,3 +4,6 @@ assets
 README.md
 LICENCE.txt
 **/coverage
+**/node_modules
+.git
+.local

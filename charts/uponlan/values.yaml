@@ -21,6 +21,37 @@ endpoint: https://github.com/mozebaltyk/uponlan
 ## specific version is required there.
 menuVersion: ""
 
+## Webapp basic authentication. For direct Podman deployment, wakemeup.sh
+## supplies user/password through temporary files. On Kubernetes, prefer an
+## existing Secret; it takes precedence over direct values.
+webappAuth:
+  user: ""
+  password: ""
+  existingSecret: ""
+  usernameKey: username
+  passwordKey: password
+
+## OKD generation is fail-closed unless this HTTPS origin, persistent storage,
+## and a valid resolved pull secret are present (public OKD placeholder if no custom secret exists).
+okd:
+  publicBaseUrl: ""
+  ## 0 disables private workspace/log retention cleanup candidates.
+  retentionDays: 0
+  pullSecret:
+    ## Optional read-only external source (authoritative when present/configured).
+    ## Otherwise uses saved internal credentials or the public OKD placeholder.
+    ## Profiles > Add Pull Secret can store a custom override; UI writes require
+    ## persistent config plus both webappAuth credentials.
+    ## Pod/podman only: trusted absolute host file. Deployment uses existingSecret.
+    hostPath: ""
+    existingSecret: ""
+    key: .dockerconfigjson
+  persistence:
+    configClaim: ""
+    assetsClaim: ""
+    menuClaim: ""
+    logsClaim: ""
+
 ## Bound host ports. 69/udp (TFTP) is privileged. webAppPort is NOT published
 ## — the webapp is reachable only through the nginx TLS proxy on webAppHttpsPort.
 webAppPort: 3000

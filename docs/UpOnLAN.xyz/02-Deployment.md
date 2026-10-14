@@ -10,6 +10,16 @@
 
 `wakemeup.sh` renders the Helm chart (`charts/uponlan/`) and pipes it to `podman play kube -`. Three modes:
 
+Webapp credentials are optional. With either or both of `WEBAPP_USER` and `WEBAPP_PASS` unset or empty, `deploy` and `redeploy` disable authentication and do not prompt. To enable authentication, set both without putting the password in shell history:
+
+```bash
+read -r -p "Webapp username: " WEBAPP_USER
+read -r -s -p "Webapp password: " WEBAPP_PASS; printf '\n'
+export WEBAPP_USER WEBAPP_PASS
+```
+
+When both values are non-empty, the script passes them to Helm through mode-0600 temporary files and removes the files after rendering. If only one value is set, authentication remains disabled; set both to enable it. The app reads credentials at startup, so use `redeploy` after changing them.
+
 ```bash
 ./wakemeup.sh -a deploy               # pull ghcr.io/.../uponlan:latest + remote (GitHub), no build
 ./wakemeup.sh -a deploy --build       # build localhost/uponlan:latest + remote (GitHub)
@@ -37,7 +47,7 @@ To use your own cert, drop it at those two paths (in the host `./config` directo
 
 - Restrict `69/UDP` to the PXE client network. Allow `8443/TCP` only where boot clients need to fetch assets and menus.
 - Restrict `3443/TCP` to administrators, or place it behind a reverse proxy.
-- Basic authentication is disabled unless **both** `WEBAPP_USER` and `WEBAPP_PASS` are set. For a protected deployment, add both environment variables to the container in the manifest before deploying. Treat the manifest and its secret values as sensitive.
+- Basic authentication is disabled unless **both** `WEBAPP_USER` and `WEBAPP_PASS` are set. When both are supplied, `wakemeup.sh deploy/redeploy` passes them to Helm through mode-0600 temporary files (not secret-bearing Helm arguments) and removes the files after rendering. The app reads credentials at startup, so run `redeploy` after changing them.
 
 ### Kubernetes deployment
 
@@ -45,6 +55,23 @@ The chart renders either a bare `Pod` or a `Deployment` depending on `deployAs`:
 
 - `deployAs: Pod` (default) — for `podman play kube`; binds host ports `8443`, `3443`, `69/udp` and uses the podman `emptyDir.path` extension so data survives `--replace`.
 - `deployAs: Deployment` — for a real cluster; `replicas: 1` (set `replicas` as needed), no host ports, and plain `emptyDir` volumes (swap in `hostPath` or a PVC if config/assets/logs must persist). Expose the service with a `Service`/`Ingress`. The libvirt socket mount remains opt-in via `libvirt.enabled` and only works on the node that owns `/var/run/libvirt/libvirt-sock`.
+
+For Kubernetes, store web credentials in a Secret rather than direct Helm values. Create it from protected files so values do not appear in command arguments, then reference it in chart values:
+
+```bash
+kubectl create secret generic uponlan-webapp-auth \
+  --from-file=username=/secure/path/webapp-username \
+  --from-file=password=/secure/path/webapp-password
+```
+
+```yaml
+webappAuth:
+  existingSecret: uponlan-webapp-auth
+  usernameKey: username
+  passwordKey: password
+```
+
+`existingSecret` takes precedence over `webappAuth.user`/`password`. Without it, the chart emits literal environment entries only when both direct values are non-empty and rejects a partial pair. The app reads credentials only at startup, so rotate the Secret and then restart the workload, for example with `kubectl rollout restart deployment/uponlan`.
 
 ### Release artifacts
 

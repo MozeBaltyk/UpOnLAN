@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import crypto from 'crypto';
 import vmHandlers from '../../sockets/vmHandlers.js';
 
 describe('vmHandlers.isValidVmName', () => {
@@ -185,9 +186,20 @@ describe('vmHandlers.isTrustStale', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uponlan-trust-'));
     const romDir = path.join(dir, 'menus', 'rom', 'ipxe');
     fs.mkdirSync(romDir, { recursive: true });
-    const rom = path.join(romDir, 'uponlan.xyz.efi');
-    fs.writeFileSync(rom, 'x');
-    return { dir, rom };
+    const tlsDir = path.join(dir, 'tls');
+    fs.mkdirSync(tlsDir);
+    const cert = Buffer.from('public cert');
+    fs.writeFileSync(path.join(tlsDir, 'server.crt'), cert);
+    const names = ['uponlan.xyz-snp.efi', 'uponlan.xyz-snponly.efi', 'uponlan.xyz-undionly.kpxe', 'uponlan.xyz.dsk', 'uponlan.xyz.efi', 'uponlan.xyz.kpxe', 'uponlan.xyz.lkrn', 'uponlan.xyz.pdsk'];
+    const files = names.map((name) => {
+      const data = Buffer.from(name);
+      fs.writeFileSync(path.join(romDir, name), data);
+      return { name, size: data.length, sha256: crypto.createHash('sha256').update(data).digest('hex') };
+    });
+    const manifest = path.join(romDir, 'build-manifest.json');
+    fs.writeFileSync(manifest, JSON.stringify({ schemaVersion: 1, ipxeVersion: '1.21.1', builtAt: '2026-01-01T00:00:00Z', trustSha256: crypto.createHash('sha256').update(cert).digest('hex'), files }));
+    const identity = crypto.createHash('sha256').update(fs.readFileSync(manifest)).digest('hex');
+    return { dir, manifest, identity };
   };
 
   afterEach(() => {
@@ -195,44 +207,35 @@ describe('vmHandlers.isTrustStale', () => {
     vi.resetModules();
   });
 
-  it('flags stale trust when the ROM is newer than the recorded boot', async () => {
-    const { dir, rom } = stage();
-    fs.writeFileSync(path.join(dir, 'vm-boot-stamp.json'), JSON.stringify({ bootedAt: Date.now() - 60_000 }));
-    const now = new Date();
-    fs.utimesSync(rom, now, now);
+  it('flags stale trust when the manifest generation differs from the recorded boot', async () => {
+    const { dir } = stage();
+    fs.writeFileSync(path.join(dir, 'vm-boot-stamp.json'), JSON.stringify({ romManifestSha256: 'a'.repeat(64) }));
 
     vi.stubEnv('UPONLAN_CONFIG', dir);
     const h = await load();
     expect(h.isTrustStale()).toBe(true);
   });
 
-  it('flags stale when only the cert moved (no ROM built)', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uponlan-trust-'));
-    const tlsDir = path.join(dir, 'tls');
-    fs.mkdirSync(tlsDir, { recursive: true });
-    const cert = path.join(tlsDir, 'server.crt');
-    fs.writeFileSync(cert, 'x');
-    const now = new Date();
-    fs.utimesSync(cert, now, now);
-    fs.writeFileSync(path.join(dir, 'vm-boot-stamp.json'), JSON.stringify({ bootedAt: Date.now() - 60_000 }));
+  it('flags stale when the cert no longer matches the ROM manifest trust hash', async () => {
+    const { dir } = stage();
+    fs.writeFileSync(path.join(dir, 'tls', 'server.crt'), 'changed cert');
+    fs.writeFileSync(path.join(dir, 'vm-boot-stamp.json'), JSON.stringify({ romManifestSha256: 'a'.repeat(64) }));
 
     vi.stubEnv('UPONLAN_CONFIG', dir);
     const h = await load();
     expect(h.isTrustStale()).toBe(true);
   });
 
-  it('returns false when the ROM predates the recorded boot', async () => {
-    const { dir, rom } = stage();
-    const past = new Date(Date.now() - 60_000);
-    fs.utimesSync(rom, past, past);
-    fs.writeFileSync(path.join(dir, 'vm-boot-stamp.json'), JSON.stringify({ bootedAt: Date.now() }));
+  it('returns false when the recorded manifest is current', async () => {
+    const { dir, identity } = stage();
+    fs.writeFileSync(path.join(dir, 'vm-boot-stamp.json'), JSON.stringify({ romManifestSha256: identity }));
 
     vi.stubEnv('UPONLAN_CONFIG', dir);
     const h = await load();
     expect(h.isTrustStale()).toBe(false);
   });
 
-  it('treats a running VM with no boot stamp as stale (ROM exists)', async () => {
+  it('treats a running VM with no boot stamp as stale when a complete manifest exists', async () => {
     const { dir } = stage();
 
     vi.stubEnv('UPONLAN_CONFIG', dir);

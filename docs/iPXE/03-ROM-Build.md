@@ -66,6 +66,12 @@ Artifacts land in `/config/menus/rom/ipxe/`:
 - `uponlan.xyz.kpxe` — iPXE stage-2 (BIOS, dhcp-boot).
 - `uponlan.xyz.efi` — UEFI PXE binary served to OVMF guests over TFTP.
 
+The builder stages all requested outputs, serializes publication, atomically
+renames each file, and writes `build-manifest.json` last. The manifest records
+only schema/iPXE version, build time, the public trust-file SHA-256, and output
+sizes/hashes. Startup rebuilds unless that manifest proves a complete, current
+Legacy+EFI set for the deployment certificate.
+
 The embedded script (`scripts/build_ipxe_roms.sh` → `embed.ipxe`) gives the binaries a serial console (`CONSOLE_SERIAL`) and a default flow: DHCP → `menu.ipxe` → `boot.cfg` → menu, with distinct recovery paths for DHCP failure, menu failure, and boot-config failure.
 
 ## Build in the webapp

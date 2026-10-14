@@ -120,10 +120,28 @@ fi
 # iPXE ROMs are no longer shipped in the release tarball — they must embed this
 # deployment's TLS cert (TRUST) so iPXE can fetch kernel/initrd over HTTPS. Build
 # them into the TFTP root on first boot, in the background so nginx/webapp/dnsmasq
-# start immediately. Subsequent boots find the artifacts present and skip. A
+# start immediately. Subsequent boots skip only when the complete BIOS+UEFI set
+# and its last-written manifest match this deployment's current trust file. A
 # failure (e.g. no internet for the iPXE source fetch) is non-fatal — PXE stays
 # down until retried via the webapp Build UI.
-if ! ls /config/menus/rom/ipxe/uponlan.xyz-* >/dev/null 2>&1; then
+roms_current() {
+  local dir=/config/menus/rom/ipxe manifest="$dir/build-manifest.json" trust_hash name size hash
+  local expected='["uponlan.xyz-snp.efi","uponlan.xyz-snponly.efi","uponlan.xyz-undionly.kpxe","uponlan.xyz.dsk","uponlan.xyz.efi","uponlan.xyz.kpxe","uponlan.xyz.lkrn","uponlan.xyz.pdsk"]'
+  [[ -f "$TLS_CRT" && ! -L "$TLS_CRT" && -f "$manifest" && ! -L "$manifest" ]] || return 1
+  trust_hash="$(sha256sum "$TLS_CRT" | cut -d' ' -f1)"
+  jq -e --arg trust "$trust_hash" --argjson expected "$expected" '
+    .schemaVersion == 1 and .ipxeVersion == "1.21.1" and .trustSha256 == $trust and
+    (.builtAt | type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T")) and
+    (.files | type == "array" and length == 8 and map(.name) == $expected and
+      all(.[]; (keys | sort) == ["name","sha256","size"] and (.size | type == "number" and . > 0) and (.sha256 | test("^[a-f0-9]{64}$"))))
+  ' "$manifest" >/dev/null || return 1
+  while IFS=$'\t' read -r name size hash; do
+    [[ -f "$dir/$name" && ! -L "$dir/$name" ]] || return 1
+    [[ "$(stat -c %s "$dir/$name")" == "$size" ]] || return 1
+    [[ "$(sha256sum "$dir/$name" | cut -d' ' -f1)" == "$hash" ]] || return 1
+  done < <(jq -r '.files[] | [.name,.size,.sha256] | @tsv' "$manifest")
+}
+if ! roms_current; then
   echo "[uponlanxyz-init] Building iPXE ROMs in the background (webapp starts immediately)"
   nohup sh -c '
     OUT_ROM=/config/menus/rom/ipxe TRUST="$1" /scripts/build_ipxe_roms.sh legacy,efi &&

@@ -87,7 +87,10 @@ class InitShUrlSpecs(unittest.TestCase):
         self.assertIn('/scripts/build_ipxe_roms.sh legacy,efi', self.init_sh)
         self.assertIn('OUT_ROM=/config/menus/rom/ipxe TRUST="$1"', self.init_sh)
         self.assertIn('nohup sh -c', self.init_sh)
-        self.assertIn('ls /config/menus/rom/ipxe/uponlan.xyz-*', self.init_sh)
+        self.assertIn('roms_current()', self.init_sh)
+        self.assertIn('build-manifest.json', self.init_sh)
+        self.assertIn('length == 8', self.init_sh)
+        self.assertIn('if ! roms_current; then', self.init_sh)
 
 
 if __name__ == '__main__':

@@ -8,6 +8,23 @@ const { getAssetOrigin, downloader } = require('./utilServices');
 const ASSETS_ROOT = process.env.UPONLAN_ASSETS || '/assets';
 const CONFIG_ROOT = process.env.UPONLAN_CONFIG || '/config';
 
+function genericAssetPath(input) {
+  if (typeof input !== 'string' || input.includes('\0')) return null;
+  let value = input.replaceAll('\\', '/');
+  try {
+    for (let i = 0; i < 3; i += 1) {
+      const decoded = decodeURIComponent(value);
+      if (decoded === value) break;
+      value = decoded.replaceAll('\\', '/');
+    }
+  } catch { return null; }
+  value = value.replace(/^\/+/, '').replace(/^assets\//i, '');
+  const normalized = path.posix.normalize(`/${value}`).slice(1);
+  if (!normalized || normalized === '..' || normalized.startsWith('../')) return null;
+  if ((normalized.split('/')[0] || '').toLowerCase() === 'okd') return null;
+  return normalized;
+}
+
 // Read the asset catalog (endpoints.yml) from the config volume. Returns an
 // empty object on any error so dlremote can still fall back to origin+path.
 function loadEndpoints() {
@@ -57,6 +74,7 @@ async function dlremote(dlfiles, callback, socket) {
   const dlarray = [];
   const origin = asset_url.replace(/\/+$/, '');
   for (let dlfile of dlfiles) {
+    if (!genericAssetPath(dlfile)) throw new Error('That asset path is reserved or unsafe.');
     const safePath = dlfile.replace(/^\/+/, '');
     // The endpoints.yml path is a URL path relative to the origin. The local
     // mirror serves assets under /assets/download/... on the origin, but the
@@ -84,5 +102,6 @@ async function dlremote(dlfiles, callback, socket) {
 
 module.exports = {
   dlremote,
+  genericAssetPath,
   resolveSource,
 };

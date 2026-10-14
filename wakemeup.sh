@@ -87,13 +87,77 @@ preview() {
 # Render the Helm chart and feed it to podman play kube (KUBEFILE|-).
 kube_play() {
     resolve_deploy_knobs
-    helm template uponlan "$CHART" \
-        --set image.repository="$UPONLAN_IMAGE_REPO" \
-        --set image.tag="$UPONLAN_IMAGE_TAG" \
-        --set image.pullPolicy="$UPONLAN_PULL_POLICY" \
-        --set endpoint="$ENDPOINT_URL" \
-        --set menuVersion="$MENU_VERSION" \
-        | sudo podman play kube "$@" -
+    (
+        set -o pipefail
+        umask 077
+        local auth_dir="" user_file password_file secret_dir secret_name secret_path
+        local auth_args=() okd_args=()
+        trap '[ -z "$auth_dir" ] || rm -rf -- "$auth_dir"' EXIT
+        trap 'exit 129' HUP
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+
+        case "${OKD_RETENTION_DAYS:-0}" in
+            ''|*[!0-9]*) echo "ERROR: OKD_RETENTION_DAYS must be a non-negative integer." >&2; exit 1 ;;
+            *) okd_args+=(--set-string "okd.retentionDays=${OKD_RETENTION_DAYS:-0}") ;;
+        esac
+
+        if [ -n "${WEBAPP_USER:-}" ] && [ -n "${WEBAPP_PASS:-}" ]; then
+            auth_dir="$(mktemp -d "${TMPDIR:-/tmp}/uponlan-auth.XXXXXX")"
+            chmod 0700 "$auth_dir"
+            user_file="$auth_dir/user"
+            password_file="$auth_dir/password"
+            printf '%s' "$WEBAPP_USER" > "$user_file"
+            printf '%s' "$WEBAPP_PASS" > "$password_file"
+            chmod 0600 "$user_file" "$password_file"
+            auth_args=(--set-file "webappAuth.user=$user_file" --set-file "webappAuth.password=$password_file")
+        fi
+
+        if [ -n "${OKD_PUBLIC_BASE_URL:-}" ]; then
+            case "$OKD_PUBLIC_BASE_URL" in
+                *','*|*'\'*|*$'\n'*) echo "ERROR: OKD_PUBLIC_BASE_URL contains unsupported characters." >&2; exit 1 ;;
+                https://*) ;;
+                *) echo "ERROR: OKD_PUBLIC_BASE_URL must be an HTTPS origin." >&2; exit 1 ;;
+            esac
+            if [[ ! "$OKD_PUBLIC_BASE_URL" =~ ^https://([A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:[0-9]{1,5})?/?$ ]]; then
+                echo "ERROR: OKD_PUBLIC_BASE_URL must be a credential-free HTTPS origin without path, query or fragment." >&2
+                exit 1
+            fi
+            okd_args+=(--set-string "okd.publicBaseUrl=$OKD_PUBLIC_BASE_URL")
+        fi
+        if [ -n "${OKD_PULL_SECRET_FILE:-}" ]; then
+            case "$OKD_PULL_SECRET_FILE" in
+                /*) ;;
+                *) echo "ERROR: OKD_PULL_SECRET_FILE must be an absolute path." >&2; exit 1 ;;
+            esac
+            case "$OKD_PULL_SECRET_FILE" in
+                *','*|*'\'*|*$'\n'*) echo "ERROR: OKD_PULL_SECRET_FILE contains unsupported path characters." >&2; exit 1 ;;
+            esac
+            if [ -L "$OKD_PULL_SECRET_FILE" ] || [ ! -f "$OKD_PULL_SECRET_FILE" ] || [ ! -r "$OKD_PULL_SECRET_FILE" ]; then
+                echo "ERROR: OKD_PULL_SECRET_FILE must be a readable regular file, not a symlink." >&2
+                exit 1
+            fi
+            secret_dir="${OKD_PULL_SECRET_FILE%/*}"
+            [ -n "$secret_dir" ] || secret_dir=/
+            secret_name="${OKD_PULL_SECRET_FILE##*/}"
+            secret_path="$(CDPATH= cd -P -- "$secret_dir" && pwd)/$secret_name"
+            if [ -L "$secret_path" ] || [ ! -f "$secret_path" ] || [ ! -r "$secret_path" ]; then
+                echo "ERROR: canonical OKD_PULL_SECRET_FILE is not a readable regular file." >&2
+                exit 1
+            fi
+            okd_args+=(--set-string "okd.pullSecret.hostPath=$secret_path")
+        fi
+
+        helm template uponlan "$CHART" \
+            --set image.repository="$UPONLAN_IMAGE_REPO" \
+            --set image.tag="$UPONLAN_IMAGE_TAG" \
+            --set image.pullPolicy="$UPONLAN_PULL_POLICY" \
+            --set endpoint="$ENDPOINT_URL" \
+            --set menuVersion="$MENU_VERSION" \
+            "${auth_args[@]}" \
+            "${okd_args[@]}" \
+            | sudo podman play kube "$@" -
+    )
 }
 
 build() {

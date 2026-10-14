@@ -5,7 +5,7 @@ const path = require('path');
 const yaml = require('js-yaml');
 const readdirp = require('readdirp');
 const { getMenuOrigin, getLocalNginx, getMenuVersion, getAssetOrigin } = require('../services/utilServices');
-const { dlremote } = require('../services/assetServices');
+const { dlremote, genericAssetPath } = require('../services/assetServices');
 const { listProvisioningAssets } = require('../services/provisioningServices');
 
 const CONFIG_ROOT = process.env.UPONLAN_CONFIG || '/config';
@@ -30,7 +30,7 @@ module.exports = function registerAssetHandlers(socket, io) {
       const endpointsFile = fs.readFileSync(path.join(CONFIG_ROOT, 'endpoints.yml'), 'utf8');
       const endpoints = yaml.load(endpointsFile);
       const localfiles = await readdirp.promise(ASSETS_ROOT + '/.');
-      const assets = localfiles.map(f => '/' + f.path);
+      const assets = localfiles.filter((f) => genericAssetPath(f.path)).map(f => '/' + f.path);
       const provisioning = await listProvisioningAssets();
       const menuversion = getMenuVersion();
       const menuorigin = getMenuOrigin();
@@ -47,11 +47,12 @@ module.exports = function registerAssetHandlers(socket, io) {
   socket.on('deletelocal', function (dlfiles) {
     try {
       for (let  file of dlfiles) {
-        const cleanPath = file.replace(/^\/+/, '');
-        const fullPath = path.join(ASSETS_ROOT, cleanPath);
+        const cleanPath = genericAssetPath(file);
+        if (!cleanPath) continue;
+        const fullPath = path.resolve(ASSETS_ROOT, cleanPath);
 
         // Prevent directory traversal
-        if (!fullPath.startsWith(path.resolve(ASSETS_ROOT))) {
+        if (!fullPath.startsWith(path.resolve(ASSETS_ROOT) + path.sep)) {
           console.warn('Blocked delete outside /assets:', fullPath);
           continue;
         }

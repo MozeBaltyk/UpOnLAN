@@ -5,7 +5,8 @@ The first step of every iPXE boot is: **DHCP assigns an IP and the iPXE chainloa
 Two knobs matter:
 
 - `next-server` — IP of the host serving the iPXE binary (TFTP).
-- `filename` — the iPXE binary to load (`undionly.0` / `undionly.kpxe` for BIOS, `ipxe.efi` for UEFI).
+- `filename` — the deployed iPXE binary: `rom/ipxe/uponlan.xyz-undionly.kpxe` for BIOS,
+  `rom/ipxe/uponlan.xyz.efi` for x86_64 UEFI (verify installed files first).
 
 That pair is the legacy option **66 + 67**. Most DHCP servers also expose them as `next-server` / `filename`.
 
@@ -26,14 +27,17 @@ dhcp-option=3,192.168.122.1
 # iPXE chainload (step 2️⃣: TFTP loads the iPXE binary)
 enable-tftp
 tftp-root=/var/lib/tftpboot
-dhcp-boot=undionly.0,192.168.122.1
+dhcp-match=set:efi64,option:client-arch,7
+dhcp-match=set:efi64,option:client-arch,9
+dhcp-boot=tag:!efi64,rom/ipxe/uponlan.xyz-undionly.kpxe,,192.168.122.1
+dhcp-boot=tag:efi64,rom/ipxe/uponlan.xyz.efi,,192.168.122.1
 ```
 
 | Key | Meaning |
 |-----|---------|
 | `enable-tftp` | Serve the iPXE binary over TFTP |
 | `tftp-root` | Where the iPXE binaries live (see [iPXE Quick Start](iPXE/01-Quick-Start.md)) |
-| `dhcp-boot=undionly.0,192.168.122.1` | `filename` + `next-server` in one line |
+| `dhcp-boot=…,filename,,server-IP` | `filename` + `next-server` (empty server-name field) |
 
 Once iPXE is loaded it fetches the menu over HTTP(S) from the UpOnLAN.xyz webapp (step 3️⃣).
 
@@ -49,17 +53,24 @@ TFTP is bound to UDP port **69** — only one TFTP server can run on a given hos
 
 ## 🧭 ProxyDHCP
 
-iPXE supports **ProxyDHCP**: the existing corporate DHCP keeps handing out IPs as usual, and a second DHCP server only advertises the boot file (`dhcp-boot` / options 66-67) without answering the address request (`dhcp-range` omitted). Clients get an IP from the main server and the PXE pointer from the proxy. This is how UpOnLAN.xyz can provide boot files on a network whose DHCP is not controlled by you.
+iPXE supports **ProxyDHCP**: externally configured dnsmasq can advertise boot
+options while the existing DHCP server leases addresses. UpOnLAN's bundled
+dnsmasq is **TFTP-only**, not a DHCP/ProxyDHCP service. Arrange this externally
+with network-owner approval; do not start a competing address server.
 
 ```bash
-# dnsmasq as a *proxy* DHCP: no dhcp-range → no address is leased
+# Example external proxy on 192.168.122.0/24; adapt interface/subnet/server.
+port=0
 interface=eth0
-enable-tftp
-tftp-root=/var/lib/tftpboot
-dhcp-boot=undionly.0
+dhcp-range=192.168.122.0,proxy,255.255.255.0
+pxe-service=x86PC,"UpOnLAN BIOS",rom/ipxe/uponlan.xyz-undionly.kpxe,192.168.122.1
+pxe-service=BC_EFI,"UpOnLAN UEFI BC",rom/ipxe/uponlan.xyz.efi,192.168.122.1
+pxe-service=X86-64_EFI,"UpOnLAN UEFI",rom/ipxe/uponlan.xyz.efi,192.168.122.1
+# TFTP already served by UpOnLAN; do not enable a second TFTP listener here.
 ```
 
-The bootloader wrapper documented in [ROM Build](iPXE/03-ROM-Build.md) handles ProxyDHCP detection automatically (`proxydhcp-next-server` fallback).
+Verify DHCP relay/architecture behavior on real firmware; this example is not
+live acceptance. Use one-time PXE boot and local disk next boot for Agent installs.
 
 ---
 

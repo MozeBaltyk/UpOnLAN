@@ -19,9 +19,8 @@ jobs:
         with:
           node-version: 24
 
-      # No committed package-lock.json in this repo, so `npm install` (not ci).
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Unit tests
         run: npm run test:unit

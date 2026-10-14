@@ -1,7 +1,7 @@
 // Unit tests: resolveSource maps a requested asset path to its on-demand
 // vendor source URL from the endpoints catalog. Pure logic, no server.
 import { describe, expect, it } from 'vitest';
-import { resolveSource } from '../../services/assetServices.js';
+import { genericAssetPath, resolveSource } from '../../services/assetServices.js';
 
 const endpoints = {
   'talos-v1.13.8-x86_64': {
@@ -45,5 +45,19 @@ describe('assetServices.resolveSource', () => {
   it('returns null for empty/undefined inputs', () => {
     expect(resolveSource('/assets/x/vmlinuz', null)).toBeNull();
     expect(resolveSource(undefined, endpoints)).toBeNull();
+  });
+});
+
+describe('assetServices OKD namespace reservation', () => {
+  it.each([
+    '/okd/profile/version/file', '/OKD/profile/version/file', '/assets/okd/file',
+    '/foo/../okd/file', '/%6fkd/file', '/%256fkd/file', '\\okd\\file', '/assets/%4fKD/file',
+  ])('rejects reserved variant %s', (value) => {
+    expect(genericAssetPath(value)).toBeNull();
+  });
+
+  it('keeps ordinary generic asset paths available', () => {
+    expect(genericAssetPath('/assets/talos-v1/vmlinuz')).toBe('talos-v1/vmlinuz');
+    expect(genericAssetPath('/releases/download/test/file')).toBe('releases/download/test/file');
   });
 });

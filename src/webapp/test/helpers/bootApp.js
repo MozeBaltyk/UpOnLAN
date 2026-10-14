@@ -18,7 +18,7 @@ function clearAppCache() {
   }
 }
 
-async function bootApp({ user = 'admin', pass = 'secret', fixtures } = {}) {
+async function bootApp({ user = 'admin', pass = 'secret', persistenceReady = false, fixtures, toolService } = {}) {
   const root = createFixtureRoot(fixtures);
 
   Object.assign(process.env, {
@@ -30,9 +30,17 @@ async function bootApp({ user = 'admin', pass = 'secret', fixtures } = {}) {
     SUBFOLDER: '/',
     WEBAPP_USER: user,
     WEBAPP_PASS: pass,
+    OKD_PERSISTENCE_READY: String(persistenceReady),
   });
 
   clearAppCache();
+  // CRUD tests must never download real binaries. Individual tests can inject the real service with a fake downloader.
+  const tools = require(path.join(WEBAPP_DIR, 'services/okdToolServices.js'));
+  tools.installTools = toolService ? toolService.installTools : async (release) => {
+    if (release !== undefined && !tools.supportedReleases.includes(release)) throw Object.assign(new Error('Unknown OKD release.'), { code: 'BAD_REQUEST' });
+    return { state: 'missing', generationReady: false, tools: {} };
+  };
+  if (toolService) tools.getToolStatus = toolService.getToolStatus;
   const { http } = require(path.join(WEBAPP_DIR, 'app.js'));
   await new Promise((resolve) => http.listen(0, resolve));
 

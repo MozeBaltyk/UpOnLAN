@@ -1,10 +1,10 @@
 FROM alpine:3.24 AS build
 ARG SOURCE_WEBAPP="webapp"
 
-# Only what npm install needs — the final stage re-installs the runtime set.
+# Install the locked production dependency set copied into the final stage.
 RUN apk add --no-cache nodejs npm
 COPY /src/${SOURCE_WEBAPP} /webapp
-RUN npm install --prefix /webapp
+RUN npm ci --omit=dev --prefix /webapp
 
 # Final stage
 FROM alpine:3.24
@@ -42,6 +42,7 @@ RUN apk add --no-cache \
     curl \
     dnsmasq \
     gettext-envsubst \
+    gcompat \
     git \
     jq \
     yq-go \
@@ -58,7 +59,8 @@ RUN apk add --no-cache \
     busybox-extras \
     tar && \
     groupmod -g 1000 users && \
-    useradd -u 911 -U -d /config -s /bin/false nbxyz && \
+    groupadd -g 911 nbxyz && \
+    useradd -u 911 -g 911 -d /config -s /bin/false nbxyz && \
     usermod -G users nbxyz && \
     mkdir /app /config /defaults
 

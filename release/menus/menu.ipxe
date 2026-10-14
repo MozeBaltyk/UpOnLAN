@@ -29,14 +29,16 @@ set space:hex 20:20
 set space ${space:string}
 isset ${next-server} && menu ${site_name} v${menu_version} - next-server: ${next-server} || menu ${site_name}
 item --gap Default:
-item local ${space} Boot from local hdd
+item local ${space} Exit to firmware (select local disk there)
+item stay ${space} Stay in network boot menu
 item --gap Distributions:
 iseq ${menu_linux} 1 && item linux ${space} Linux Network Installs (64-bit) ||
 iseq ${menu_linux_arm} 1 && item linux-arm ${space} Linux Network Installs (arm64) ||
+item okd ${space} OKD Agent Installer
 item netinfo ${space} Network card info
 
 isset ${menu} && set timeout 0 || set timeout ${boot_timeout}
-choose --timeout ${timeout} --default ${menu} menu || goto menu_timeout
+choose --timeout ${timeout} --default stay menu || goto menu_timeout
 echo ${cls}
 goto ${menu}
 
@@ -45,6 +47,10 @@ goto ${menu}
 # which cannot work without a disk and reboot-looped back to PXE. Keep the
 # operator at the menu instead.
 echo No boot selection made - returning to menu
+goto main_menu
+
+:stay
+clear menu
 goto main_menu
 
 :change_menu
@@ -57,12 +63,12 @@ prompt
 goto main_menu
 
 :local
-# Diskless PXE client: there is no local disk. `choose` returns 0 on timeout
-# (selecting the first item, "local"), so `|| goto menu_timeout` above never
-# fires — the timeout lands here. Re-render instead of `exit 1` (which drops
-# to the iPXE shell via embed.ipxe's `:menu_failed`).
-echo No local disk - returning to menu
-goto main_menu
+# Never guess a BIOS drive number or claim disk detection. Diskless clients can
+# cancel here; diskful clients must arrange one-time PXE and local disk next boot.
+echo Returning to firmware does not guarantee local disk boot.
+echo Use firmware/BMC one-time PXE boot and select the installed disk next boot.
+prompt --key 0x79 Press y to exit, any other key to return to menu || goto main_menu
+exit
 
 :linux
 chain linux.ipxe || goto error
@@ -70,6 +76,10 @@ goto main_menu
 
 :linux-arm
 chain linux-arm.ipxe || goto error
+goto main_menu
+
+:okd
+chain local/okd.ipxe || goto error
 goto main_menu
 
 :netinfo

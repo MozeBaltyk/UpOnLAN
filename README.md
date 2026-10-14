@@ -99,3 +99,9 @@ See [Deployment](docs/UpOnLAN.xyz/02-Deployment.md) for remote and local deploym
 Editing a served iPXE menu does not normally require a new ROM: an existing iPXE boot binary can chain to the menu. Build when the boot binary itself must embed UpOnLAN.xyz's wrapper or start a custom default boot flow, or when you need boot media for a machine that cannot use the existing network-boot path.
 
 In the webapp, open **Menus**, expand **ROM Files**, then select **Build**. Choose the required firmware/media options (Legacy, EFI, ISO, USB) and select **Run**. `scripts/build_ipxe_roms.sh` builds the selected custom iPXE binaries and, when selected, hybrid ISO or USB image media — offline, using the iPXE source vendored into the container image; generated files appear in the ROM Files list. See [ROM Build](docs/iPXE/03-ROM-Build.md) for firmware and media selection guidance.
+
+For an active OKD PXE publication, `scripts/verify_okd_boot_readiness.py` can
+read-only verify the pointer, immutable artifact and ROM manifests, local and
+HTTPS hashes, and the configured TLS CA/SAN chain. Passing it is not physical
+boot acceptance: BIOS, UEFI, Agent initramfs trust, inventory, and target disks
+still require operator verification.

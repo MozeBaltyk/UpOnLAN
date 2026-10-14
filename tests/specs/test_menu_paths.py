@@ -47,6 +47,35 @@ class MenuPathSpecs(unittest.TestCase):
         self.assertIn('kickstart_url', lv)
         self.assertIn('cloud_init_url', lv)
 
+    def test_top_level_okd_entry_only_chains_the_managed_local_menu(self):
+        menu = (self.menus / 'menu.ipxe').read_text()
+        self.assertIn('item okd ${space} OKD Agent Installer', menu)
+        handler = menu.split(':okd\n', 1)[1].split('\n:', 1)[0].strip()
+        self.assertEqual(handler, 'chain local/okd.ipxe || goto error\ngoto main_menu')
+
+    def test_local_action_confirms_firmware_exit_without_guessing_disks(self):
+        menu = (self.menus / 'menu.ipxe').read_text()
+        local = menu.split(':local\n', 1)[1].split('\n:', 1)[0]
+        self.assertIn('Exit to firmware', menu)
+        self.assertIn('prompt --key 0x79', local)
+        self.assertIn('|| goto main_menu', local)
+        self.assertTrue(local.rstrip().endswith('exit'))
+        self.assertNotIn('sanboot', local)
+        self.assertNotIn('No local disk', local)
+        self.assertIn('--default stay', menu)
+        embed = (REPO_ROOT / 'scripts/build_ipxe_roms.sh').read_text()
+        self.assertIn('chain --autofree menu.ipxe || goto menu_failed\nexit', embed)
+
+    def test_okd_assets_disable_listing_without_changing_generic_download_root(self):
+        nginx = (REPO_ROOT / 'src/defaults/default').read_text()
+        location = nginx.split('location ^~ /okd/ {', 1)[1].split('}', 1)[0]
+        self.assertIn('root /assets;', location)
+        self.assertIn('autoindex off;', location)
+        self.assertNotIn('deny all', location)
+        self.assertIn('location / {\n\t\troot /assets;\n\t\tautoindex on;', nginx)
+        webapp = nginx.split('proxy_pass http://127.0.0.1:${WEB_APP_PORT};', 1)[1]
+        self.assertIn('client_max_body_size 7m;', webapp)
+
     def test_menu_url_resolution_local_vs_github(self):
         # Extract the real defaults, then simulate the two origin layouts.
         boot_cfg = (self.menus / 'boot.cfg').read_text()

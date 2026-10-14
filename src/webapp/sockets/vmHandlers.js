@@ -4,6 +4,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { mintVncToken } = require('./vncProxy');
+const { currentBootManifestIdentity } = require('../services/romBuildService');
 
 // Test VM the Console tab manages (overridable, e.g. VM_NAME=pxetest).
 const VM_NAME = process.env.VM_NAME || 'uponlan-client';
@@ -29,10 +30,8 @@ const VNC_PASSWORD_FILE = (process.env.UPONLAN_CONFIG || '/config') + '/vm-vnc-p
 // regenerates the TLS cert and rebuilds the trusted ROMs, leaving it on a stale
 // in-memory iPXE session (HTTPS boot then fails 0216eb8f "No usable
 // certificates"). We stamp when the managed VM last booted and compare it to the
-// cert/ROM mtimes so the operator gets an active "restart me" warning (console
-// open + power actions), not just passive status text.
-const TLS_CRT = `${process.env.UPONLAN_CONFIG || '/config'}/tls/server.crt`;
-const ROM_EFI = `${process.env.UPONLAN_CONFIG || '/config'}/menus/rom/ipxe/uponlan.xyz.efi`;
+// last-written ROM manifest generation so the operator gets an active "restart
+// me" warning (console open + power actions), not just passive status text.
 const VM_BOOT_STAMP = `${process.env.UPONLAN_CONFIG || '/config'}/vm-boot-stamp.json`;
 const TRUST_WARNING = 'PXE boot trust may be out of date — restart the VM to reload the current certificate/ROM.';
 const TRUST_RELOADED = 'Reloaded boot trust — the previous VM session was on an older certificate/ROM.';
@@ -126,36 +125,19 @@ async function getVmHasConsole() {
 
 function recordVmBootTime() {
   try {
-    fs.writeFileSync(VM_BOOT_STAMP, JSON.stringify({ bootedAt: Date.now() }));
+    const identity = currentBootManifestIdentity();
+    fs.writeFileSync(VM_BOOT_STAMP, JSON.stringify({ romManifestSha256: identity && !identity.startsWith('invalid:') ? identity : null }));
   } catch (e) {
     console.warn('Failed to persist VM boot stamp:', e.message);
   }
 }
 
-// Trust freshness is derived from the cert + ROM file mtimes (not a persisted
-// generation). Both are read independently and a missing side contributes 0, so
-// a redeploy that regenerates the cert but leaves ROMs untouched still flags a
-// running VM as stale. If mtime proves unreliable (cp -p on deploy, skewed
-// clocks), switch to a generation counter written on every cert/ROM change.
-function mtimeMs(file) {
-  try { return fs.statSync(file).mtimeMs; } catch { return 0; }
-}
-
 function isTrustStale() {
-  let bootedAt = NaN;
+  const current = currentBootManifestIdentity();
+  if (!current) return false;
   try {
-    bootedAt = Number(JSON.parse(fs.readFileSync(VM_BOOT_STAMP, 'utf8')).bootedAt);
-  } catch {
-    /* no stamp yet — handled below */
-  }
-  const trustMs = Math.max(mtimeMs(TLS_CRT), mtimeMs(ROM_EFI));
-  if (Number.isFinite(bootedAt)) {
-    return trustMs > bootedAt; // nothing bootable yet => trustMs 0 => false
-  }
-  // No boot stamp: a running VM reaches this only when it booted before tracking
-  // existed (or was started outside the webapp), so its boot time is unknown.
-  // Assume stale when trust material exists — one restart records a stamp.
-  return trustMs > 0;
+    return JSON.parse(fs.readFileSync(VM_BOOT_STAMP, 'utf8')).romManifestSha256 !== current;
+  } catch { return true; }
 }
 
 // `virsh pool-info` prints "State: inactive" for a defined-but-not-started

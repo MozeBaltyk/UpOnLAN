@@ -1,0 +1,4 @@
+#!ipxe
+initrd --name initrd https://installer.invalid/output/agent.x86_64-initrd.img
+kernel https://installer.invalid/output/agent.x86_64-vmlinuz initrd=initrd coreos.live.rootfs_url=https://installer.invalid/output/agent.x86_64-rootfs.img rd.neednet=1 console=tty0
+boot

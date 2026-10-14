@@ -9,8 +9,15 @@ const registerLogHandlers = require('./logHandlers');
 const registerMetricHandlers = require('./metricHandlers');
 const registerDocHandlers = require('./docHandlers');
 const registerVmHandlers = require('./vmHandlers');
+const registerOkdHandlers = require('./okdHandlers');
 
 module.exports = function(io) {
+  // Recover persisted OKD jobs at application startup; do not wait for a browser.
+  // Keep the message fixed so filesystem paths or credential-bearing errors cannot leak.
+  registerOkdHandlers.initialize().catch(() => {
+    console.error('[ERROR] OKD job recovery failed; generation remains fail-closed.');
+  });
+
   io.on('connection', (socket) => {
     const timestamp = new Date().toISOString(); // e.g., "2025-06-03T18:30:12.123Z"
     console.log(`[${timestamp}] socket_id: ${socket.id} connected`);
@@ -26,5 +33,6 @@ module.exports = function(io) {
     registerWolHandlers(socket);
     registerDocHandlers(socket);
     registerVmHandlers(socket);
+    registerOkdHandlers(socket);
   });
 };

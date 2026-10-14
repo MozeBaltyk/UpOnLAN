@@ -6,6 +6,7 @@ __pycache__/
 *.pyc
 .c9
 package-lock.json
+!src/webapp/package-lock.json
 release/output/**
 release/menus/rom/**
 release/menus/local-vars.ipxe

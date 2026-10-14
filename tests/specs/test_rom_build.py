@@ -66,6 +66,13 @@ class RomBuildSpecs(unittest.TestCase):
         self.assertNotIn('uponlan-e1000.rom', self.script)
         self.assertNotIn('PXE_ROM_PATH', self.script)
 
+    def test_stages_serializes_and_publishes_manifest_last(self):
+        self.assertIn('.ipxe-stage-', self.script)
+        self.assertIn('flock 9', self.script)
+        self.assertIn("'{schemaVersion:1,ipxeVersion:$version,builtAt:$builtAt", self.script)
+        self.assertLess(self.script.index('rm -f "$OUT_ROM/build-manifest.json"'), self.script.index('mv "$STAGE/build-manifest.json"'))
+        self.assertGreater(self.script.index('mv "$STAGE/build-manifest.json"'), self.script.index('for file in "$STAGE"/uponlan.xyz.*'))
+
 
 class BuildReleaseSpecs(unittest.TestCase):
     """build_release.sh runs the local release pipeline (assets -> menu) and
@@ -85,6 +92,18 @@ class BuildReleaseSpecs(unittest.TestCase):
     def test_reports_menu_layout_path(self):
         self.assertIn('release/output/menu/${MENU_VERSION}/menus.tar.gz', self.script)
         self.assertNotIn('release/output/releases/download', self.script)
+
+
+class InitRomFreshnessSpecs(unittest.TestCase):
+    def test_rebuild_requires_complete_manifest_and_current_trust_hash(self):
+        init = (REPO_ROOT / 'src' / 'init.sh').read_text()
+        self.assertIn('roms_current()', init)
+        self.assertIn('build-manifest.json', init)
+        self.assertIn('.ipxeVersion == "1.21.1"', init)
+        self.assertIn('.trustSha256 == $trust', init)
+        self.assertIn('length == 8', init)
+        self.assertIn('sha256sum "$dir/$name"', init)
+        self.assertIn('if ! roms_current; then', init)
 
 
 if __name__ == '__main__':

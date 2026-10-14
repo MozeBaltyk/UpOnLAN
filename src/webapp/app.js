@@ -8,7 +8,11 @@ const crypto = require('crypto');
 const express = require('express');
 const app = express();
 const http = require('http').Server(app);
-const io = require('socket.io')(http, { path: (process.env.SUBFOLDER || '/') + 'socket.io' });
+const io = require('socket.io')(http, {
+  path: (process.env.SUBFOLDER || '/') + 'socket.io',
+  // Raw secret API remains 1 MiB; JSON escaping can expand a packet up to 6x.
+  maxHttpBufferSize: 7 * 1024 * 1024,
+});
 
 const baseRoutes = require('./routes/baseRoutes');
 const socketHandlers = require('./sockets/socketHandlers');

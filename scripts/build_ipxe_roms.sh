@@ -42,9 +42,11 @@ OUT_ROM="${OUT_ROM:-$REPO_ROOT/release/menus/rom/ipxe}"
 FORMATS="${1:-release}"
 
 WORK="$(mktemp -d /tmp/ipxe-build-XXXXXX)"
-trap 'rm -rf "$WORK"' EXIT
+STAGE=""
+trap 'rm -rf "$WORK"; [[ -z "$STAGE" ]] || rm -rf "$STAGE"' EXIT
 
-command -v make gcc curl >/dev/null
+command -v make gcc curl sha256sum flock jq >/dev/null
+[[ "$IPXE_VERSION" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "ERROR: invalid IPXE_VERSION" >&2; exit 1; }
 if ! command -v lzma >/dev/null; then
   echo "ERROR: 'lzma' not found - the iPXE ROM build requires liblzma-dev (and xz-utils)." >&2
   echo "       Install it: sudo apt-get install -y liblzma-dev xz-utils" >&2
@@ -86,6 +88,7 @@ cat > "$WORK/embed.ipxe" <<'EOF'
 # run because `chain` itself fails first.
 dhcp || goto dhcp_failed
 chain --autofree menu.ipxe || goto menu_failed
+exit
 
 :dhcp_failed
 echo DHCP failed - no network response on the PXE NIC
@@ -180,27 +183,55 @@ if [ -n "$efi_targets" ]; then
   make -j"$(nproc)" $efi_targets EMBED="$WORK/embed.ipxe" NO_WERROR=1 EXTRA_CFLAGS="$EXTRA_CFLAGS_VAL" $SSL_ARGS
 fi
 
-mkdir -p "$OUT_ROM"
-# Remove stale artifacts from a previous build so a removed target (e.g. the
-# old e1000 option ROM) can't linger in the TFTP root and get advertised.
-rm -f "$OUT_ROM"/uponlan.xyz-*.rom "$OUT_ROM"/uponlan.xyz-*.kpxe \
-      "$OUT_ROM"/uponlan.xyz-*.efi "$OUT_ROM"/uponlan.xyz-*.dsk \
-      "$OUT_ROM"/uponlan.xyz-*.pdsk "$OUT_ROM"/uponlan.xyz-*.lkrn \
-      "$OUT_ROM"/uponlan.xyz-*.iso "$OUT_ROM"/uponlan.xyz-*.img
+OUT_PARENT="$(dirname "$OUT_ROM")"
+mkdir -p "$OUT_PARENT"
+STAGE="$(mktemp -d "$OUT_PARENT/.ipxe-stage-XXXXXX")"
 for pair in "${artifacts[@]}"; do
   src="${pair%%:*}"; dst="${pair##*:}"
-  cp "$src" "$OUT_ROM/$dst"
+  cp "$src" "$STAGE/$dst"
 done
 
 if [ "$gen_iso" = 1 ]; then
   echo "[ipxe] generating ISO"
-  "$REPO_ROOT/scripts/sources/genfsimg" -o "$OUT_ROM/uponlan.xyz.iso" \
+  "$REPO_ROOT/scripts/sources/genfsimg" -o "$STAGE/uponlan.xyz.iso" \
     bin-x86_64-efi/ipxe.efi bin/ipxe.lkrn
 fi
 if [ "$gen_usb" = 1 ]; then
   echo "[ipxe] generating USB image"
-  "$REPO_ROOT/scripts/sources/genfsimg" -o "$OUT_ROM/uponlan.xyz.img" \
+  "$REPO_ROOT/scripts/sources/genfsimg" -o "$STAGE/uponlan.xyz.img" \
     bin-x86_64-efi/ipxe.efi bin/ipxe.lkrn
 fi
+
+# The manifest is public provenance only. Stage every requested output first,
+# then publish each file by atomic rename while holding the deployment-wide
+# writer lock. Removing the old manifest first and writing the new one last
+# means readers never accept a mixed generation.
+TRUST_SHA256=""
+if [[ -n "${TRUST:-}" ]]; then TRUST_SHA256="$(sha256sum "$TRUST" | cut -d' ' -f1)"; fi
+files='[]'
+for file in "$STAGE"/uponlan.xyz.* "$STAGE"/uponlan.xyz-*; do
+  [[ -f "$file" ]] || continue
+  name="$(basename "$file")"
+  size="$(stat -c %s "$file")"
+  hash="$(sha256sum "$file" | cut -d' ' -f1)"
+  files="$(jq -c --arg name "$name" --argjson size "$size" --arg sha256 "$hash" '. + [{name:$name,size:$size,sha256:$sha256}] | sort_by(.name)' <<<"$files")"
+done
+jq -n --arg version "$IPXE_VERSION" --arg builtAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg trust "$TRUST_SHA256" --argjson files "$files" \
+  '{schemaVersion:1,ipxeVersion:$version,builtAt:$builtAt,trustSha256:(if $trust == "" then null else $trust end),files:$files}' \
+  > "$STAGE/build-manifest.json"
+
+exec 9>"$OUT_PARENT/.ipxe-build.lock"
+flock 9
+mkdir -p "$OUT_ROM"
+rm -f "$OUT_ROM/build-manifest.json"
+rm -f "$OUT_ROM"/uponlan.xyz-*.rom "$OUT_ROM"/uponlan.xyz-*.kpxe \
+      "$OUT_ROM"/uponlan.xyz-*.efi "$OUT_ROM"/uponlan.xyz-*.dsk \
+      "$OUT_ROM"/uponlan.xyz-*.pdsk "$OUT_ROM"/uponlan.xyz-*.lkrn \
+      "$OUT_ROM"/uponlan.xyz-*.iso "$OUT_ROM"/uponlan.xyz-*.img
+for file in "$STAGE"/uponlan.xyz.* "$STAGE"/uponlan.xyz-*; do
+  [[ -f "$file" ]] && mv "$file" "$OUT_ROM/$(basename "$file")"
+done
+mv "$STAGE/build-manifest.json" "$OUT_ROM/build-manifest.json"
 
 echo "[ipxe] done -> $OUT_ROM"

@@ -55,6 +55,12 @@ function buildTree(paths) {
     }
   });
 
+  // Keep other categories and numbered pages in their existing order.
+  if (root.Kubernetes) {
+    const kubernetes = root.Kubernetes;
+    delete root.Kubernetes;
+    root.Kubernetes = kubernetes;
+  }
   return root;
 }
 

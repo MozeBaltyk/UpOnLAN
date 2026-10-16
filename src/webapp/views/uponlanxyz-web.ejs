@@ -1425,7 +1425,7 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
     <div class="card-header">OKD generated artifacts <span class="badge badge-secondary ml-2">${okdCount} verified versions</span></div>
     <div class="card-body">
       <p class="small text-muted">Read-only files verified from immutable manifests. Saving an Asset server URL does not bind or assign its address; DNS, host addressing, routing, firewall and TLS remain operator-managed.</p>
-      <table class="table table-sm"><thead><tr><th>Profile</th><th>Version</th><th>Mode</th><th>State</th><th>Published URL</th><th>Immutable HTTPS files</th></tr></thead><tbody id="okdassetrows"></tbody></table>
+      <table class="table table-sm"><thead><tr><th>Profile</th><th>Version</th><th>Mode</th><th>State</th><th>Immutable HTTPS files</th></tr></thead><tbody id="okdassetrows"></tbody></table>
     </div>
   </div>`);
   var tableoptions = {
@@ -1521,25 +1521,19 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
   }
   $('#okdassetrows').empty();
   if (!okdArtifacts || okdArtifacts.length === 0) {
-    $('#okdassetrows').append('<tr><td colspan="6" class="text-muted">No verified OKD artifacts yet.</td></tr>');
+    $('#okdassetrows').append('<tr><td colspan="5" class="text-muted">No verified OKD artifacts yet.</td></tr>');
   } else {
     $.each(okdArtifacts, function(index, value) {
       const files = value.files.map(function(file) {
         if (file.portalPath) {
           const portalUrl = window.location.origin + buildAssetUrl('<%= baseurl %>', file.portalPath); const encoded = encodeURIComponent(portalUrl);
-          return `<div><a href="${okdAttr(portalUrl)}">Download ${okdAttr(file.name)}</a> <button type="button" class="btn btn-outline-secondary btn-sm" data-copy-url="${encoded}">Copy URL</button></div>`;
+          return `<div class="d-flex justify-content-between align-items-center"><a href="${okdAttr(portalUrl)}">Download ${okdAttr(file.name)}</a> <button type="button" class="btn btn-outline-secondary btn-sm ml-2 flex-shrink-0" data-copy-url="${encoded}">Copy URL</button></div>`;
         }
         if (!file.url) return `<span class="text-muted">${okdAttr(file.name)} (no HTTPS origin captured)</span>`;
         const url = okdAttr(file.url); const encoded = encodeURIComponent(file.url);
-        return `<div><a target="_blank" rel="noopener" href="${url}">${okdAttr(file.name)}</a> <button type="button" class="btn btn-outline-secondary btn-sm" data-copy-url="${encoded}">Copy URL</button></div>`;
+        return `<div class="d-flex justify-content-between align-items-center"><a target="_blank" rel="noopener" href="${url}">${okdAttr(file.name)}</a> <button type="button" class="btn btn-outline-secondary btn-sm ml-2 flex-shrink-0" data-copy-url="${encoded}">Copy URL</button></div>`;
       }).join('');
-      const ipxe = value.files.find(function(file) { return file.role === 'ipxe' && file.url; });
-      const iso = value.files.find(function(file) { return file.portalPath; });
-      const publishedUrl = ipxe ? ipxe.url : (iso ? window.location.origin + buildAssetUrl('<%= baseurl %>', iso.portalPath) : null);
-      const urlCell = publishedUrl
-        ? `<a target="_blank" rel="noopener" href="${okdAttr(publishedUrl)}">${okdAttr(publishedUrl)}</a> <button type="button" class="btn btn-outline-secondary btn-sm" data-copy-url="${encodeURIComponent(publishedUrl)}">Copy URL</button>`
-        : '<span class="text-muted">—</span>';
-      $('#okdassetrows').append(`<tr><td>${okdAttr(value.profileId)}</td><td><code>${okdAttr(value.versionId)}</code></td><td>${okdAttr(value.mode)}</td><td>${value.active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-secondary">Inactive</span>'}</td><td>${urlCell}</td><td>${files}</td></tr>`);
+      $('#okdassetrows').append(`<tr><td>${okdAttr(value.profileId)}</td><td><code>${okdAttr(value.versionId)}</code></td><td>${okdAttr(value.mode)}</td><td>${value.active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-secondary">Inactive</span>'}</td><td>${files}</td></tr>`);
     });
   }
   // Debounced per-table filters

@@ -114,22 +114,30 @@ describe('utilServices.isValidUrl', () => {
 });
 
 describe('utilServices.getLocalNginx', () => {
+  it('keeps the internal loopback URL separate from the configured public asset origin', async () => {
+    fs.writeFileSync(nginxFile, 'server {\n  listen 8443 ssl;\n}\n');
+    fs.writeFileSync(path.join(path.dirname(path.dirname(path.dirname(nginxFile))), 'local-assets.json'), JSON.stringify({ assetUrl: 'https://192.168.7.1:8443/' }));
+    const svc = await loadServices();
+    expect(svc.getLocalNginx()).toBe('https://127.0.0.1:8443');
+    expect(svc.getLocalAssetUrl()).toBe('https://192.168.7.1:8443');
+  });
+
   it('parses an https listen directive', async () => {
     fs.writeFileSync(nginxFile, 'server {\n  listen 443 ssl;\n  server_name _;\n}\n');
     const svc = await loadServices();
-    expect(svc.getLocalNginx()).toBe('https://localhost:443');
+    expect(svc.getLocalNginx()).toBe('https://127.0.0.1:443');
   });
 
   it('parses a plain http listen directive', async () => {
     fs.writeFileSync(nginxFile, 'server {\n  listen 8080;\n}\n');
     const svc = await loadServices();
-    expect(svc.getLocalNginx()).toBe('http://localhost:8080');
+    expect(svc.getLocalNginx()).toBe('http://127.0.0.1:8080');
   });
 
-  it('falls back to http://localhost when the config is unreadable', async () => {
+  it('falls back to the IPv4 loopback when the config is unreadable', async () => {
     fs.rmSync(nginxFile);
     const svc = await loadServices();
-    expect(svc.getLocalNginx()).toBe('http://localhost');
+    expect(svc.getLocalNginx()).toBe('http://127.0.0.1');
   });
 });
 

@@ -31,7 +31,8 @@ webappAuth:
   usernameKey: username
   passwordKey: password
 
-## OKD generation is fail-closed unless this HTTPS origin, persistent storage,
+## Optional OKD HTTPS origin override; otherwise use Assets > Local Assets > Asset URL.
+## OKD generation is fail-closed unless an explicit HTTPS origin, persistent storage,
 ## and a valid resolved pull secret are present (public OKD placeholder if no custom secret exists).
 okd:
   publicBaseUrl: ""

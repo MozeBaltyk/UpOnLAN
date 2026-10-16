@@ -10,23 +10,39 @@ const { WebSocketServer } = require('ws');
 // QEMU's VNC binds the host (0.0.0.0 via the domain XML), reachable from the
 // container through the podman bridge gateway.
 const VNC_TARGET_HOST = process.env.VNC_TARGET_HOST || 'host.containers.internal';
+// libvirt autoport assigns VNC display ports starting at 5900. Restrict the
+// proxy to that range so it cannot be used as a general TCP relay to arbitrary
+// host ports. Overridable for deployments with a shifted display range.
+const VNC_PORT_MIN = Number(process.env.VNC_PORT_MIN) || 5900;
+const VNC_PORT_MAX = Number(process.env.VNC_PORT_MAX) || 5999;
+
+function isAllowedVncPort(port) {
+  return Number.isInteger(port) && port >= VNC_PORT_MIN && port <= VNC_PORT_MAX;
+}
 
 // Short-lived tokens the authenticated socket.io channel mints so noVNC's raw
 // WebSocket (which can't carry the Basic auth header) can prove it's allowed.
 const VNC_TOKEN_TTL_MS = 60_000;
-const vncTokens = new Map(); // token -> expiry epoch ms
+const vncTokens = new Map(); // token -> { expiry, port }
 
-function mintVncToken() {
+function purgeExpiredVncTokens(now = Date.now()) {
+  for (const [token, value] of vncTokens) if (now >= value.expiry) vncTokens.delete(token);
+}
+
+function mintVncToken(port) {
+  if (!isAllowedVncPort(port)) throw new Error('Invalid VNC port');
+  purgeExpiredVncTokens();
   const token = crypto.randomBytes(16).toString('hex');
-  vncTokens.set(token, Date.now() + VNC_TOKEN_TTL_MS);
+  vncTokens.set(token, { expiry: Date.now() + VNC_TOKEN_TTL_MS, port });
   return token;
 }
 
-function isValidVncToken(token) {
+function isValidVncToken(token, port) {
+  purgeExpiredVncTokens();
   if (!token || typeof token !== 'string') return false;
-  const expiry = vncTokens.get(token);
-  if (!expiry) return false;
-  if (Date.now() > expiry) { vncTokens.delete(token); return false; }
+  const value = vncTokens.get(token);
+  if (!value || value.port !== port) return false;
+  vncTokens.delete(token);
   return true;
 }
 
@@ -38,15 +54,15 @@ function attachVncProxy(httpServer, authorize) {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname !== '/novnc/ws') return; // not ours; let other handlers run
 
-    if (!authorize(req)) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    const port = Number(url.searchParams.get('port'));
+    if (!isAllowedVncPort(port)) {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
       socket.destroy();
       return;
     }
 
-    const port = Number(url.searchParams.get('port'));
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+    if (!authorize(req, port)) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
     }
@@ -73,5 +89,4 @@ function attachVncProxy(httpServer, authorize) {
   return wss;
 }
 
-module.exports = { attachVncProxy, mintVncToken, isValidVncToken };
-
+module.exports = { attachVncProxy, mintVncToken, isValidVncToken, isAllowedVncPort, purgeExpiredVncTokens };

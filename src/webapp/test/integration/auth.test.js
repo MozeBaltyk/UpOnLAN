@@ -88,6 +88,28 @@ describe('socket.io authentication', () => {
     socket.close();
     expect(outcome).toBe('connected');
   });
+
+  it('accepts same-origin browser handshakes', async () => {
+    const socket = ctx.connectClient({ extraHeaders: { Authorization: basicHeader, Origin: ctx.baseUrl } });
+    const outcome = await new Promise((resolve) => {
+      socket.on('connect', () => resolve('connected'));
+      socket.on('connect_error', (e) => resolve(`rejected:${e.message}`));
+      setTimeout(() => resolve('timeout'), 4000);
+    });
+    socket.close();
+    expect(outcome).toBe('connected');
+  });
+
+  it('rejects cross-origin handshakes even with valid credentials', async () => {
+    const socket = ctx.connectClient({ extraHeaders: { Authorization: basicHeader, Origin: 'https://evil.example' } });
+    const outcome = await new Promise((resolve) => {
+      socket.on('connect', () => resolve('connected'));
+      socket.on('connect_error', (e) => resolve(`rejected:${e.message}`));
+      setTimeout(() => resolve('timeout'), 4000);
+    });
+    socket.close();
+    expect(outcome).toMatch(/^rejected:/);
+  });
 });
 
 describe('socket event round-trips', () => {

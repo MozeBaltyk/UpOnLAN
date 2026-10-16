@@ -50,6 +50,7 @@ RUN apk add --no-cache \
     nginx \
     nodejs \
     openssl \
+    openssh-keygen \
     py3-pip \
     python3 \
     shadow \

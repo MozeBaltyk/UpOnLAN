@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # make our folders
 mkdir -p \
@@ -31,6 +32,7 @@ export WEBAPP_HTTPS_PORT="${WEBAPP_HTTPS_PORT:-3443}"
 # ports so nginx's own $host / $http_upgrade variables survive untouched.
 TLS_CRT=/config/tls/server.crt
 TLS_KEY=/config/tls/server.key
+TLS_DEFAULT_MARKER=/config/tls/.uponlan-default-cert.sha256
 if [[ -f "$TLS_CRT" && -f "$TLS_KEY" ]]; then
   echo "[uponlanxyz-init] TLS: using mounted server.crt + server.key"
 elif [[ ! -f "$TLS_CRT" && ! -f "$TLS_KEY" ]]; then
@@ -39,6 +41,7 @@ elif [[ ! -f "$TLS_CRT" && ! -f "$TLS_KEY" ]]; then
     -keyout "$TLS_KEY" -out "$TLS_CRT" \
     -subj "/CN=uponlan.xyz" \
     -addext "subjectAltName=DNS:uponlan.xyz,DNS:localhost,IP:127.0.0.1,IP:192.168.7.1" >/dev/null 2>&1
+  sha256sum "$TLS_CRT" | cut -d' ' -f1 > "$TLS_DEFAULT_MARKER"
 fi
 if [[ -f "$TLS_CRT" && -f "$TLS_KEY" ]]; then
   # Single HTTPS site-conf: assets on HTTPS_PORT, webapp reverse-proxy on
@@ -59,11 +62,14 @@ fi
 # Resolve the menu version. Empty and unset mean the same thing here: the chart
 # always injects MENU_VERSION (possibly as an empty string), so `${VAR+x}` would
 # wrongly treat an empty version as deliberate and the dashboard would show
-# `none`. GitHub endpoints need the real latest tag; flat/local mirrors use a
+# `none`. GitHub endpoints need the real latest tag; resolve it through the
+# public redirect rather than the rate-limited API. Flat/local mirrors use a
 # `latest` file under /menu/latest.
 if [[ -z "${MENU_VERSION:-}" ]]; then
   if [[ "${ENDPOINT_URL}" == *github.com* ]]; then
-    MENU_VERSION=$(curl -sL "https://api.github.com/repos/mozebaltyk/uponlan/releases/latest" | jq -r '.tag_name')
+    latest_release_url=$(curl -fsSL -o /dev/null -w '%{url_effective}' "${ENDPOINT_URL%/}/releases/latest")
+    MENU_VERSION="${latest_release_url##*/}"
+    [[ "$latest_release_url" == */releases/tag/"$MENU_VERSION" ]] || { echo "[uponlanxyz-init] Could not resolve latest menu version" >&2; exit 1; }
   else
     MENU_VERSION="latest"
   fi
@@ -72,6 +78,7 @@ fi
 # Import menus: use a staged tarball (bind-mounted by test-local) if present, else download
 if [[ -f /config/menus.tar.gz ]]; then
   echo "[uponlanxyz-init] Using staged menus.tar.gz (local test)"
+  mv /config/menus.tar.gz /config/menus/menus.tar.gz
 else
   # GitHub serves release assets at /releases/download/<tag>/; the local mirror
   # (deploy --local) splits menu/ from assets/.
@@ -81,7 +88,7 @@ else
     menu_tarball_url="${ENDPOINT_URL}/menu/${MENU_VERSION}/menus.tar.gz"
   fi
   echo "[uponlanxyz-init] Import menu from ${ENDPOINT_URL} version ${MENU_VERSION}"
-  curl -L ${menu_tarball_url} -o /config/menus/menus.tar.gz
+  curl -fL "$menu_tarball_url" -o /config/menus/menus.tar.gz
 fi
 
 # Extract menus if exists
@@ -125,7 +132,8 @@ fi
 # failure (e.g. no internet for the iPXE source fetch) is non-fatal — PXE stays
 # down until retried via the webapp Build UI.
 roms_current() {
-  local dir=/config/menus/rom/ipxe manifest="$dir/build-manifest.json" trust_hash name size hash
+  local dir=/config/menus/rom/ipxe trust_hash name size hash
+  local manifest="$dir/build-manifest.json"
   local expected='["uponlan.xyz-snp.efi","uponlan.xyz-snponly.efi","uponlan.xyz-undionly.kpxe","uponlan.xyz.dsk","uponlan.xyz.efi","uponlan.xyz.kpxe","uponlan.xyz.lkrn","uponlan.xyz.pdsk"]'
   [[ -f "$TLS_CRT" && ! -L "$TLS_CRT" && -f "$manifest" && ! -L "$manifest" ]] || return 1
   trust_hash="$(sha256sum "$TLS_CRT" | cut -d' ' -f1)"
@@ -162,7 +170,7 @@ else
   endpoint_catalog_url="${ENDPOINT_URL}/assets/endpoints.yml"
 fi
 echo "[uponlanxyz-init] Import endpoints.yml from ${endpoint_catalog_url}"
-if ! curl -fsL ${endpoint_catalog_url} -o /tmp/endpoints.yml; then
+if ! curl -fsL "$endpoint_catalog_url" -o /tmp/endpoints.yml; then
   if [[ -f /config/endpoints.yml ]]; then
     echo "[uponlanxyz-init] Keeping existing /config/endpoints.yml (refresh failed)"
   else

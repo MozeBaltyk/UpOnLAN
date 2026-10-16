@@ -11,7 +11,10 @@ const view = fs.readFileSync(
 
 describe('Menus provisioning editor wiring', () => {
   it('still parses as client-side JavaScript after rendering the baseurl placeholders', () => {
-    const rendered = view.replaceAll('<%= baseurl %>', '/');
+    const rendered = view
+      .replaceAll('<%= baseurl %>', '/')
+      .replaceAll('<%= okdRelease %>', '5.0.0-okd-scos.1')
+      .replaceAll('<%= okdMaxWorkers %>', '20');
     expect(() => new Function(rendered)).not.toThrow();
   });
 

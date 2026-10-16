@@ -97,6 +97,33 @@ describe('dlremote strips the local assets/ namespace', () => {
   });
 });
 
+describe('dlremote normalizes traversal before mapping the request', () => {
+  it('downloads only to the normalized contained destination', async () => {
+    const mirror = http.createServer((req, res) => {
+      if (req.url === '/assets/safe/file') res.end('safe');
+      else { res.writeHead(404); res.end(); }
+    });
+    await new Promise((resolve) => mirror.listen(0, resolve));
+    const app = await bootApp({ fixtures: {
+      'config/endpoints.yml': 'endpoints: {}\n',
+      'config/menu.yml': `menu:\n  origin: http://127.0.0.1:${mirror.address().port}\n  version: local-test\n`,
+    } });
+    try {
+      const socket = app.connectClient({ auth: { token: 'secret' } });
+      await once(socket, 'connect');
+      const done = once(socket, 'dlremotedone');
+      socket.emit('dlremote', ['/assets/discard/../safe/file']);
+      await done;
+      expect(fs.readFileSync(path.join(app.root, 'assets/safe/file'), 'utf8')).toBe('safe');
+      expect(fs.existsSync(path.join(app.root, 'assets/discard'))).toBe(false);
+      socket.close();
+    } finally {
+      await app.close();
+      await new Promise((resolve) => mirror.close(resolve));
+    }
+  });
+});
+
 describe('dlremote imports direct_file assets from the vendor source', () => {
   it('downloads from sources[index] and pins the endpoint file name', async () => {
     // Vendor serves the file under a URL whose basename differs from the

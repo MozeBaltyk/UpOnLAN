@@ -1302,10 +1302,12 @@ function setAssetFilter(filter) {
 
 function applyAssetFilter() {
   if (!$('#boot-assets-card-group').length) return;
-  const showBoot = assetCategoryFilter !== 'provisioning';
-  const showProvisioning = assetCategoryFilter !== 'boot';
+  const showBoot = !['provisioning', 'okd'].includes(assetCategoryFilter);
+  const showProvisioning = !['boot', 'okd'].includes(assetCategoryFilter);
+  const showOkd = !['boot', 'provisioning'].includes(assetCategoryFilter);
   $('#boot-assets-card-group').toggle(showBoot);
   $('#provisioning-assets-card').toggle(showProvisioning);
+  $('#okd-assets-card').toggle(showOkd);
   $('[data-asset-filter]').removeClass('active');
   $('[data-asset-filter="' + assetCategoryFilter + '"]').addClass('active');
 }
@@ -1315,10 +1317,18 @@ function renderlocal(){
   showLoading('#pagecontent', 'Getting Remote file list');
   socket.emit('getlocal');
 }
-socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotemenuorigin,remoteassetorigin,localnginxurl,provisioning){
+$(document).on('click', '#okd-open-asset-settings', function() {
+  okdAfterModalHidden('#okd-generate-modal', function() {
+    okdActiveTab = 'operations'; okdRenderForm();
+    $('#okd-asset-server-details').prop('open', true);
+    $('#local-asset-url').trigger('focus');
+  });
+});
+socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotemenuorigin,remoteassetorigin,localnginxurl,provisioning,localSettings,okdArtifacts){
   const bootCount = endpoints && endpoints.endpoints ? Object.keys(endpoints.endpoints).length : 0;
   const provisioningCount = provisioning ? provisioning.length : 0;
-  const allCount = bootCount + provisioningCount;
+  const okdCount = okdArtifacts ? okdArtifacts.length : 0;
+  const allCount = bootCount + provisioningCount + okdCount;
   $('#pagecontent').empty();
   $('#pagecontent').append(`
   <div class="mb-3">
@@ -1326,6 +1336,7 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
       <li class="nav-item"><button type="button" class="nav-link active" data-asset-filter="all">All <span class="badge badge-light ml-1">${allCount}</span></button></li>
       <li class="nav-item"><button type="button" class="nav-link" data-asset-filter="boot">Boot <span class="badge badge-light ml-1">${bootCount}</span></button></li>
       <li class="nav-item"><button type="button" class="nav-link" data-asset-filter="provisioning">Provisioning <span class="badge badge-light ml-1">${provisioningCount}</span></button></li>
+      <li class="nav-item"><button type="button" class="nav-link" data-asset-filter="okd">OKD <span class="badge badge-light ml-1">${okdCount}</span></button></li>
     </ul>
   </div>
   <div id="boot-assets-card-group" class="card-group">
@@ -1357,7 +1368,7 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
     </div>
     <div class="card">
       <div class="card-header">
-        Local Assets at <a target="_blank" href="${localnginxurl}">link</a>
+        Local Assets at <a target="_blank" href="${okdAttr(localnginxurl)}">link</a>
         <br>
         <span style="float:right;">
           <div class="form-row">
@@ -1408,6 +1419,13 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
         </thead>
         <tbody id="provisioningassetrows"></tbody>
       </table>
+    </div>
+  </div>
+  <div id="okd-assets-card" class="card mt-3">
+    <div class="card-header">OKD generated artifacts <span class="badge badge-secondary ml-2">${okdCount} verified versions</span></div>
+    <div class="card-body">
+      <p class="small text-muted">Read-only files verified from immutable manifests. Saving an Asset server URL does not bind or assign its address; DNS, host addressing, routing, firewall and TLS remain operator-managed.</p>
+      <table class="table table-sm"><thead><tr><th>Profile</th><th>Version</th><th>Mode</th><th>State</th><th>Published URL</th><th>Immutable HTTPS files</th></tr></thead><tbody id="okdassetrows"></tbody></table>
     </div>
   </div>`);
   var tableoptions = {
@@ -1499,6 +1517,29 @@ socket.on('renderlocal', function(endpoints,localfiles,remotemenuversion,remotem
           </td>
         </tr>
       `);
+    });
+  }
+  $('#okdassetrows').empty();
+  if (!okdArtifacts || okdArtifacts.length === 0) {
+    $('#okdassetrows').append('<tr><td colspan="6" class="text-muted">No verified OKD artifacts yet.</td></tr>');
+  } else {
+    $.each(okdArtifacts, function(index, value) {
+      const files = value.files.map(function(file) {
+        if (file.portalPath) {
+          const portalUrl = window.location.origin + buildAssetUrl('<%= baseurl %>', file.portalPath); const encoded = encodeURIComponent(portalUrl);
+          return `<div><a href="${okdAttr(portalUrl)}">Download ${okdAttr(file.name)}</a> <button type="button" class="btn btn-outline-secondary btn-sm" data-copy-url="${encoded}">Copy URL</button></div>`;
+        }
+        if (!file.url) return `<span class="text-muted">${okdAttr(file.name)} (no HTTPS origin captured)</span>`;
+        const url = okdAttr(file.url); const encoded = encodeURIComponent(file.url);
+        return `<div><a target="_blank" rel="noopener" href="${url}">${okdAttr(file.name)}</a> <button type="button" class="btn btn-outline-secondary btn-sm" data-copy-url="${encoded}">Copy URL</button></div>`;
+      }).join('');
+      const ipxe = value.files.find(function(file) { return file.role === 'ipxe' && file.url; });
+      const iso = value.files.find(function(file) { return file.portalPath; });
+      const publishedUrl = ipxe ? ipxe.url : (iso ? window.location.origin + buildAssetUrl('<%= baseurl %>', iso.portalPath) : null);
+      const urlCell = publishedUrl
+        ? `<a target="_blank" rel="noopener" href="${okdAttr(publishedUrl)}">${okdAttr(publishedUrl)}</a> <button type="button" class="btn btn-outline-secondary btn-sm" data-copy-url="${encodeURIComponent(publishedUrl)}">Copy URL</button>`
+        : '<span class="text-muted">—</span>';
+      $('#okdassetrows').append(`<tr><td>${okdAttr(value.profileId)}</td><td><code>${okdAttr(value.versionId)}</code></td><td>${okdAttr(value.mode)}</td><td>${value.active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-secondary">Inactive</span>'}</td><td>${urlCell}</td><td>${files}</td></tr>`);
     });
   }
   // Debounced per-table filters
@@ -1756,8 +1797,8 @@ $(document).on('click', '#doc-viewer a', function(e) {
 });
 
 //// Render OKD profile page ////
-const OKD_RELEASE = '5.0.0-okd-scos.1';
-const OKD_MAX_WORKERS = 20;
+const OKD_RELEASE = '<%= okdRelease %>';
+const OKD_MAX_WORKERS = <%= okdMaxWorkers %>;
 let okdProfiles = [];
 let okdProfile = null;
 let okdExistingId = null;
@@ -1779,19 +1820,101 @@ let okdPreflight = { ready: false, errors: [{ message: 'Select and save a profil
 let okdJobLog = '';
 let okdJobPoll = null;
 let okdVersions = [];
-let okdOperationVersion = '';
-let okdMonitor = null;
-let okdMonitorLog = '';
-let okdHealth = null;
-let okdProbes = null;
-let okdStorage = null;
-let okdDiagnostics = null;
 let okdConfigs = null;
 let okdConfigStatus = '';
 let okdPageActive = false;
 let okdViewEpoch = 0;
 let okdEditorEpoch = 0;
 let okdModalOpen = false;
+let okdGenerateContext = null;
+let okdGenerateEpoch = 0;
+const okdDetailsOpen = {};
+let okdCertificateInspection = null;
+let okdCertificateMessage = '';
+let okdCertificateInspecting = false;
+let okdCertificateEpoch = 0;
+let okdAdditionalCertificates = [];
+let okdCaValidation = null;
+let okdCaEpoch = 0;
+
+function okdCertificateDetails(cert) {
+  if (!cert || !cert.metadata) return '<p>Certificate status has not been inspected.</p>';
+  const metadata = cert.metadata; const leaf = metadata.chain && metadata.chain[0] || {};
+  const tags = [metadata.localCertificateMatch ? 'default certificate' : 'custom certificate', leaf.selfSigned ? 'self-signed' : 'CA-issued',
+    metadata.validity === 'current' ? 'valid' : metadata.validity === 'not_yet_valid' ? 'not yet valid' : 'expired',
+    metadata.hostnameMatch ? 'name/address matches' : 'name/address does not match', metadata.systemTrusted ? 'system trusted' : 'not system trusted',
+    okdProfile && (okdProfile.asset_certificate_bundle && !metadata.storedMismatch || metadata.additionalCaMatch) ? 'included in additionalTrustBundle' : 'not included in additionalTrustBundle'];
+  const chain = (metadata.chain || []).map(function(item, index) {
+    return `<li><strong>${index ? 'Issuer' : 'Leaf'}:</strong> ${okdAttr(item.subject)} · ${item.ca ? 'CA certificate' : 'end-entity certificate'}<br>Issuer: ${okdAttr(item.issuer)}<br>Valid ${okdAttr(item.validFrom)} to ${okdAttr(item.validTo)}<br>SHA-256: <code>${okdAttr(item.fingerprint256)}</code></li>`;
+  }).join('');
+  return `<div class="mb-2">${tags.map(function(tag) { return `<span class="badge badge-secondary mr-1">${okdAttr(tag)}</span>`; }).join('')}</div>
+    ${metadata.endpointVerified === false ? '<div class="alert alert-warning py-2"><strong>Endpoint not verified:</strong> using the validated local deployment certificate because the live endpoint could not be reached.</div>' : ''}<dl class="small text-break"><dt>Subject and issuer</dt><dd>${okdAttr(leaf.subject)}<br>${okdAttr(leaf.issuer)}</dd><dt>Subject alternative names</dt><dd>${okdAttr(leaf.subjectAltName || 'None')}</dd>
+    <dt>Valid from / valid to</dt><dd>${okdAttr(leaf.validFrom)} / ${okdAttr(leaf.validTo)}</dd><dt>SHA-256 fingerprint</dt><dd><code>${okdAttr(leaf.fingerprint256)}</code></dd>
+    <dt>Inspected endpoint</dt><dd>${okdAttr(metadata.hostname)} (${okdAttr(metadata.address)})</dd><dt>Chain details</dt><dd><ol class="pl-3">${chain}</ol></dd><dt>Inspection/trust warnings</dt><dd>${okdAttr(metadata.authorizationError || 'None')}<br>${okdAttr(metadata.rootfsVerification || '')}${metadata.storedMismatch ? '<br><strong>Stored and presented certificates do not match.</strong>' : ''}</dd></dl>
+    ${(metadata.storedMismatch || (!metadata.systemTrusted && !metadata.localCertificateMatch && !metadata.additionalCaMatch)) && cert.caPem ? '<button id="okd-trust-inspected" type="button" class="btn btn-warning btn-sm">Use inspected certificate trust</button>' : ''}`;
+}
+
+function okdCertificateStatus() {
+  if (okdCertificateInspecting) return { state: 'secondary', text: 'Inspecting certificate…' };
+  const metadata = okdCertificateInspection && okdCertificateInspection.metadata;
+  if (!metadata) return { state: okdCertificateMessage ? 'danger' : 'secondary', text: okdCertificateMessage || 'Not inspected' };
+  if (metadata.storedMismatch) return { state: 'danger', text: 'Certificate changed; resolve before saving' };
+  if (metadata.endpointVerified === false) return { state: 'warning', text: 'Inspected · see certificate details' };
+  const trusted = metadata.systemTrusted || metadata.localCertificateMatch || metadata.additionalCaMatch;
+  const ready = metadata.validity === 'current' && metadata.hostnameMatch && trusted;
+  return { state: ready ? 'success' : 'warning', text: `${metadata.validity === 'current' ? 'Inspected' : metadata.validity} · ${metadata.hostnameMatch ? 'name matches' : 'name mismatch'} · ${trusted ? 'trusted' : 'confirmation required'}` };
+}
+
+function okdCertificateSummary() { return okdCertificateStatus().text; }
+
+function okdUpdateCertificateStatus() {
+  const status = okdCertificateStatus();
+  $('#okd-certificate-status').text(status.text).removeClass('alert-secondary alert-success alert-warning alert-danger').addClass(`alert-${status.state}`);
+}
+
+function okdInspectCertificate(profile, callback) {
+  const epoch = okdViewEpoch; const token = ++okdCertificateEpoch; const assetUrl = profile.asset_url;
+  okdCertificateInspecting = true; okdUpdateCertificateStatus();
+  socket.timeout(15000).emit('okd:certificates:inspect', { assetUrl: assetUrl, storedPem: profile.asset_certificate_bundle || '', additionalPem: profile.additional_ca_bundle || '' }, function(err, result) {
+    if (!okdPageActive || epoch !== okdViewEpoch || token !== okdCertificateEpoch || assetUrl !== okdReadForm().asset_url) return;
+    okdCertificateInspecting = false;
+    okdCertificateInspection = !err && result && result.ok ? result.data : null;
+    okdCertificateMessage = err || !result ? 'Certificate inspection was not acknowledged.' : (result.ok ? '' : result.message);
+    okdUpdateCertificateStatus();
+    $('#okd-certificate-details').prop('disabled', !okdCertificateInspection);
+    if (callback) callback(err || !result ? { ok: false, message: okdCertificateMessage } : result);
+  });
+}
+
+function okdPemBlocks(pem) {
+  return (pem || '').match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----\s*/g) || [];
+}
+
+function okdMergeAdditionalBundle(currentPem, currentCertificates, added) {
+  const entries = [];
+  function append(pem, certificates) {
+    const blocks = okdPemBlocks(pem);
+    certificates.forEach(function(cert, index) { if (blocks[index]) entries.push({ cert: cert, pem: blocks[index].trim() + '\n' }); });
+  }
+  append(currentPem || '', currentCertificates || []); append(added.pem || '', added.certificates || []);
+  const unique = new Map(); entries.forEach(function(entry) { unique.set(entry.cert.fingerprint256, entry); });
+  const normalized = Array.from(unique.values()).sort(function(a, b) { return a.cert.fingerprint256.localeCompare(b.cert.fingerprint256); });
+  return { pem: normalized.map(function(entry) { return entry.pem; }).join(''), certificates: normalized.map(function(entry) { return entry.cert; }) };
+}
+
+function okdAdditionalCaRows() {
+  if (!okdAdditionalCertificates.length) return '<p class="small text-muted mb-2">No additional CA certificates.</p>';
+  return `<ul class="list-group mb-2">${okdAdditionalCertificates.map(function(cert) { return `<li class="list-group-item py-2 d-flex justify-content-between align-items-start"><span class="small text-break"><strong>${okdAttr(cert.subject)}</strong><br>${okdAttr(cert.validity)} · valid to ${okdAttr(cert.validTo)}<br><code>${okdAttr(cert.fingerprint256)}</code></span><button type="button" class="btn btn-outline-danger btn-sm ml-2" data-okd-remove-ca="${okdAttr(cert.fingerprint256)}" aria-label="Remove CA certificate ${okdAttr(cert.subject)}">Remove</button></li>`; }).join('')}</ul>`;
+}
+
+function okdLoadAdditionalCertificates(profile) {
+  const epoch = okdViewEpoch; const pem = profile.additional_ca_bundle || '';
+  if (!pem) { okdAdditionalCertificates = []; return; }
+  socket.timeout(15000).emit('okd:certificates:validate', { pem: pem }, function(err, result) {
+    if (!okdPageActive || epoch !== okdViewEpoch || profile !== okdProfile || err || !result || !result.ok) return;
+    profile.additional_ca_bundle = result.data.pem; okdAdditionalCertificates = result.data.certificates; okdRefreshView();
+  });
+}
 
 function okdAttr(value) {
   const chars = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -1830,9 +1953,14 @@ function okdNewProfile() {
   return {
     id: 'lab-okd', release: OKD_RELEASE, platform: 'none', topology: 'sno',
     cluster_name: 'lab', base_domain: 'example.com', machine_network: '192.168.7.0/24', rendezvous_ip: '192.168.7.10',
-    ssh_public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey', worker_count: 0, api_vip: '', ingress_vip: '',
+    ssh_public_key: '', worker_count: 0, api_vip: '', ingress_vip: '',
+    boot_mode: 'pxe', asset_url: 'https://192.168.7.1:8443/', asset_certificate_bundle: '', additional_ca_bundle: '',
     hosts: [{ hostname: 'master-0', role: 'control-plane', mac: '02:00:00:00:00:10', ipv4: '192.168.7.10', interface: 'eno1', disk_hint: 'deviceName:/dev/vda' }]
   };
+}
+
+function okdNormalizeProfile(profile) {
+  return Object.assign({}, okdNewProfile(), profile, { hosts: profile.hosts || [] });
 }
 
 function okdDesiredRoles(profile) {
@@ -1857,7 +1985,9 @@ function okdReadForm() {
     base_domain: $('#okd-base-domain').val().trim(), machine_network: $('#okd-machine-network').val().trim(),
     rendezvous_ip: $('#okd-rendezvous').val().trim(), ssh_public_key: $('#okd-ssh-key').val().trim(),
     worker_count: Number($('#okd-workers').val()), api_vip: $('#okd-api-vip').val().trim(),
-    ingress_vip: $('#okd-ingress-vip').val().trim(), hosts: []
+    ingress_vip: $('#okd-ingress-vip').val().trim(), boot_mode: $('input[name="okd-boot-mode"]:checked').val() || 'pxe',
+    asset_url: $('#okd-asset-url').val().trim(), asset_certificate_bundle: okdProfile.asset_certificate_bundle || '',
+    additional_ca_bundle: okdProfile.additional_ca_bundle || '', hosts: []
   };
   $('#okd-hosts tbody tr').each(function() {
     const row = $(this);
@@ -1892,9 +2022,9 @@ function okdAfterModalHidden(selector, callback) {
 }
 
 function okdReply(callback) {
-  const epoch = okdViewEpoch; const id = okdExistingId; const revision = okdRevision; const version = okdOperationVersion;
+  const epoch = okdViewEpoch; const id = okdExistingId; const revision = okdRevision;
   return function(result) {
-    if (!okdPageActive || epoch !== okdViewEpoch || id !== okdExistingId || revision !== okdRevision || version !== okdOperationVersion) return;
+    if (!okdPageActive || epoch !== okdViewEpoch || id !== okdExistingId || revision !== okdRevision) return;
     callback(result);
   };
 }
@@ -1906,7 +2036,7 @@ function okdSubmitPullSecret(secret) {
     if (err || !result) {
       okdPullSecretMessage = 'Pull-secret submission was not acknowledged. It may have saved; reconnect and check status before submitting again.';
       okdPullSecretMessageType = 'danger';
-    } else if (result.ok) { okdPullSecretStatus = result.data; okdPullSecretMessage = 'Pull secret saved securely.'; okdPullSecretMessageType = 'success'; okdRefreshJobs(); }
+    } else if (result.ok) { okdPullSecretStatus = result.data; okdPullSecretMessage = 'Pull secret saved to persistent config.'; okdPullSecretMessageType = 'success'; okdRefreshJobs(); }
     else { okdPullSecretMessage = result.message || 'Pull secret could not be saved.'; okdPullSecretMessageType = 'danger'; }
     okdUpdatePullSecret();
   };
@@ -1924,6 +2054,7 @@ function okdSaveProfile(profile) {
     $('#okd-save').prop('disabled', false).text('Save');
     if (!result.ok) { okdShowResult(result); return; }
     const draft = okdReadForm();
+    if (draft.ssh_public_key === profile.ssh_public_key) { $('#okd-ssh-key').val(result.data.ssh_public_key); draft.ssh_public_key = result.data.ssh_public_key; }
     okdProfile = okdSnapshot(draft) === submitted ? result.data : Object.assign({}, draft, { id: result.data.id, revision: result.data.revision, saved_at: result.data.saved_at });
     okdExistingId = result.data.id; okdRevision = result.data.revision; okdMarkClean(result.data);
     okdPreflight = { ready: false, errors: [{ message: 'Checking saved profile readiness…' }] };
@@ -1934,6 +2065,37 @@ function okdSaveProfile(profile) {
       if (listResult.ok) okdProfiles = listResult.data;
       okdProfile = Object.assign({}, okdReadForm(), { id: result.data.id, revision: result.data.revision, saved_at: result.data.saved_at });
       okdRefreshJobs(); okdShowResult({ ok: true, message: 'Profile saved. Edits made after submission remain unsaved.' });
+    });
+  });
+}
+
+function okdPrepareProfileSave(profile) {
+  const epoch = okdViewEpoch; const submitted = okdSnapshot(profile);
+  $('#okd-save').prop('disabled', true).text('Checking…');
+  socket.timeout(15000).emit('okd:certificates:validate', { pem: profile.additional_ca_bundle || '' }, function(err, validation) {
+    if (!okdPageActive || epoch !== okdViewEpoch || submitted !== okdSnapshot(okdReadForm())) return;
+    if (err || !validation || !validation.ok) {
+      $('#okd-save').prop('disabled', false).text('Save');
+      okdShowResult(validation || { ok: false, message: 'CA validation was not acknowledged.' }); return;
+    }
+    profile.additional_ca_bundle = validation.data.pem;
+    if (profile.boot_mode !== 'pxe') { okdSaveProfile(profile); return; }
+    okdInspectCertificate(profile, function(result) {
+      if (!result.ok) { $('#okd-save').prop('disabled', false).text('Save'); okdShowResult(result); return; }
+      const inspected = result.data; const metadata = inspected.metadata;
+      if (metadata.validity !== 'current' || !metadata.hostnameMatch || metadata.storedMismatch) {
+        $('#okd-save').prop('disabled', false).text('Save');
+        okdShowResult({ ok: false, message: 'Resolve the Asset server certificate validity, name, or stored-certificate mismatch before saving.' }); return;
+      }
+      if (!metadata.systemTrusted && !metadata.localCertificateMatch && !metadata.additionalCaMatch && !profile.asset_certificate_bundle) {
+        if (!inspected.caPem || !confirm('The Asset server certificate is not system trusted. Trust the inspected CA for this profile?')) {
+          $('#okd-save').prop('disabled', false).text('Save'); return;
+        }
+        profile.asset_certificate_bundle = inspected.caPem;
+        socket.emit('okd:certificates:confirm', { profileId: profile.id });
+      }
+      okdProfile.asset_certificate_bundle = profile.asset_certificate_bundle;
+      okdSaveProfile(profile);
     });
   });
 }
@@ -1960,9 +2122,8 @@ function okdUpdateToolsModal() {
   $('#okd-tool-error').toggleClass('d-none', !okdToolError).text(okdToolError);
   $('#okd-tools-progress').toggleClass('d-none', !(status && status.state === 'preparing'));
   $('#okd-tools-ready').toggleClass('text-success', !!(status && status.generationReady)).toggleClass('text-muted', !(status && status.generationReady)).text(`Selected tools: ${status && status.generationReady ? 'required tools ready' : 'required tools not ready'}.`);
-  const active = !!(okdJobStatus.current || okdJobStatus.blocking || (okdMonitor && ['starting', 'running', 'cancelling'].includes(okdMonitor.state)));
-  $('#okd-generate').prop('disabled', !(okdExistingId && okdSnapshot(okdReadForm()) === okdBaseline && okdGenerationReady && okdPreflight.ready && !active));
-  $('#okd-profile-generate-reason').text(okdGenerationReason(okdReadForm()));
+  okdUpdateGenerateModal();
+  $('#okd-generate-reason').text(okdGenerationReason(okdReadForm()));
 }
 
 function okdStopToolPoll() {
@@ -1972,9 +2133,9 @@ function okdStopToolPoll() {
 function okdRefreshTools(attempt = 0) {
   okdStopToolPoll();
   if (!okdPageActive || !okdExistingId || !okdSavedRelease) return;
-  const epoch = okdViewEpoch; const token = okdToolEpoch; const id = okdExistingId; const release = okdSavedRelease;
+  const epoch = okdViewEpoch; const token = okdToolEpoch; const id = okdExistingId; const release = okdSavedRelease; const revision = okdRevision;
   socket.timeout(15000).emit('okd:tools:status', release, function(err, result) {
-    if (!okdPageActive || epoch !== okdViewEpoch || token !== okdToolEpoch || id !== okdExistingId || release !== okdSavedRelease) return;
+    if (!okdPageActive || epoch !== okdViewEpoch || token !== okdToolEpoch || id !== okdExistingId || release !== okdSavedRelease || revision !== okdRevision) return;
     if (err || !result || !result.ok || result.data.release !== release) {
       okdToolError = 'Unable to load tools status. Reopen Edit to retry.'; okdGenerationReady = false;
       okdUpdateToolsModal(); return;
@@ -1982,6 +2143,7 @@ function okdRefreshTools(attempt = 0) {
     const wasReady = okdGenerationReady;
     okdToolError = ''; okdToolStatus = result.data; okdGenerationReady = release === OKD_RELEASE && !!result.data.generationReady;
     okdUpdateToolsModal();
+    if (!wasReady && okdGenerationReady && okdGenerateCurrent()) okdCheckGenerate();
     if (result.data.state === 'preparing' && attempt < 300) okdToolPoll = setTimeout(function() { okdRefreshTools(attempt + 1); }, 2000);
     else {
       if (result.data.state === 'preparing') { okdToolError = 'Preparation is still running on the server. Reopen Edit for updated status.'; okdUpdateToolsModal(); }
@@ -1999,6 +2161,7 @@ function okdUpdatePullSecret() {
     .toggleClass('text-success', state === 'ready').toggleClass('text-danger', state === 'invalid').toggleClass('text-muted', !['ready', 'invalid'].includes(state));
   $('#okd-pull-secret-input').prop('disabled', okdPullSecretSaving || externallyManaged);
   $('#okd-pull-secret-disabled').text(status ? (status.disabledReasons || []).join(' ') : 'Loading management permissions…');
+  $('#okd-pull-secret-auth-warning').toggleClass('d-none', !status || status.authenticationConfigured !== false);
   $('#okd-pull-secret-save').prop('disabled', okdPullSecretSaving || externallyManaged || !(status && status.writable))
     .attr('aria-busy', okdPullSecretSaving ? 'true' : 'false')
     .text(okdPullSecretSaving ? 'Saving…' : (status && status.exists ? 'Update pull secret' : 'Add pull secret'));
@@ -2018,7 +2181,7 @@ function okdLoadPullSecretStatus() {
 function okdRefreshView() {
   if (!okdPageActive) return;
   if (okdJobPoll) clearTimeout(okdJobPoll);
-  if (okdJobStatus.current || okdJobStatus.blocking || (okdMonitor && ['starting', 'running', 'cancelling'].includes(okdMonitor.state))) okdJobPoll = setTimeout(okdRefreshJobs, 1500);
+  if (okdJobStatus.current || okdJobStatus.blocking) okdJobPoll = setTimeout(okdRefreshJobs, 1500);
   okdUpdateToolsModal();
   // Keep typed fields and modal DOM intact; render latest state only when safe.
   if (okdModalOpen || $('[id^="okd-"][id$="-modal"]').hasClass('show')) return;
@@ -2040,14 +2203,10 @@ function okdRefreshJobs() {
     socket.emit('okd:versions:list', requestProfile, function(versionResult) {
       if (stale()) return;
       okdVersions = versionResult.ok ? versionResult.data : [];
-      if (!okdVersions.some(function(version) { return version.versionId === okdOperationVersion; })) okdOperationVersion = okdVersions.length ? okdVersions[0].versionId : '';
       if (!versionResult.ok) okdShowResult(versionResult);
-      socket.emit('okd:operations:monitor:status', function(monitorResult) {
-        if (stale()) return;
-        if (monitorResult.ok) okdMonitor = monitorResult.data;
-        okdRefreshView();
-      });
+      okdRefreshView();
     });
+    if (okdSnapshot(okdReadForm()) !== okdBaseline) return;
     socket.emit('okd:jobs:preflight', { profileId: requestProfile, revision: requestRevision }, function(checkResult) {
       if (stale()) return;
       okdPreflight = checkResult.ok ? checkResult.data : { ready: false, errors: [{ message: checkResult.message }] };
@@ -2060,102 +2219,163 @@ function okdVersionCard() {
   const active = okdVersions.find(function(version) { return version.active; });
   if (!okdExistingId) return '';
   const rows = okdVersions.map(function(version) {
+    const mediaVersion = version.mediaVersion || version.versionId;
     const files = (version.files || []).map(function(file) {
       return `${okdAttr(file.role)}: ${okdAttr(file.name)} · ${okdAttr(file.size)} bytes · <code>${okdAttr(file.sha256)}</code>`;
     }).join('<br>');
     const publish = version.mode === 'pxe' && !version.active
-      ? `<button class="btn btn-outline-primary btn-sm" data-okd-publish="${okdAttr(version.versionId)}">${active ? 'Activate' : 'Publish'}</button>` : '';
+      ? `<button class="btn btn-outline-primary btn-sm" data-okd-publish="${okdAttr(mediaVersion)}" data-release="${okdAttr(version.release)}">${active ? 'Activate' : 'Publish'}</button>` : '';
     const unpublish = version.active ? '<button class="btn btn-outline-warning btn-sm" data-okd-unpublish>Unpublish</button>' : '';
-    const bootTest = version.mode === 'pxe' && version.active ? '<button class="btn btn-outline-info btn-sm" data-okd-uefi-test>Open managed UEFI boot test</button>' : '';
-    const remove = !version.active ? `<button class="btn btn-outline-danger btn-sm" data-okd-delete-version="${okdAttr(version.versionId)}">Delete</button>` : '';
-    const iso = version.isoUrl ? `<a href="${okdAttr(version.isoUrl)}" target="_blank" rel="noopener">HTTPS ISO</a>` : '';
-    return `<tr><td><code>${okdAttr(version.versionId)}</code>${version.active ? ' <span class="badge badge-success">Active</span>' : ''}</td>
-      <td>${okdAttr(version.mode)}</td><td>${okdAttr(version.createdAt)}</td><td class="small text-break">${files}<br>Profile revision: <code>${okdAttr(version.profileRevision)}</code> ${iso}</td>
-      <td>${publish} ${unpublish} ${bootTest} ${remove}</td></tr>`;
+    const remove = !version.active ? `<button class="btn btn-outline-danger btn-sm" data-okd-delete-version="${okdAttr(mediaVersion)}" data-release="${okdAttr(version.release)}">Delete</button>` : '';
+    const iso = version.mode === 'iso' ? `<a href="<%= baseurl %>okd/${encodeURIComponent(version.profileId)}/${encodeURIComponent(version.release)}/${encodeURIComponent(mediaVersion)}/iso">Download ISO</a>` : '';
+    return `<tr><td><code>${okdAttr(mediaVersion)}</code>${version.active ? ' <span class="badge badge-success">Active</span>' : ''}</td>
+      <td>${okdAttr(version.mode)}</td><td>${okdAttr(version.createdAt)}</td><td class="small text-break">${files}<br>Profile revision: <code>${okdAttr(version.profileRevision)}</code>${version.baseUrl ? `<br><code>bootArtifactsBaseURL: ${okdAttr(version.baseUrl.replace(/\/$/, ''))}</code>` : ''} ${iso}</td>
+      <td>${publish} ${unpublish} ${remove}</td></tr>`;
   }).join('');
   return `<div id="okd-versions" class="border rounded p-2 mb-3"><strong>Artifacts</strong>
     ${rows ? `<div class="table-responsive mt-2"><table class="table table-sm table-bordered mb-0"><thead><tr><th>Version</th><th>Mode</th><th>Created</th><th>Checksums / provenance</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="small text-muted mt-2">No finalized versions.</div>'}
-    <small class="d-block text-muted mt-2">Activating a previous PXE version changes only the boot-menu target; it does not roll back machines or clusters. The managed UEFI test only opens Console/Create VM; it does not prove BIOS, Agent rootfs trust, inventory, or target disk acceptance.</small></div>`;
+    <small class="d-block text-muted mt-2">Activating a previous PXE version changes only the boot-menu target; it does not roll back machines or clusters.</small></div>`;
 }
 
 function okdGenerationReason(profile) {
-  if (!okdExistingId) return 'Save the profile first.';
-  if (okdSnapshot(profile) !== okdBaseline) return 'Save or discard profile changes first.';
-  if (okdJobStatus.current || okdJobStatus.blocking) return 'A generation job is active on this instance.';
-  if (okdMonitor && ['starting', 'running', 'cancelling'].includes(okdMonitor.state)) return 'Generation is blocked while installer monitoring is active.';
-  if (okdToolStatus && okdToolStatus.state === 'preparing') return 'Tools are preparing in the background. View progress in Edit → Tools.';
-  if (okdToolError) return okdToolError;
-  if (okdToolStatus && okdToolStatus.state === 'failed') return 'Tool preparation failed. View Edit → Tools; Save the profile to retry.';
-  if (!okdPreflight.ready) return (okdPreflight.errors || []).map(function(e) { return e.message; }).join(' ');
-  return okdGenerationReady ? 'Local preflight ready; native installer and target readiness remain unvalidated.' : 'Save the profile to prepare the exact installer and oc; view Edit → Tools.';
+  if (!okdExistingId) return 'Profile not saved';
+  if (okdSnapshot(profile) !== okdBaseline) return 'Unsaved changes';
+  if (okdJobStatus.current || okdJobStatus.blocking) return 'Generation in progress';
+  if (okdToolStatus && okdToolStatus.state === 'preparing') return 'Tools preparing';
+  if (okdToolError || (okdToolStatus && okdToolStatus.state === 'failed')) return 'Tool preparation failed';
+  if (!(okdPreflight.ready || (okdPreflight.perMode && okdPreflight.perMode.iso.ready))) return 'Not ready';
+  return okdGenerationReady ? '' : 'Tools not ready';
+}
+
+function okdGenerateCurrent() {
+  const c = okdGenerateContext;
+  return c && okdPageActive && c.epoch === okdViewEpoch && c.id === okdExistingId && c.revision === okdRevision && c.modal === $('#okd-generate-modal')[0];
+}
+
+function okdGenerateProblems() {
+  const c = okdGenerateContext; const errors = []; const warnings = [];
+  if (!okdExistingId) warnings.push('Save the new profile before generation.');
+  else if (okdSnapshot(okdReadForm()) !== okdBaseline) warnings.push('Save or discard unsaved form changes before generation.');
+  if (okdJobStatus.current || okdJobStatus.blocking) warnings.push('Generation is already active on this instance.');
+  if (!okdGenerationReady) {
+    if (okdToolStatus && okdToolStatus.state === 'preparing' && (!okdToolError || okdToolError.includes('still running'))) warnings.push('Required tools are preparing. Wait for verification.');
+    else if (okdToolError || (okdToolStatus && okdToolStatus.state === 'failed')) errors.push('Required tools are unavailable. Check Edit → Tools and retry preparation.');
+    else warnings.push(okdToolStatus && okdToolStatus.state === 'preparing' ? 'Required tools are preparing. Wait for verification.' : 'Required tools are not ready yet. Check Edit → Tools.');
+  }
+  if (!okdGenerateCurrent()) warnings.push('Profile context changed. Close and reopen Generate to check again.');
+  else {
+    const check = c.check;
+    for (const problem of (check.errors || [])) {
+      if (['revision', 'job'].includes(problem.field)) warnings.push(problem.message);
+      else if (['installer', 'oc'].includes(problem.field) && okdToolStatus && okdToolStatus.state === 'preparing') warnings.push('Required tools are preparing. Wait for verification.');
+       else errors.push(problem.message);
+    }
+    if (c.failure) errors.push(c.failure);
+    if (!c.checking && !check.ready && !errors.length && !warnings.length) warnings.push('Prerequisites are not ready. Close and reopen Generate to retry.');
+  }
+  return { errors: [...new Set(errors)], warnings: [...new Set(warnings)] };
+}
+
+function okdUpdateGenerateModal() {
+  const list = function(title, items, kind) { return items.length ? `<div class="alert alert-${kind}"><strong>${title}</strong><ul class="mb-0">${items.map(function(message) { return `<li>${okdAttr(message)}</li>`; }).join('')}</ul></div>` : ''; };
+  const problems = okdGenerateProblems(); const mode = (okdProfile && okdProfile.boot_mode || 'pxe').toUpperCase(); const c = okdGenerateContext;
+  $('#okd-generate-problems').html(list(`${mode} errors`, problems.errors, 'danger') + list(`${mode} — resolve before generation`, problems.warnings, 'warning'));
+  $('#okd-generate-action').text(!c ? '' : c.starting ? 'Starting generation…' : c.checking ? 'Checking current prerequisites…' : (!problems.errors.length && !problems.warnings.length ? 'Checks passed — starting generation…' : ''));
+}
+
+function okdCheckGenerate() {
+  const c = okdGenerateContext;
+  if (!okdGenerateCurrent() || c.starting) return;
+  c.check = { ready: false }; c.failure = ''; c.checking = false;
+  if (!c.id || okdSnapshot(okdReadForm()) !== okdBaseline) { okdUpdateGenerateModal(); return; }
+  c.checking = true; const token = ++okdGenerateEpoch; let remaining = 2;
+  okdUpdateGenerateModal();
+  const reply = function(apply) { return function(err, result) {
+    if (!okdGenerateCurrent() || c !== okdGenerateContext || token !== okdGenerateEpoch) return;
+    if (err || !result) c.failure = 'Prerequisite check was not acknowledged within 15 seconds. Check your connection and reopen Generate to retry.';
+    else if (!result.ok) c.failure = result.message || 'Unable to check prerequisites.';
+    else apply(result.data);
+    remaining -= 1; c.checking = remaining > 0; okdUpdateGenerateModal();
+    if (!c.checking) { const problems = okdGenerateProblems(); if (!problems.errors.length && !problems.warnings.length) okdStartGenerate(); }
+  }; };
+  socket.timeout(15000).emit('okd:jobs:preflight', { profileId: c.id, revision: c.revision }, reply(function(data) {
+    c.check = data.profileRevision === c.revision ? data : { ready: false, errors: (data.errors || []).concat([{ field: 'revision', message: 'Saved revision changed. Reload the profile before generation.' }]) };
+  }));
+  socket.timeout(15000).emit('okd:jobs:status', c.id, reply(function(data) { okdJobStatus = data; }));
+}
+
+function okdStartGenerate() {
+  const c = okdGenerateContext;
+  if (!c || c.starting || c.checking || !okdGenerateCurrent()) return;
+  const problems = okdGenerateProblems();
+  if (problems.errors.length || problems.warnings.length) { okdUpdateGenerateModal(); return; }
+  c.starting = true; okdUpdateGenerateModal();
+  socket.volatile.timeout(15000).emit('okd:jobs:start', { profileId: okdExistingId, revision: okdRevision, confirmed: true }, function(err, result) {
+    if (!okdGenerateCurrent() || c !== okdGenerateContext) return;
+    c.starting = false;
+    if (err || !result || !result.ok) {
+      c.check = { ready: false, errors: result && result.errors || [] };
+      c.failure = err || !result ? 'Generation request was not acknowledged. It may have started; close and reopen Generate to check status before retrying.' : result.message || 'Generation failed.';
+      if (result && ['OPERATION_ACTIVE', 'JOB_ACTIVE', 'MONITOR_ACTIVE', 'STALE_REVISION'].includes(result.code)) {
+        c.check.errors = c.check.errors.concat([{ field: result.code === 'STALE_REVISION' ? 'revision' : 'job', message: c.failure }]); c.failure = '';
+      }
+      okdUpdateGenerateModal(); return;
+    }
+    okdJobLog = '';
+    okdAfterModalHidden('#okd-generate-modal', okdRefreshJobs);
+  });
 }
 
 function okdPullSecretBox() {
-  return `<section class="border rounded p-3 mt-3" aria-labelledby="okd-pull-secret-title"><h6 id="okd-pull-secret-title">Shared pull secret</h6>
+  return `<section class="border rounded p-3 mt-3" aria-labelledby="okd-pull-secret-title"><div class="d-flex align-items-center mb-2"><h6 id="okd-pull-secret-title" class="mb-0">Shared pull secret</h6><button type="button" class="btn btn-outline-secondary btn-sm rounded-circle p-0 ml-1 d-inline-flex align-items-center justify-content-center" style="width:1.25rem;height:1.25rem" aria-label="Shared pull secret help" aria-describedby="okd-pull-secret-overview-help" title="Default OKD placeholder — public registries only; no private registry authentication&#10;&#10;The active pull secret is inserted into the generated install-config.yaml. Saving it here persists and reuses it, so you do not need to paste it into every profile or config. Existing credentials are never retrieved or displayed. The persisted secret and generated config are plaintext files protected by filesystem permissions; WEBAPP authentication controls access but does not encrypt them. Mounted external credentials are authoritative and read-only."><i class="bi bi-question-lg" aria-hidden="true"></i></button></div>
+    <span id="okd-pull-secret-overview-help" class="sr-only">Default OKD placeholder — public registries only; no private registry authentication. The active pull secret is inserted into the generated install-config.yaml. Saving it here persists and reuses it, so you do not need to paste it into every profile or config. Existing credentials are never retrieved or displayed. The persisted secret and generated config are plaintext files protected by filesystem permissions; WEBAPP authentication controls access but does not encrypt them. Mounted external credentials are authoritative and read-only.</span>
     <div id="okd-pull-secret-status" class="small text-muted mb-2" aria-live="polite">Loading status…</div>
-    <p class="small text-muted">Shared config, not per-profile. Existing credentials are never retrieved or displayed. Mounted external credentials are authoritative and read-only.</p>
+    <div id="okd-pull-secret-auth-warning" class="alert alert-warning py-2 d-none" role="alert"><strong>Warning:</strong> WEBAPP_USER/WEBAPP_PASS are not configured. Pull secret management is unauthenticated, and the pull secret is stored unencrypted (plaintext) in persistent config; filesystem permissions still apply.</div>
     <div id="okd-pull-secret-disabled" class="small text-warning mb-2"></div>
-    <label for="okd-pull-secret-input">Add/update pull secret JSON</label><textarea id="okd-pull-secret-input" class="form-control text-monospace" rows="5" maxlength="1048576" autocomplete="new-password" spellcheck="false" aria-describedby="okd-pull-secret-help"></textarea>
-    <small id="okd-pull-secret-help" class="form-text text-muted">Up to 1 MiB. Input is cleared on submission or closing this popup. Never paste credentials into profile YAML.</small>
+    <div class="d-flex align-items-center mb-2"><label for="okd-pull-secret-input" class="mb-0">Add/update pull secret JSON</label><button type="button" class="btn btn-outline-secondary btn-sm rounded-circle p-0 ml-1 d-inline-flex align-items-center justify-content-center" style="width:1.25rem;height:1.25rem" aria-label="Pull secret input help" aria-describedby="okd-pull-secret-help" title="Enter JSON directly without outer shell quotes, for example {&quot;auths&quot;:{&quot;fake&quot;:{&quot;auth&quot;:&quot;aWQ6cGFzcwo=&quot;}}}. Up to 1 MiB. Input is cleared on submission or closing this popup. Never paste credentials into profile YAML."><i class="bi bi-question-lg" aria-hidden="true"></i></button></div>
+    <span id="okd-pull-secret-help" class="sr-only">Enter JSON directly without outer shell quotes, for example {"auths":{"fake":{"auth":"aWQ6cGFzcwo="}}}. Up to 1 MiB. Input is cleared on submission or closing this popup. Never paste credentials into profile YAML.</span><textarea id="okd-pull-secret-input" class="form-control text-monospace" rows="5" maxlength="1048576" autocomplete="new-password" spellcheck="false" aria-describedby="okd-pull-secret-help"></textarea>
     <div id="okd-pull-secret-message" class="alert alert-secondary py-2 mt-2 d-none" aria-live="polite"></div>
     <div id="okd-pull-secret-loading" class="spinner-border spinner-border-sm mr-2 d-none" role="status" aria-label="Saving pull secret"></div><button id="okd-pull-secret-save" class="btn btn-primary btn-sm mt-2" disabled aria-busy="false">Add pull secret</button>
   </section>`;
 }
 
+function okdDuration(record, active) {
+  const start = Date.parse(record.startedAt || record.createdAt); const end = Date.parse(record.finishedAt || (active ? new Date().toISOString() : ''));
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '—';
+  const seconds = Math.floor((end - start) / 1000); return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
 function okdJobCard(profile) {
   const current = okdJobStatus.current;
   const blocking = okdJobStatus.blocking;
-  const shown = current || okdJobStatus.history[0];
-  const monitorBlocking = okdMonitor && ['starting', 'running', 'cancelling'].includes(okdMonitor.state);
-  const active = !!(current || blocking || monitorBlocking);
-  const unchanged = !!okdExistingId && okdSnapshot(profile) === okdBaseline;
-  const installerReady = okdGenerationReady;
-  let reason = '';
-  if (!okdExistingId) reason = 'Save the profile first.';
-  else if (!unchanged) reason = 'Save or discard profile changes first.';
-  else if (!installerReady) reason = 'Prepare and verify the exact installer first.';
-  else if (blocking) reason = `Generation is blocked by job ${blocking.id} for profile ${blocking.profileId}.`;
-  else if (monitorBlocking) reason = 'Generation is blocked while installer monitoring is active.';
-  else if (active) reason = 'A generation job is already active on this instance.';
-  else if (!okdPreflight.ready) reason = (okdPreflight.errors || []).map(function(e) { return e.message; }).join(' ');
-  const timestamps = shown ? `Created: ${okdAttr(shown.createdAt || '—')} · Started: ${okdAttr(shown.startedAt || '—')} · Finished: ${okdAttr(shown.finishedAt || '—')}` : 'No generation jobs for this profile.';
-  return `<div id="okd-generation-status" class="border rounded p-2 mb-3"><strong>Generation</strong>
-    <div id="okd-job-state" aria-live="polite">${blocking ? `Global generation job <code>${okdAttr(blocking.id)}</code> for profile <code>${okdAttr(blocking.profileId)}</code> is <strong>${okdAttr(blocking.state)}</strong>.` : (shown ? `Job <code>${okdAttr(shown.id)}</code>: <strong>${okdAttr(shown.state)}</strong> — ${okdAttr(shown.message || '')}` : 'No job yet.')}</div>
-    <small class="d-block text-muted mb-2">${timestamps}</small>
+  const mode = (profile.boot_mode || 'pxe').toUpperCase();
+  const destination = profile.boot_mode === 'pxe' ? `${profile.asset_url || ''}okd/${profile.id}/${profile.release}/&lt;next-version&gt;/` : 'Authenticated ISO download';
+  return `<section id="okd-generation-status" class="border border-primary rounded p-3 mb-3">
+    <h5>Generate installation media</h5><dl class="row small mb-2"><dt class="col-sm-3">Profile</dt><dd class="col-sm-9">${okdAttr(profile.id)}</dd><dt class="col-sm-3">Mode</dt><dd class="col-sm-9">${okdAttr(mode)}</dd><dt class="col-sm-3">Release</dt><dd class="col-sm-9">${okdAttr(profile.release)}</dd><dt class="col-sm-3">Destination</dt><dd class="col-sm-9 text-break"><code>${destination}</code></dd><dt class="col-sm-3">Readiness</dt><dd id="okd-generate-reason" class="col-sm-9" aria-live="polite">${okdAttr(okdGenerationReason(profile) || 'Ready')}</dd></dl>
+    <button id="okd-generate" class="btn btn-danger btn-sm">Generate ${okdAttr(mode)}</button>
+    ${(current || blocking) ? `<hr><h6>Active generation</h6><div id="okd-job-state" aria-live="polite"><strong>${okdAttr((current || blocking).state)}</strong> · ${okdAttr((current || blocking).mediaVersion || 'allocating version')} · ${okdAttr((current || blocking).message || '')}</div><small class="d-block text-muted mb-2">Created: ${okdAttr((current || blocking).createdAt || '—')} · Started: ${okdAttr((current || blocking).startedAt || '—')} · Elapsed: ${okdAttr(okdDuration(current || blocking, true))}</small>` : '<div id="okd-job-state" class="sr-only" aria-live="polite">No active generation.</div>'}
     ${current && current.cancellable ? '<button id="okd-cancel" class="btn btn-outline-danger btn-sm ml-2">Cancel</button>' : ''}
-    ${shown ? '<button id="okd-log" class="btn btn-outline-secondary btn-sm ml-2">View sanitized log</button>' : ''}
-    <div id="okd-generate-reason" class="small text-muted mt-2">${okdAttr(reason)}</div>
+    ${current ? '<button id="okd-log" class="btn btn-outline-secondary btn-sm ml-2">Show/hide log</button>' : ''}
     ${okdJobLog ? `<pre class="border rounded p-2 mt-2 mb-0" style="max-height:18rem;overflow:auto">${okdAttr(okdJobLog)}</pre>` : ''}
-    <small class="d-block text-muted mt-2">Cancel stops only this managed installer process. It does not stop booted machines or roll back a cluster.</small>
-  </div>`;
+  </section>`;
 }
 
 function okdOperationsCard() {
   if (!okdExistingId) return '';
-  const versions = okdVersions.map(function(version) { return `<option value="${okdAttr(version.versionId)}" ${version.versionId === okdOperationVersion ? 'selected' : ''}>${okdAttr(version.versionId)} (${okdAttr(version.mode)})</option>`; }).join('');
-  const monitorActive = okdMonitor && ['starting', 'running', 'cancelling'].includes(okdMonitor.state);
-  const generationActive = !!(okdJobStatus.current || okdJobStatus.blocking);
-  const monitorText = okdMonitor ? `${okdAttr(okdMonitor.state)} — ${okdAttr(okdMonitor.message)} · Started ${okdAttr(okdMonitor.startedAt || '—')} · Finished ${okdAttr(okdMonitor.finishedAt || '—')}` : 'No monitoring run yet.';
-  const health = okdHealth ? (okdHealth.querySucceeded
-     ? `${okdHealth.ready ? 'Cluster readiness checks passed' : 'Query succeeded; cluster NOT ready'}: Nodes ${okdAttr(okdHealth.nodes.ready)}/${okdAttr(okdHealth.nodes.total)} ready (expected ${okdAttr(okdHealth.nodes.expected)}); operators ${okdAttr(okdHealth.operators.available)}/${okdAttr(okdHealth.operators.total)} available, ${okdAttr(okdHealth.operators.progressing)} progressing, ${okdAttr(okdHealth.operators.degraded)} degraded.`
-    : `Not ready: ${okdAttr(okdHealth.reason)}.`) : 'Not requested.';
-  const probeRows = okdProbes ? okdProbes.results.map(function(item) { return `<tr><td>${okdAttr(item.hostname)}</td><td>${okdAttr(item.probe)}${item.port ? ':' + okdAttr(item.port) : ''}</td><td>${item.success ? 'yes' : 'no'}</td><td>${okdAttr(item.durationMs)} ms${item.error ? ' · ' + okdAttr(item.error) : ''}</td></tr>`; }).join('') : '';
-   const storage = okdStorage ? ['profiles', 'jobs', 'workspaces', 'logs', 'artifactVersions'].map(function(name) { const item = okdStorage[name]; return `${name}: ${item.count} entries / ${item.bytes} bytes`; }).join(' · ') + ` · retention: ${okdStorage.retention.enabled ? okdStorage.retention.count + ' candidate(s), ' + okdStorage.retention.blockedByPublication + ' publication-blocked, ' + okdStorage.retention.protectedInstallations + ' protected installations' : 'disabled'}` : 'Not loaded.';
-  const diagnostics = okdDiagnostics ? `Configured: auth ${okdDiagnostics.configured.authentication ? 'yes' : 'no'}, persistence ${okdDiagnostics.configured.persistence ? 'yes' : 'no'}, public origin ${okdDiagnostics.configured.publicBaseUrl ? 'yes' : 'no'} · Tools: installer ${okdDiagnostics.tools.installer ? 'ready' : 'not ready'}, oc ${okdDiagnostics.tools.oc ? 'ready' : 'not ready'} · Active: generation ${okdDiagnostics.active.generation ? 'yes' : 'no'}, monitoring ${okdDiagnostics.active.monitoring ? 'yes' : 'no'} · Inventory: ${okdDiagnostics.inventory.profiles} profiles, ${okdDiagnostics.inventory.publications} publications, ${okdDiagnostics.inventory.versions} versions · ROM manifest ${okdDiagnostics.romManifestReady ? 'ready' : 'not ready'}.` : 'Not loaded.';
-  return `<div id="okd-operations" class="border rounded p-2 mb-3"><strong>Operations</strong>
-    <div class="form-row align-items-end mt-1"><div class="form-group col-md-7 mb-2"><label for="okd-operation-version">Successful version</label><select id="okd-operation-version" class="form-control form-control-sm"><option value="">Select version…</option>${versions}</select></div>
-    <div class="form-group col-md-5 mb-2"><button id="okd-monitor-start" class="btn btn-outline-primary btn-sm" ${!okdOperationVersion || monitorActive || generationActive ? 'disabled' : ''}>Start monitoring</button>${monitorActive && okdMonitor.cancellable ? '<button id="okd-monitor-cancel" class="btn btn-outline-danger btn-sm ml-2">Cancel monitoring</button>' : ''}<button id="okd-monitor-log" class="btn btn-outline-secondary btn-sm ml-2">View log</button></div></div>
-    <div class="small" aria-live="polite">${monitorText}</div>${okdMonitorLog ? `<pre class="border rounded p-2 mt-2" style="max-height:12rem;overflow:auto">${okdAttr(okdMonitorLog)}</pre>` : ''}
-    <div class="mt-2"><button id="okd-health" class="btn btn-outline-info btn-sm" ${okdOperationVersion ? '' : 'disabled'}>Cluster health snapshot</button><span class="small ml-2">${health}</span></div>
-    <div class="mt-2"><button id="okd-probes" class="btn btn-outline-info btn-sm" ${okdOperationVersion ? '' : 'disabled'}>Run probes</button><span class="small text-muted ml-2">Server namespace DNS/TCP, first address only; endpoints are derived server-side. Not target-node, TLS or HTTP readiness.</span>${probeRows ? `<div class="table-responsive mt-1"><table class="table table-sm table-bordered mb-0"><tbody>${probeRows}</tbody></table></div>` : ''}</div>
-    <div class="mt-2"><button id="okd-storage-refresh" class="btn btn-outline-secondary btn-sm">Storage / retention report</button><button id="okd-retention-cleanup" class="btn btn-outline-danger btn-sm ml-2" ${okdStorage && okdStorage.retention.enabled && okdStorage.retention.count ? '' : 'disabled'}>Clean eligible private data</button><div class="small mt-1">${okdAttr(storage)}</div></div>
-    <div class="mt-2"><button id="okd-diagnostics" class="btn btn-outline-secondary btn-sm">Diagnostics</button><div class="small mt-1">${okdAttr(diagnostics)}</div></div>
-    <small class="d-block text-muted mt-2">Monitoring, health, and probes are opt-in and never gate generation or publication. No workspace path, kubeconfig, credential, raw installer state, or raw cluster JSON is returned.</small></div>`;
+  const versions = new Map(okdVersions.map(function(version) { return [`${version.release}/${version.mediaVersion || version.versionId}`, version]; }));
+  const rows = (okdJobStatus.history || []).map(function(job) {
+    const mediaVersion = job.mediaVersion || job.versionId; const release = job.release || okdProfile.release; const version = versions.get(`${release}/${mediaVersion}`); const successful = job.state === 'succeeded';
+    const download = successful && job.mode === 'pxe' ? `<a class="btn btn-link btn-sm" href="<%= baseurl %>okd/${encodeURIComponent(job.profileId)}/${encodeURIComponent(release)}/${encodeURIComponent(mediaVersion)}/pxe.tar.gz">Download PXE bundle</a>` : successful && job.mode === 'iso' ? `<a class="btn btn-link btn-sm" href="<%= baseurl %>okd/${encodeURIComponent(job.profileId)}/${encodeURIComponent(release)}/${encodeURIComponent(mediaVersion)}/iso">Download ISO</a>` : '';
+    return `<tr><td><code>${okdAttr(mediaVersion)}</code></td><td>${okdAttr((job.mode || '').toUpperCase())}</td><td>${okdAttr(job.state)}</td><td>${okdAttr(job.createdAt || '—')}</td><td>${okdAttr(okdDuration(job, false))}</td><td><button class="btn btn-link btn-sm" data-okd-history-log="${okdAttr(mediaVersion)}" data-release="${okdAttr(release)}">Log</button>${download}${version ? '<button class="btn btn-link btn-sm" data-okd-view-artifacts>View artifacts</button>' : ''}</td></tr>`;
+  }).join('');
+  return `<section id="okd-recent-generations" class="border rounded p-3 mb-3"><h5>Recent generations</h5>${rows ? `<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Version</th><th>Mode</th><th>State</th><th>Created</th><th>Duration</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="small text-muted mb-0">No recent generations.</p>'}</section>`;
 }
 
 function okdRenderForm() {
   if (!okdPageActive) return;
   if (okdModalOpen || $('[id^="okd-"][id$="-modal"]').hasClass('show')) return;
+  $('#pagecontent details[id]').each(function() { okdDetailsOpen[this.id] = this.open; });
+  const focusedId = $('#pagecontent :focus').attr('id');
   const secretDraft = $('#okd-pull-secret-input').val() || '';
   const p = okdProfile || okdNewProfile();
   okdFitHosts(p);
@@ -2176,18 +2396,15 @@ function okdRenderForm() {
   const profileTab = okdActiveTab === 'profiles';
   const artifactsTab = okdActiveTab === 'artifacts';
   const operationsTab = okdActiveTab === 'operations';
-  const unchanged = !!okdExistingId && okdSnapshot(p) === okdBaseline;
-  const generationActive = !!(okdJobStatus.current || okdJobStatus.blocking || (okdMonitor && ['starting', 'running', 'cancelling'].includes(okdMonitor.state)));
-  const canGenerate = unchanged && okdGenerationReady && okdPreflight.ready && !generationActive;
   $('#pagecontent').html(`
     <ul class="nav nav-tabs mb-3" role="tablist">
       <li class="nav-item"><button class="nav-link ${profileTab ? 'active' : ''}" data-okd-tab="profiles" type="button" role="tab" aria-selected="${profileTab ? 'true' : 'false'}">Profiles</button></li>
-      <li class="nav-item"><button class="nav-link ${artifactsTab ? 'active' : ''}" data-okd-tab="artifacts" type="button" role="tab" aria-selected="${artifactsTab ? 'true' : 'false'}">Artifacts</button></li>
       <li class="nav-item"><button class="nav-link ${operationsTab ? 'active' : ''}" data-okd-tab="operations" type="button" role="tab" aria-selected="${operationsTab ? 'true' : 'false'}">Operations</button></li>
+      <li class="nav-item"><button class="nav-link ${artifactsTab ? 'active' : ''}" data-okd-tab="artifacts" type="button" role="tab" aria-selected="${artifactsTab ? 'true' : 'false'}">Artifacts</button></li>
     </ul>
     <div id="okd-content-card" class="card mb-3">
     <div id="okd-content-body" class="card-body py-3">
-    <div class="d-flex align-items-center mb-3"><label for="okd-profile-list" class="mb-0"><strong>Selected profile</strong></label>
+    <div class="d-flex align-items-center mb-3"><label for="okd-profile-list" class="mb-0"></label>
       <select id="okd-profile-list" class="form-control form-control-sm ml-3" style="max-width:260px"><option value="">Select profile…</option>${options}</select>
       <button id="okd-new" class="btn btn-outline-primary btn-sm ml-2">New</button>
       <button id="okd-delete" class="btn btn-outline-danger btn-sm ml-2" ${okdExistingId ? '' : 'disabled'}>Delete</button></div>
@@ -2208,20 +2425,25 @@ function okdRenderForm() {
             <div class="form-group col-md-3"><label for="okd-rendezvous">Rendezvous IPv4</label><input id="okd-rendezvous" class="form-control form-control-sm" value="${okdAttr(p.rendezvous_ip)}"></div>
           </div>
           <div class="form-row">
-            <div class="form-group col-md-${p.platform === 'baremetal' ? '6' : '12'}"><label for="okd-ssh-key">SSH public key</label><input id="okd-ssh-key" class="form-control form-control-sm" value="${okdAttr(p.ssh_public_key)}"></div>
+            <div class="form-group col-md-${p.platform === 'baremetal' ? '6' : '12'}"><div class="d-flex align-items-center"><label for="okd-ssh-key" class="mb-0">SSH public key</label><button type="button" class="btn btn-outline-secondary btn-sm rounded-circle p-0 ml-1 d-inline-flex align-items-center justify-content-center" style="width:1.25rem;height:1.25rem" aria-label="SSH public key help" aria-describedby="okd-ssh-key-help" title="Leaving this empty generates or reuses an Ed25519 pair when the profile is saved. The generated public key is then shown here and stored in the profile and install-config. The private key stays only at /config/okd/keys/&lt;profile&gt;/id_ed25519, mode 0600, and is never exposed in the UI or installation media. If a public key is supplied, its matching private key remains operator-managed."><i class="bi bi-question-lg" aria-hidden="true"></i></button></div><span id="okd-ssh-key-help" class="sr-only">Leaving this empty generates or reuses an Ed25519 pair when the profile is saved. The generated public key is then shown here and stored in the profile and install-config. The private key stays only at /config/okd/keys/&lt;profile&gt;/id_ed25519, mode 0600, and is never exposed in the UI or installation media. If a public key is supplied, its matching private key remains operator-managed.</span><input id="okd-ssh-key" class="form-control form-control-sm" value="${okdAttr(p.ssh_public_key)}" aria-describedby="okd-ssh-key-help"></div>
             <div class="form-group col-md-3 ${p.platform === 'baremetal' ? '' : 'd-none'}"><label for="okd-api-vip">API VIP</label><input id="okd-api-vip" class="form-control form-control-sm" value="${okdAttr(p.api_vip)}"></div>
             <div class="form-group col-md-3 ${p.platform === 'baremetal' ? '' : 'd-none'}"><label for="okd-ingress-vip">Ingress VIP</label><input id="okd-ingress-vip" class="form-control form-control-sm" value="${okdAttr(p.ingress_vip)}"></div>
-          </div>
-          <div class="table-responsive"><table id="okd-hosts" class="table table-sm table-bordered mb-1"><thead><tr><th>#</th><th>Role</th><th>Hostname</th><th>MAC</th><th>IPv4</th><th>Interface</th><th>Hint type</th><th>Hint value</th></tr></thead><tbody>${hostRows}</tbody></table></div>
-          <small class="form-text text-muted mb-3">Choose a hint type, then enter only its value. For Device name, enter <code>/dev/sda</code>, not <code>deviceName:/dev/sda</code>.</small>
-          <div id="okd-profile-actions"><button id="okd-save" class="btn btn-success btn-sm">Save</button>
-          <button id="okd-edit" class="btn btn-outline-primary btn-sm ml-2">Edit</button>
-           <button id="okd-generate" class="btn btn-danger btn-sm ml-2" ${canGenerate ? '' : 'disabled'}>Generate</button></div>
-           <div id="okd-profile-generate-reason" class="small text-muted mt-2" aria-live="polite">${okdAttr(okdGenerationReason(p))}</div>
-           <p class="small text-warning mt-2">IPv4 is expected DHCP reservation / inventory, not static configuration. Reserve rendezvous and host addresses externally. Agent boot can automatically overwrite disks after validation; use one-time media boot, then local disk.</p>
+           </div>
+           <div class="table-responsive"><table id="okd-hosts" class="table table-sm table-bordered mb-1"><thead><tr><th>#</th><th>Role</th><th>Hostname</th><th>MAC</th><th>IPv4</th><th>Interface</th><th>Hint type</th><th>Hint value</th></tr></thead><tbody>${hostRows}</tbody></table></div>
+           <section id="okd-installation-media" class="border rounded p-3 my-3" aria-labelledby="okd-installation-media-title"><h5 id="okd-installation-media-title">Installation media</h5>
+             <fieldset><legend class="sr-only">Boot mode</legend><div class="custom-control custom-radio custom-control-inline"><input class="custom-control-input" type="radio" name="okd-boot-mode" id="okd-boot-pxe" value="pxe" ${p.boot_mode !== 'iso' ? 'checked' : ''}><label class="custom-control-label" for="okd-boot-pxe">PXE boot</label></div><div class="custom-control custom-radio custom-control-inline"><input class="custom-control-input" type="radio" name="okd-boot-mode" id="okd-boot-iso" value="iso" ${p.boot_mode === 'iso' ? 'checked' : ''}><label class="custom-control-label" for="okd-boot-iso">ISO</label></div></fieldset>
+             <div id="okd-pxe-settings" class="mt-3 ${p.boot_mode === 'iso' ? 'd-none' : ''}"><label for="okd-asset-url">Asset server URL <span aria-hidden="true">*</span></label><input id="okd-asset-url" class="form-control form-control-sm" type="url" required maxlength="2048" value="${okdAttr(p.asset_url)}" aria-describedby="okd-certificate-status">
+              <button id="okd-certificate-details" type="button" class="btn btn-link btn-sm" ${okdCertificateInspection ? '' : 'disabled'}>Certificate details</button>
+                <div id="okd-certificate-status" class="alert alert-${okdCertificateStatus().state} py-1 px-2 mb-0 mt-2" role="status" aria-live="polite">${okdAttr(okdCertificateSummary())}</div>
+
+             </div>
+             <div class="mt-3"><div class="d-flex align-items-center"><strong class="mr-2">Additional trust certificates</strong><button id="okd-add-ca" type="button" class="btn btn-primary btn-sm rounded-circle p-0 d-inline-flex align-items-center justify-content-center" style="width:1.75rem;height:1.75rem" aria-label="Add CA certificate" title="Add CA certificate"><i class="bi bi-plus-lg" aria-hidden="true"></i></button></div><div id="okd-additional-ca-list" class="mt-2">${okdAdditionalCaRows()}</div></div>
+           </section>
+           <div id="okd-profile-actions"><button id="okd-save" class="btn btn-success btn-sm">Save</button>
+           <button id="okd-edit" class="btn btn-outline-primary btn-sm ml-2">Edit</button></div>
     </div>
     <div class="${artifactsTab ? '' : 'd-none'}">${okdVersionCard() || '<div class="text-muted">Select a saved profile.</div>'}</div>
-    <div class="${operationsTab ? '' : 'd-none'}">${okdExistingId ? okdJobCard(p) + okdOperationsCard() : '<div class="text-muted">Select a saved profile.</div>'}</div>
+    ${operationsTab ? okdJobCard(p) + okdOperationsCard() : ''}
     </div></div>
     <div class="modal fade" id="okd-edit-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="okd-edit-title"><div class="modal-dialog modal-xl" role="document"><div class="modal-content">
       <div class="modal-header"><h5 class="modal-title" id="okd-edit-title">Edit profile YAML templates and pull secret</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>
@@ -2234,7 +2456,7 @@ function okdRenderForm() {
       </ul>
       <div class="tab-content">
         <div class="tab-pane fade show active" id="okd-install-config-pane" role="tabpanel" aria-labelledby="okd-install-config-tab"><p class="small text-muted">Templates display the public OKD fallback (older templates may show a placeholder). The active configured pull secret replaces it only during generation in the private workspace. Manage credentials in Pull Secret, never in YAML.</p><textarea id="okd-install-config" class="form-control text-monospace" rows="20" aria-label="install-config.yaml" ${okdConfigs ? '' : 'disabled'}>${okdAttr(okdConfigs ? okdConfigs.installConfig : '')}</textarea></div>
-        <div class="tab-pane fade" id="okd-agent-config-pane" role="tabpanel" aria-labelledby="okd-agent-config-tab"><textarea id="okd-agent-config" class="form-control text-monospace" rows="20" aria-label="agent-config.yaml" ${okdConfigs ? '' : 'disabled'}>${okdAttr(okdConfigs ? okdConfigs.agentConfig : '')}</textarea></div>
+        <div class="tab-pane fade" id="okd-agent-config-pane" role="tabpanel" aria-labelledby="okd-agent-config-tab"><textarea id="okd-agent-config" class="form-control text-monospace" rows="20" aria-label="agent-config.yaml" ${okdConfigs ? '' : 'disabled'}>${okdAttr(okdConfigs ? okdConfigs.agentConfig : '')}</textarea><label for="okd-effective-preview" class="mt-3">Effective generation preview</label><pre id="okd-effective-preview" class="border rounded p-2" aria-label="Effective generation preview">${okdAttr(p.boot_mode === 'pxe' ? `bootArtifactsBaseURL: ${p.asset_url}okd/${p.id}/${p.release}/<next-media-version>` : 'bootArtifactsBaseURL: not used for ISO')}</pre><small class="text-muted">Read-only preview. The pull secret is never included.</small></div>
         <div class="tab-pane fade" id="okd-pull-secret-pane" role="tabpanel" aria-labelledby="okd-pull-secret-tab"><p class="small text-muted">Add/update pull secret saves shared credentials independently of Save YAML. It does not save profile form changes or YAML drafts.</p>${okdPullSecretBox()}</div>
         <div class="tab-pane fade" id="okd-tools-pane" role="tabpanel" aria-labelledby="okd-tools-tab">
           <p id="okd-tools-summary"></p><p class="small text-muted">Profile Save prepares the saved release's tools in the background. Save again to retry failures (form Save replaces YAML edits). Verified cached tools are reused. Downloads continue after closing Edit. Binaries stay on the server.</p>
@@ -2248,19 +2470,27 @@ function okdRenderForm() {
     </div></div></div>
     <div class="modal fade" id="okd-generate-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="okd-generate-title"><div class="modal-dialog" role="document"><div class="modal-content">
       <div class="modal-header"><h5 class="modal-title" id="okd-generate-title">Generate installation artifacts</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>
-       <div class="modal-body"><div class="alert alert-danger"><strong>Disk-destructive warning:</strong> booting Agent media can automatically overwrite disks selected by the effective YAML root-device hints after validations pass. No manual pause is guaranteed. Verify physical disks before boot; use one-time boot then local disk.</div>
-      <button data-okd-generate="pxe" class="btn btn-danger" ${canGenerate ? '' : 'disabled'}>PXE boot</button><button data-okd-generate="iso" class="btn btn-danger ml-2" ${canGenerate ? '' : 'disabled'}>ISO</button></div>
-    </div></div></div>`);
+       <div class="modal-body"><div id="okd-generate-problems" aria-live="polite"></div><div id="okd-generate-action" class="small text-muted" aria-live="polite"></div><p class="small mb-0 mt-2"><a href="Kubernetes/OKD/05-Reference-and-Troubleshooting.md" data-okd-generation-help>Configuration help</a></p></div>
+    </div></div></div>
+    <div class="modal fade" id="okd-certificate-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="okd-certificate-title"><div class="modal-dialog modal-lg" role="document"><div class="modal-content"><div class="modal-header"><h5 id="okd-certificate-title" class="modal-title">Certificate details</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div id="okd-certificate-body" class="modal-body">${okdCertificateDetails(okdCertificateInspection)}</div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button></div></div></div></div>
+    <div class="modal fade" id="okd-ca-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="okd-ca-title"><div class="modal-dialog" role="document"><div class="modal-content"><div class="modal-header"><h5 id="okd-ca-title" class="modal-title">Add CA certificate</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div class="modal-body"><label for="okd-ca-pem">PEM certificate or CA bundle</label><textarea id="okd-ca-pem" class="form-control text-monospace" rows="10" maxlength="262144" spellcheck="false"></textarea><div id="okd-ca-result" class="mt-2" role="status" aria-live="polite"></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button><button id="okd-ca-validate" type="button" class="btn btn-primary">Validate and add</button></div></div></div></div>`);
 
+  $('#pagecontent details[id]').each(function() { this.open = !!okdDetailsOpen[this.id]; });
+  if (focusedId) $('#' + focusedId).trigger('focus');
   $('[data-okd-tab]').click(function() {
     $('#okd-pull-secret-input').val('');
     okdProfile = okdReadForm();
     okdActiveTab = $(this).data('okd-tab');
     okdRenderForm();
   });
+  $('#okd-view-artifacts').click(function() { okdProfile = okdReadForm(); okdActiveTab = 'artifacts'; okdRenderForm(); });
+  $('[data-okd-view-artifacts]').click(function() { okdProfile = okdReadForm(); okdActiveTab = 'artifacts'; okdRenderForm(); });
 
   $('[id^="okd-"][id$="-modal"]').on('show.bs.modal', function() { okdModalOpen = true; });
   $('#okd-edit-modal').on('hide.bs.modal', function() { okdEditorEpoch += 1; $('#okd-pull-secret-input').val(''); });
+  $('#okd-generate-modal').on('hide.bs.modal', function() { okdGenerateEpoch += 1; okdGenerateContext = null; });
+  $('#okd-ca-modal').on('hide.bs.modal', function() { okdCaEpoch += 1; okdCaValidation = null; $('#okd-ca-pem').val(''); });
+  $('[data-okd-generation-help]').click(function(event) { event.preventDefault(); okdAfterModalHidden('#okd-generate-modal', function() { loaddoc('Kubernetes/OKD/05-Reference-and-Troubleshooting.md'); }); });
   $('[id^="okd-"][id$="-modal"]').on('hidden.bs.modal', function() { okdModalOpen = false; okdRefreshView(); });
   okdUpdatePullSecret();
   okdUpdateToolsModal();
@@ -2270,6 +2500,41 @@ function okdRenderForm() {
     const input = $('#okd-pull-secret-input'); const secret = input.val();
     input.val('');
     okdSubmitPullSecret(secret);
+  });
+  $('#okd-certificate-details').click(function() {
+    $('#okd-certificate-body').html(okdCertificateDetails(okdCertificateInspection));
+    $('#okd-trust-inspected').click(function() {
+      if (!okdCertificateInspection || !confirm('Replace the saved Asset certificate trust with the inspected endpoint trust?')) return;
+      const metadata = okdCertificateInspection.metadata;
+      okdProfile = okdReadForm(); okdProfile.asset_certificate_bundle = metadata.systemTrusted ? '' : okdCertificateInspection.caPem; metadata.storedMismatch = false;
+      socket.emit('okd:certificates:confirm', { profileId: okdProfile.id });
+      okdAfterModalHidden('#okd-certificate-modal', okdRenderForm);
+    });
+    $('#okd-certificate-modal').modal('show');
+  });
+  $('#okd-asset-url').on('blur', function() { const profile = okdReadForm(); if (profile.boot_mode === 'pxe' && profile.asset_url) okdInspectCertificate(profile); });
+  $('#okd-add-ca').click(function() { okdCaEpoch += 1; okdCaValidation = null; $('#okd-ca-pem').val(''); $('#okd-ca-result').empty(); $('#okd-ca-validate').text('Validate and add').prop('disabled', false); $('#okd-ca-modal').modal('show'); });
+  $('#okd-ca-validate').click(function() {
+    if (okdCaValidation) {
+      okdProfile = okdReadForm(); const merged = okdMergeAdditionalBundle(okdProfile.additional_ca_bundle, okdAdditionalCertificates, okdCaValidation);
+      okdProfile.additional_ca_bundle = merged.pem; okdAdditionalCertificates = merged.certificates;
+      okdAfterModalHidden('#okd-ca-modal', okdRenderForm); return;
+    }
+    const pem = $('#okd-ca-pem').val(); const epoch = okdCaEpoch; $('#okd-ca-validate').prop('disabled', true).text('Validating…');
+    socket.timeout(15000).emit('okd:certificates:validate', { pem: pem }, function(err, result) {
+      if (!okdPageActive || epoch !== okdCaEpoch || !$('#okd-ca-modal').hasClass('show')) return;
+      $('#okd-ca-validate').prop('disabled', false);
+      if (err || !result || !result.ok) { $('#okd-ca-result').html(`<div class="alert alert-danger">${okdAttr(result && result.message || 'Certificate validation was not acknowledged.')}</div>`); $('#okd-ca-validate').text('Validate and add'); return; }
+      okdCaValidation = result.data;
+      $('#okd-ca-result').html(`<ul class="small">${result.data.certificates.map(function(cert) { return `<li>${okdAttr(cert.subject)} · ${okdAttr(cert.validity)} · <code>${okdAttr(cert.fingerprint256)}</code></li>`; }).join('')}</ul>`);
+      $('#okd-ca-validate').text('Add certificates');
+    });
+  });
+  $('[data-okd-remove-ca]').click(function() {
+    const fingerprint = $(this).data('okd-remove-ca'); const index = okdAdditionalCertificates.findIndex(function(cert) { return cert.fingerprint256 === fingerprint; });
+    if (index < 0) return;
+    const blocks = okdPemBlocks(okdReadForm().additional_ca_bundle); blocks.splice(index, 1);
+    okdProfile = okdReadForm(); okdProfile.additional_ca_bundle = blocks.map(function(block) { return block.trim() + '\n'; }).join(''); okdAdditionalCertificates.splice(index, 1); okdRenderForm();
   });
   $('#okd-edit').click(function() {
     const yamlAvailable = !!okdExistingId && okdSnapshot(okdReadForm()) === okdBaseline;
@@ -2304,28 +2569,23 @@ function okdRenderForm() {
       installConfig: $('#okd-install-config').val(), agentConfig: $('#okd-agent-config').val()
     }, okdReply(function(result) {
       if (!result.ok) { okdShowResult(result, true); return; }
-      okdRevision = result.data.revision; okdConfigs = result.data;
+       okdRevision = result.data.revision; okdConfigs = result.data;
+       okdPreflight = { ready: false, errors: [{ message: 'Checking saved YAML readiness…' }] };
       if (okdProfile) { okdProfile.revision = result.data.revision; okdProfile.saved_at = result.data.savedAt; }
       okdMarkClean(okdProfile);
       okdAfterModalHidden('#okd-edit-modal', okdRefreshJobs);
     }));
   });
-  $('#okd-generate').click(function() { $('#okd-generate-modal').modal('show'); });
-
-  $('[data-okd-generate]').click(function() {
-    const mode = $(this).data('okd-generate');
-    if (okdSnapshot(okdReadForm()) !== okdBaseline) { okdShowResult({ ok: false, message: 'Save or discard profile changes before generation.' }); return; }
-    $(this).prop('disabled', true);
-    socket.emit('okd:jobs:start', { profileId: okdExistingId, revision: okdRevision, confirmed: true, mode: mode }, function(result) {
-      if (!result.ok) okdShowResult(result);
-      okdJobLog = '';
-      okdAfterModalHidden('#okd-generate-modal', okdRefreshJobs);
-    });
+  $('#okd-generate').click(function() {
+    okdGenerateContext = { epoch: okdViewEpoch, id: okdExistingId, revision: okdRevision, modal: $('#okd-generate-modal')[0], check: { ready: false }, checking: false, starting: false };
+    $('#okd-generate-modal').modal('show');
+    okdCheckGenerate();
+    if (okdExistingId && okdSnapshot(okdReadForm()) === okdBaseline) okdRefreshTools();
   });
   $('[data-okd-publish]').click(function() {
     const versionId = $(this).data('okd-publish');
     if (!confirm('Publish this PXE version as the active boot-menu target?')) return;
-    socket.emit('okd:versions:publish', { profileId: okdExistingId, versionId: versionId }, function(result) {
+    socket.emit('okd:versions:publish', { profileId: okdExistingId, release: $(this).data('release'), versionId: versionId }, function(result) {
       okdShowResult(result.ok ? { ok: true, message: 'PXE version is now active.' } : result); okdRefreshJobs();
     });
   });
@@ -2338,59 +2598,32 @@ function okdRenderForm() {
   $('[data-okd-delete-version]').click(function() {
     const versionId = $(this).data('okd-delete-version');
     if (!confirm('Permanently delete inactive artifact version ' + versionId + '? Private workspace and job history are retained.')) return;
-    socket.emit('okd:versions:delete', { profileId: okdExistingId, versionId: versionId, confirmed: true }, function(result) {
+    socket.emit('okd:versions:delete', { profileId: okdExistingId, release: $(this).data('release'), versionId: versionId, confirmed: true }, function(result) {
       okdShowResult(result.ok ? { ok: true, message: 'Artifact version deleted.' } : result); okdRefreshJobs();
     });
-  });
-  $('[data-okd-uefi-test]').click(function() {
-    navTo('renderconsole', 'navconsole');
-    vmCreate();
-  });
-  $('#okd-operation-version').change(function() { okdOperationVersion = $(this).val(); okdHealth = null; okdRenderForm(); });
-  $('#okd-monitor-start').click(function() {
-    if (!confirm('Start installation observation? The previous bounded monitor log will be overwritten. Save it securely first. Cancellation stops observation only.')) return;
-    socket.emit('okd:operations:monitor:start', { profileId: okdExistingId, versionId: okdOperationVersion }, okdReply(function(result) { if (!result.ok) okdShowResult(result); else okdMonitor = result.data; okdRefreshJobs(); }));
-  });
-  $('#okd-monitor-cancel').click(function() {
-    if (!confirm('Cancel active installer monitoring? This does not stop or roll back the cluster installation.')) return;
-    socket.emit('okd:operations:monitor:cancel', function(result) { if (!result.ok) okdShowResult(result); okdRefreshJobs(); });
-  });
-  $('#okd-monitor-log').click(function() {
-    socket.emit('okd:operations:monitor:log', okdReply(function(result) { if (!result.ok) okdShowResult(result); else { okdMonitorLog = result.data.text; okdRenderForm(); } }));
-  });
-  $('#okd-health').click(function() {
-    socket.emit('okd:operations:health', { profileId: okdExistingId, versionId: okdOperationVersion }, okdReply(function(result) { if (!result.ok) okdShowResult(result); else { okdHealth = result.data; okdRenderForm(); } }));
-  });
-  $('#okd-probes').click(function() {
-    socket.emit('okd:operations:probes', { profileId: okdExistingId, versionId: okdOperationVersion }, okdReply(function(result) { if (!result.ok) okdShowResult(result); else { okdProbes = result.data; okdRenderForm(); } }));
-  });
-  $('#okd-storage-refresh').click(function() {
-    socket.emit('okd:operations:storage', okdReply(function(result) { if (!result.ok) okdShowResult(result); else { okdStorage = result.data; okdRenderForm(); } }));
-  });
-  $('#okd-retention-cleanup').click(function() {
-    if (!confirm('Delete eligible old failed/cancelled/interrupted private workspaces and logs? This removes their auth/state and diagnostic recovery ability. Successful/version-bearing and monitor-selected jobs are protected; public artifacts and job records remain. Verify secure backups and no remaining use first.')) return;
-    socket.emit('okd:operations:cleanup', { confirmed: true }, function(result) { okdShowResult(result.ok ? { ok: true, message: 'Eligible private data cleaned; job audit records and public artifacts were preserved.' } : result); $('#okd-storage-refresh').click(); });
-  });
-  $('#okd-diagnostics').click(function() {
-    socket.emit('okd:operations:diagnostics', okdReply(function(result) { if (!result.ok) okdShowResult(result); else { okdDiagnostics = result.data; okdRenderForm(); } }));
   });
   $('#okd-cancel').click(function() {
     if (!okdJobStatus.current) return;
     if (!confirm('Cancel active Agent generation? Generated partial output will not be published.')) return;
-    socket.emit('okd:jobs:cancel', okdJobStatus.current.id, function(result) { if (!result.ok) okdShowResult(result); okdRefreshJobs(); });
+    const job = okdJobStatus.current;
+    socket.emit('okd:jobs:cancel', { profileId: job.profileId, release: job.release, mediaVersion: job.mediaVersion }, function(result) { if (!result.ok) okdShowResult(result); okdRefreshJobs(); });
   });
   $('#okd-log').click(function() {
     const shown = okdJobStatus.current || okdJobStatus.history[0];
     if (!shown) return;
-    socket.emit('okd:jobs:log', { id: shown.id, maxBytes: 65536 }, okdReply(function(result) { if (!result.ok) okdShowResult(result); else { okdJobLog = result.data.text; okdRenderForm(); } }));
+    socket.emit('okd:jobs:log', { profileId: shown.profileId, release: shown.release, mediaVersion: shown.mediaVersion, maxBytes: 65536 }, okdReply(function(result) { if (!result.ok) okdShowResult(result); else { okdJobLog = okdJobLog ? '' : result.data.text; okdRenderForm(); } }));
   });
-  $('#okd-id, #okd-release, #okd-platform, #okd-topology, #okd-workers, #okd-cluster-name, #okd-base-domain, #okd-machine-network, #okd-rendezvous, #okd-ssh-key, #okd-api-vip, #okd-ingress-vip, #okd-hosts input, #okd-hosts select').on('input change', function() {
+  $('[data-okd-history-log]').click(function() {
+    socket.emit('okd:jobs:log', { profileId: okdExistingId, release: $(this).data('release'), mediaVersion: $(this).data('okd-history-log'), maxBytes: 65536 }, okdReply(function(result) { if (!result.ok) okdShowResult(result); else { okdJobLog = result.data.text; okdRenderForm(); } }));
+  });
+  $('#okd-id, #okd-release, #okd-platform, #okd-topology, #okd-workers, #okd-cluster-name, #okd-base-domain, #okd-machine-network, #okd-rendezvous, #okd-ssh-key, #okd-api-vip, #okd-ingress-vip, #okd-asset-url, input[name="okd-boot-mode"], #okd-hosts input, #okd-hosts select').on('input change', function() {
     const draft = okdReadForm();
     if (!['okd-topology', 'okd-workers', 'okd-platform'].includes(this.id)) okdProfile = draft;
-    if (okdExistingId && okdSnapshot(draft) !== okdBaseline) { $('[data-okd-generate], #okd-generate').prop('disabled', true); $('#okd-profile-generate-reason').text('Save or discard profile changes first.'); }
+    if (this.name === 'okd-boot-mode') { okdRenderForm(); return; }
+    okdUpdateToolsModal();
   });
   if (okdJobPoll) clearTimeout(okdJobPoll);
-  if ((okdJobStatus.current && ['queued', 'running', 'finalizing', 'cancelling'].includes(okdJobStatus.current.state)) || okdJobStatus.blocking || (okdMonitor && ['starting', 'running', 'cancelling'].includes(okdMonitor.state))) okdJobPoll = setTimeout(okdRefreshJobs, 1500);
+  if ((okdJobStatus.current && ['queued', 'running', 'finalizing', 'cancelling'].includes(okdJobStatus.current.state)) || okdJobStatus.blocking) okdJobPoll = setTimeout(okdRefreshJobs, 1500);
 
   $('#okd-profile-list').change(function() {
     const id = $(this).val();
@@ -2403,7 +2636,7 @@ function okdRenderForm() {
       if (!result.ok) { okdShowResult(result); return; }
       okdPreflight = { ready: false, errors: [{ message: 'Checking saved profile readiness…' }] };
       okdSavedRelease = result.data.release; okdToolStatus = null; okdToolError = ''; okdGenerationReady = false;
-      okdProfile = result.data; okdExistingId = result.data.id; okdRevision = result.data.revision; okdConfigs = null; okdConfigStatus = ''; okdJobLog = ''; okdMonitorLog = ''; okdHealth = null; okdProbes = null; okdStorage = null; okdDiagnostics = null; okdMarkClean(result.data); okdRenderForm(); okdRefreshJobs();
+      okdProfile = okdNormalizeProfile(result.data); okdExistingId = result.data.id; okdRevision = result.data.revision; okdConfigs = null; okdConfigStatus = ''; okdJobLog = ''; okdCertificateInspection = null; okdAdditionalCertificates = []; okdMarkClean(okdProfile); okdLoadAdditionalCertificates(okdProfile); okdRenderForm(); okdRefreshJobs();
       okdRefreshTools();
     });
   });
@@ -2411,7 +2644,8 @@ function okdRenderForm() {
     if (!okdConfirmDiscard()) return;
     okdViewEpoch += 1;
     okdStopToolPoll(); okdSavedRelease = null; okdToolStatus = null; okdToolError = ''; okdGenerationReady = false;
-    okdProfile = okdNewProfile(); okdExistingId = null; okdRevision = null; okdConfigs = null; okdConfigStatus = ''; okdJobLog = ''; okdMonitorLog = ''; okdHealth = null; okdProbes = null; okdStorage = null; okdDiagnostics = null; okdMarkClean(okdProfile); okdRenderForm();
+    okdJobStatus = { current: null, blocking: okdJobStatus.current || okdJobStatus.blocking, history: [] }; okdVersions = [];
+    okdProfile = okdNewProfile(); okdExistingId = null; okdRevision = null; okdConfigs = null; okdConfigStatus = ''; okdJobLog = ''; okdCertificateInspection = null; okdAdditionalCertificates = []; okdMarkClean(okdProfile); okdRenderForm();
   });
   $('#okd-platform').change(function() { okdProfile = okdReadForm(); if (okdProfile.platform === 'none') { okdProfile.api_vip = ''; okdProfile.ingress_vip = ''; } okdRenderForm(); });
   $('#okd-hosts [data-host="disk_hint_type"]').change(function() {
@@ -2443,7 +2677,7 @@ function okdRenderForm() {
       return;
     }
     const profile = okdReadForm();
-    okdSaveProfile(profile);
+    okdPrepareProfileSave(profile);
   });
   $('#okd-delete').click(function() {
     if (!okdExistingId || !confirm('Delete profile metadata for ' + okdExistingId + '?')) return;
@@ -2471,7 +2705,7 @@ function renderokd() {
     socket.emit('okd:get', selectedId, function(profileResult) {
       if (!okdPageActive || epoch !== okdViewEpoch) return;
       if (!profileResult.ok) { okdProfile = okdNewProfile(); okdExistingId = null; okdRevision = null; okdMarkClean(okdProfile); okdRenderForm(); okdShowResult(profileResult); return; }
-      okdProfile = profileResult.data; okdExistingId = profileResult.data.id; okdRevision = profileResult.data.revision; okdConfigs = null; okdConfigStatus = ''; okdMarkClean(profileResult.data); finish();
+      okdProfile = okdNormalizeProfile(profileResult.data); okdExistingId = profileResult.data.id; okdRevision = profileResult.data.revision; okdConfigs = null; okdConfigStatus = ''; okdAdditionalCertificates = []; okdCertificateInspection = null; okdMarkClean(okdProfile); okdLoadAdditionalCertificates(okdProfile); finish();
     });
   });
 }
@@ -2506,7 +2740,22 @@ function renderwol(){
 function wolStatusBadge(status) {
   const s = status || 'unknown';
   const cls = s === 'online' ? 'success' : (s === 'offline' ? 'danger' : 'secondary');
-  return `<span class="badge badge-${cls}">${s}</span>`;
+  return `<span class="badge badge-${cls}">${okdAttr(s)}</span>`;
+}
+
+function wolHostRow(host) {
+  const mac = okdAttr(host.default_mac || '');
+  const hostname = okdAttr(host.hostname || '');
+  const ip = okdAttr(host.ip || '');
+  const wakeAt = okdAttr(host.wake_at || '');
+  return `<tr>
+    <td>${hostname}</td><td>${mac}</td><td>${ip}</td><td>${wolStatusBadge(host.status)}</td>
+    <td>${wakeAt ? `<span class="mr-2">${wakeAt}</span><button class="btn btn-warning btn-sm clear-wol-schedule-btn" data-mac="${mac}" title="Clear schedule">Clear</button>` : ''}
+      <input type="datetime-local" class="form-control form-control-sm d-inline-block wol-schedule-input" data-mac="${mac}" style="width:auto;">
+      <button class="btn btn-outline-primary btn-sm set-wol-schedule-btn" data-mac="${mac}" title="Set schedule">Set</button></td>
+    <td><button class="btn btn-success btn-sm wake-wol-btn" data-mac="${mac}" title="Wake"><span style="font-size:1.2em;">&#9889;</span></button>
+      <button class="btn btn-danger btn-sm delete-wol-btn" data-mac="${mac}"><span style="font-size:1.2em;">&#128465;</span></button></td>
+  </tr>`;
 }
 
 socket.on('renderwol', function(wolpoints, remotemenuversion){
@@ -2515,8 +2764,8 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
     <div class="card mb-3">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span>Wake-On-LAN</span>
-        <button id="add-wol-btn" class="btn btn-primary btn-sm rounded-circle" title="Add Host">
-          <span style="font-size:1.2em;line-height:1;">&#10010;</span>
+        <button id="add-wol-btn" class="btn btn-primary btn-sm rounded-circle p-0 d-inline-flex align-items-center justify-content-center" style="width:1.75rem;height:1.75rem" title="Add Host" aria-label="Add Host">
+          <i class="bi bi-plus-lg" aria-hidden="true"></i>
         </button>
       </div>
       <div class="card-body">
@@ -2536,26 +2785,7 @@ socket.on('renderwol', function(wolpoints, remotemenuversion){
   `;
   if (wolpoints && Array.isArray(wolpoints.wakeonlan)) {
     wolpoints.wakeonlan.forEach(function(host) {
-      const mac = host.default_mac || '';
-      html += `<tr>
-        <td>${host.hostname || ''}</td>
-        <td>${mac}</td>
-        <td>${host.ip || ''}</td>
-        <td>${wolStatusBadge(host.status)}</td>
-        <td>
-          ${host.wake_at ? `<span class="mr-2">${host.wake_at}</span><button class="btn btn-warning btn-sm clear-wol-schedule-btn" data-mac="${mac}" title="Clear schedule">Clear</button>` : ''}
-          <input type="datetime-local" class="form-control form-control-sm d-inline-block wol-schedule-input" data-mac="${mac}" style="width:auto;">
-          <button class="btn btn-outline-primary btn-sm set-wol-schedule-btn" data-mac="${mac}" title="Set schedule">Set</button>
-        </td>
-        <td>
-          <button class="btn btn-success btn-sm wake-wol-btn" data-mac="${mac}" title="Wake">
-            <span style="font-size:1.2em;">&#9889;</span>
-          </button>
-          <button class="btn btn-danger btn-sm delete-wol-btn" data-mac="${mac}">
-            <span style="font-size:1.2em;">&#128465;</span>
-          </button>
-        </td>
-      </tr>`;
+      html += wolHostRow(host);
     });
   } else {
     html += `<tr><td colspan="6" class="text-center">No hosts available</td></tr>`;

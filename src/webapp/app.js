@@ -8,8 +8,11 @@ const crypto = require('crypto');
 const express = require('express');
 const app = express();
 const http = require('http').Server(app);
+// A SUBFOLDER without a trailing slash would concatenate into broken paths
+// (e.g. "/portalsocket.io", "/portalpublic"), so normalize to exactly one.
+const SUBFOLDER = (process.env.SUBFOLDER || '/').replace(/\/*$/, '/');
 const io = require('socket.io')(http, {
-  path: (process.env.SUBFOLDER || '/') + 'socket.io',
+  path: SUBFOLDER + 'socket.io',
   // Raw secret API remains 1 MiB; JSON escaping can expand a packet up to 6x.
   maxHttpBufferSize: 7 * 1024 * 1024,
 });
@@ -45,6 +48,16 @@ function isValidBasic(authHeader) {
   return safeEqual(decoded.slice(0, sep), authUser) && safeEqual(decoded.slice(sep + 1), authPass);
 }
 
+// Browsers attach cached Basic credentials to cross-site WebSocket handshakes,
+// so a matching Origin must accompany any browser handshake. Non-browser clients
+// send no Origin header and are unaffected.
+function isTrustedSocketOrigin(headers = {}) {
+  const origin = headers.origin;
+  if (!origin) return true;
+  if (!headers.host) return false;
+  try { return new URL(origin).host === headers.host; } catch { return false; }
+}
+
 if (!authEnabled) {
   console.warn('[WARN] Webapp authentication disabled. Set WEBAPP_USER and WEBAPP_PASS env vars.');
 }
@@ -64,7 +77,9 @@ app.use((req, res, next) => {
 // Gate WebSocket upgrade path, which bypasses Express middleware
 if (authEnabled) {
   io.use((socket, next) => {
-    if (isValidBasic(socket.handshake.headers.authorization) ||
+    if (!isTrustedSocketOrigin(socket.handshake.headers)) {
+      next(new Error('forbidden origin'));
+    } else if (isValidBasic(socket.handshake.headers.authorization) ||
         (socket.handshake.auth && safeEqual(socket.handshake.auth.token, authPass))) {
       next();
     } else {
@@ -76,12 +91,15 @@ if (authEnabled) {
 // Set up EJS view engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+// Views build client URLs by concatenation, so they need the same normalized
+// prefix as the mounts below.
+app.locals.baseurl = SUBFOLDER;
 
 // Serve static files
-app.use((process.env.SUBFOLDER || '/') + 'public', express.static(path.join(__dirname, 'public')));
+app.use(SUBFOLDER + 'public', express.static(path.join(__dirname, 'public')));
 
 // Register routes
-app.use(process.env.SUBFOLDER || '/', baseRoutes);
+app.use(SUBFOLDER, baseRoutes);
 
 // Register socket.io handlers
 socketHandlers(io);
@@ -90,10 +108,10 @@ socketHandlers(io);
 // raw WebSocket can't carry the Basic auth header, so the (already-authed)
 // socket.io channel mints a short-lived token via mintVncToken and noVNC sends
 // it back in the URL. When auth is disabled, the proxy is open.
-attachVncProxy(http, (req) => {
+attachVncProxy(http, (req, port) => {
   if (!authEnabled) return true;
   const url = new URL(req.url, 'http://localhost');
-  return isValidVncToken(url.searchParams.get('token'));
+  return isValidVncToken(url.searchParams.get('token'), port);
 });
 
 // Export components so tests can boot the server on their own port.

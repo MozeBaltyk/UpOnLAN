@@ -68,10 +68,13 @@ class MenuPathSpecs(unittest.TestCase):
 
     def test_okd_assets_disable_listing_without_changing_generic_download_root(self):
         nginx = (REPO_ROOT / 'src/defaults/default').read_text()
-        location = nginx.split('location ^~ /okd/ {', 1)[1].split('}', 1)[0]
-        self.assertIn('root /assets;', location)
-        self.assertIn('autoindex off;', location)
-        self.assertNotIn('deny all', location)
+        self.assertIn('location ~ "^/okd/', nginx)
+        self.assertIn('root /assets;\n\t\tautoindex off;', nginx)
+        for name in ('boot[.]ipxe', 'agent[.]x86_64-vmlinuz', 'agent[.]x86_64-initrd[.]img', 'agent[.]x86_64-rootfs[.]img'):
+            self.assertIn(name, nginx)
+        public_pattern = nginx.split('location ~ "^/okd/', 1)[1].split('$"', 1)[0]
+        self.assertNotIn('iso', public_pattern.lower())
+        self.assertIn('location /okd/ { return 404; }', nginx)
         self.assertIn('location / {\n\t\troot /assets;\n\t\tautoindex on;', nginx)
         webapp = nginx.split('proxy_pass http://127.0.0.1:${WEB_APP_PORT};', 1)[1]
         self.assertIn('client_max_body_size 7m;', webapp)

@@ -151,15 +151,21 @@ class HelmAuthRenderSpecs(unittest.TestCase):
         self.assertIn('defaultMode: 0440', rendered)  # owner/group read only
         self.assertNotIn('privileged: true', rendered)
 
-    def test_okd_persistent_deployment_requires_one_replica(self):
-        proc = self.render(
-            'deployAs=Deployment', 'replicas=2',
+    def test_deployment_requires_one_replica_with_or_without_pvcs(self):
+        pvcs = (
             'okd.persistence.configClaim=config-pvc', 'okd.persistence.assetsClaim=assets-pvc',
             'okd.persistence.menuClaim=menu-pvc', 'okd.persistence.logsClaim=logs-pvc',
-            check=False,
         )
-        self.assertNotEqual(proc.returncode, 0)
-        self.assertIn('OKD persistent generation requires replicas=1', proc.stderr)
+        for storage in ((), pvcs):
+            with self.subTest(storage='pvc' if storage else 'ephemeral'):
+                proc = self.render('deployAs=Deployment', 'replicas=2', *storage, check=False)
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertIn('Deployment requires replicas=1', proc.stderr)
+
+    def test_deployment_with_one_replica_renders(self):
+        rendered = self.render('deployAs=Deployment', 'replicas=1').stdout
+        self.assertIn('kind: Deployment', rendered)
+        self.assertIn('replicas: 1', rendered)
 
     def test_pod_renders_pull_secret_host_file_without_secret_contents(self):
         rendered = self.render(

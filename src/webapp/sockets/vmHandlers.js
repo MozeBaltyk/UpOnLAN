@@ -201,9 +201,11 @@ function buildDomainXml(name, network, diskPath, opts = {}) {
     : '';
   // Boot order: with a disk attached, boot it first and fall back to network, so
   // a finished install reboots into the OS instead of the PXE menu. A diskless
-  // VM keeps network as its only boot target.
+  // VM keeps network as its only boot target. The disk value is `hd` (libvirt's
+  // enum is fd/hd/cdrom/network) — `disk` makes `virsh define` fail with "Invalid
+  // value for attribute 'dev' in element 'boot'".
   const bootOrder = diskPath
-    ? `    <boot dev='disk'/>
+    ? `    <boot dev='hd'/>
     <boot dev='network'/>`
     : `    <boot dev='network'/>`;
   // Optional: graphical console (VNC) for GUI installers, on top of serial.
@@ -308,7 +310,7 @@ module.exports = function registerVmHandlers(socket) {
     const disp = await runVirsh(['domdisplay', VM_NAME]);
     const port = disp.ok ? parseVncPort(disp.out) : 0;
     const password = port > 0 ? getVncPassword() : null;
-    socket.emit('vm:vnc:info', { port, password, token: port > 0 ? mintVncToken() : null });
+    socket.emit('vm:vnc:info', { port, password, token: port > 0 ? mintVncToken(port) : null });
   });
 
   socket.on('vm:power', async (action) => {
@@ -416,6 +418,11 @@ module.exports = function registerVmHandlers(socket) {
         socket.emit('vm:action:result', { action: 'create', ok: false, message: `storage pool '${VM_STORAGE_POOL}' create failed` });
         return;
       }
+      // A prior create that failed after the volume step (e.g. an invalid
+      // domain XML) leaves an orphaned volume behind; the domain is already
+      // known absent at this point, so any volume with this name is stale and
+      // would otherwise block vol-create-as with "exists already" forever.
+      await runVirsh(['vol-delete', '--pool', VM_STORAGE_POOL, volName]);
       const created = await runVirsh(['vol-create-as', VM_STORAGE_POOL, volName, '--format', 'qcow2', `${diskSize}G`]);
       if (!created.ok) {
         socket.emit('vm:action:result', { action: 'create', ok: false, message: `disk create failed: ${created.err}` });

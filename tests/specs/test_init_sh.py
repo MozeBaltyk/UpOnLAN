@@ -37,8 +37,13 @@ class InitShUrlSpecs(unittest.TestCase):
         # endpoints.yml is generated state and should refresh from the endpoint
         # on every boot, falling back to the existing local copy if the fetch
         # fails. This avoids stale empty catalogs after new assets are released.
-        self.assertIn('curl -fsL ${endpoint_catalog_url} -o /tmp/endpoints.yml', self.init_sh)
+        self.assertIn('curl -fsL "$endpoint_catalog_url" -o /tmp/endpoints.yml', self.init_sh)
         self.assertIn('Keeping existing /config/endpoints.yml (refresh failed)', self.init_sh)
+
+    def test_critical_steps_fail_but_documented_fallbacks_are_explicit(self):
+        self.assertIn('set -euo pipefail', self.init_sh)
+        self.assertIn('if ! curl -fsL "$endpoint_catalog_url"', self.init_sh)
+        self.assertIn('nohup sh -c', self.init_sh)
 
     def test_tls_block(self):
         # HTTPS is on by default: a mounted cert+key pair wins, otherwise a

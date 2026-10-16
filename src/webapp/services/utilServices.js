@@ -121,18 +121,23 @@ function getLocalNginx() {
     }
 
     if (selected) {
-      cachedNginxURL = `${selected.protocol}://localhost:${selected.port}`;
+      cachedNginxURL = `${selected.protocol}://127.0.0.1:${selected.port}`;
     } else {
       console.warn(`No valid 'listen' directive found in ${configPath}.`);
-      cachedNginxURL = 'http://localhost';
+      cachedNginxURL = 'http://127.0.0.1';
     }
 
     return cachedNginxURL;
   } catch (err) {
     console.error(`Error reading NGINX config at ${configPath}:`, err.message);
-    cachedNginxURL = 'http://localhost';
+    cachedNginxURL = 'http://127.0.0.1';
     return cachedNginxURL;
   }
+}
+
+function getLocalAssetUrl() {
+  const configured = require('./localAssetSettings').get();
+  return configured ? configured.replace(/\/$/, '') : getLocalNginx();
 }
 
 function getEndpointUrls() {
@@ -282,6 +287,7 @@ module.exports = {
   getMenuOrigin,
   getAssetOrigin,
   getLocalNginx,
+  getLocalAssetUrl,
   isValidUrl,
   isMenuVersionTag,
   getEndpointUrls,

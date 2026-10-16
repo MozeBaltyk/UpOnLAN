@@ -95,6 +95,12 @@ class BuildReleaseSpecs(unittest.TestCase):
 
 
 class InitRomFreshnessSpecs(unittest.TestCase):
+    def test_generated_certificate_records_public_provenance_without_key_material(self):
+        init = (REPO_ROOT / 'src' / 'init.sh').read_text()
+        self.assertIn('TLS_DEFAULT_MARKER=/config/tls/.uponlan-default-cert.sha256', init)
+        self.assertIn('sha256sum "$TLS_CRT"', init)
+        self.assertNotIn('sha256sum "$TLS_KEY"', init)
+
     def test_rebuild_requires_complete_manifest_and_current_trust_hash(self):
         init = (REPO_ROOT / 'src' / 'init.sh').read_text()
         self.assertIn('roms_current()', init)

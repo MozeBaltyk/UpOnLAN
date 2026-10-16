@@ -11,10 +11,15 @@ server {
 	ssl_certificate_key /config/tls/server.key;
 
 	location = /okd { return 301 /okd/; }
-	location ^~ /okd/ {
+	# Only the fixed PXE outputs are public. ISO and manifest/private names fall
+	# through to the deny location and are downloadable only through the portal.
+	# Accepts legacy "/okd/<profile>/<version>/<file>" and current
+	# "/okd/<profile>/<release>/<version>/<file>" (version "vN") layouts.
+	location ~ "^/okd/[a-z0-9]+(?:-[a-z0-9]+)*/(?:[0-9A-Za-z][0-9A-Za-z._-]{0,127}/)?(?:v[1-9][0-9]*|[0-9a-f-]{16,64})/(?:boot[.]ipxe|agent[.]x86_64-vmlinuz|agent[.]x86_64-initrd[.]img|agent[.]x86_64-rootfs[.]img)$" {
 		root /assets;
 		autoindex off;
 	}
+	location /okd/ { return 404; }
 	location / {
 		root /assets;
 		autoindex on;

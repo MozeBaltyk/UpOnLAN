@@ -35,8 +35,37 @@ describe('documentation navigation', () => {
       .map((match) => match[1]);
     expect(folders.indexOf('Kubernetes')).toBeGreaterThan(folders.indexOf('UpOnLAN-xyz'));
     expect(folders.indexOf('Kubernetes')).toBeGreaterThan(folders.indexOf('iPXE'));
-    expect(html.indexOf('data-doc="Kubernetes/OKD/01-Prerequisites.md"'))
-      .toBeLessThan(html.indexOf('data-doc="Kubernetes/OKD/08-Troubleshooting.md"'));
+    const journey = [
+      '01-Understand-the-Installation.md',
+      '02-Infrastructure-Checklist.md',
+      '03-Generate-with-UpOnLAN.md',
+      '04-Boot-and-Verify.md',
+      '05-Reference-and-Troubleshooting.md',
+    ];
+    expect(files.filter((file) => file.startsWith('Kubernetes/OKD/')))
+      .toEqual(journey.map((file) => `Kubernetes/OKD/${file}`));
+    const positions = journey.map((file) => html.indexOf(`data-doc="Kubernetes/OKD/${file}"`));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  it('renders the operator diagrams as readable plain-text code blocks', async () => {
+    for (const file of [
+      '01-Understand-the-Installation.md',
+      '02-Infrastructure-Checklist.md',
+      '04-Boot-and-Verify.md',
+    ]) {
+      const raw = await fs.readFile(path.join(docsRoot, 'Kubernetes/OKD', file), 'utf8');
+      const diagrams = marked.lexer(raw).filter((token) => token.type === 'code' && token.lang === 'text');
+      expect(diagrams.length).toBeGreaterThan(0);
+      for (const diagram of diagrams) {
+        expect(diagram.text.split('\n').every((line) => line.length <= 90)).toBe(true);
+        expect(diagram.text).toMatch(/^[\x20-\x7e\n]*$/);
+        expect(marked.parse(raw)).toContain(marked.parse(diagram.raw));
+        expect(marked.parse(diagram.raw)).toContain('<pre><code class="language-text">');
+      }
+      expect(raw).not.toContain('```mermaid');
+    }
   });
 
   it('keeps project-relative Markdown navigation targets valid and removes Talos doc links', async () => {

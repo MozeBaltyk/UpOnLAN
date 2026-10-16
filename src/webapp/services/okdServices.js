@@ -5,11 +5,17 @@ const path = require('path');
 const yaml = require('js-yaml');
 const { isDeepStrictEqual } = require('util');
 const { PUBLIC_PULL_SECRET } = require('./okdPullSecretServices');
+const sshKeys = require('./okdSshKeyServices');
+const certificates = require('./assetCertificateServices');
+const { createSettings, validateOrigin } = require('./localAssetSettings');
 
 const CONFIG_ROOT = process.env.UPONLAN_CONFIG || '/config';
 const ASSETS_ROOT = process.env.UPONLAN_ASSETS || '/assets';
 const PROFILES_ROOT = path.join(CONFIG_ROOT, 'okd', 'profiles');
 const TEMPLATE_LIMIT = 256 * 1024;
+const PROFILE_LIMIT = 256 * 1024;
+const STRING_LIMIT = 4096;
+const SSH_KEY_LIMIT = 16 * 1024;
 const PULL_SECRET_PLACEHOLDER = '__UPONLAN_PULL_SECRET__';
 const RELEASE = '5.0.0-okd-scos.1';
 // Keep release-specific combinations here until a second release justifies compatibility files.
@@ -29,9 +35,6 @@ const COMPATIBILITY_RECORD = Object.freeze({
   releaseDigest: RELEASE_DIGEST,
   releaseMetadataUrl: `${RELEASE_BASE_URL}/release.txt`,
   checksumMetadataUrl: `${RELEASE_BASE_URL}/sha256sum.txt`,
-  commands: Object.freeze({
-    monitor: Object.freeze(['agent', 'wait-for', 'install-complete', '--dir']),
-  }),
   outputs: Object.freeze({
     pxe: Object.freeze({
       kernel: 'agent.x86_64-vmlinuz',
@@ -67,7 +70,7 @@ const COMPATIBILITY_RECORD = Object.freeze({
     }),
   }),
 });
-const PROFILE_KEYS = new Set(['id', 'release', 'platform', 'topology', 'cluster_name', 'base_domain', 'machine_network', 'rendezvous_ip', 'ssh_public_key', 'worker_count', 'api_vip', 'ingress_vip', 'hosts', 'revision', 'saved_at']);
+const PROFILE_KEYS = new Set(['id', 'release', 'platform', 'topology', 'cluster_name', 'base_domain', 'machine_network', 'rendezvous_ip', 'ssh_public_key', 'worker_count', 'api_vip', 'ingress_vip', 'hosts', 'boot_mode', 'asset_url', 'asset_certificate_bundle', 'additional_ca_bundle', 'revision', 'saved_at']);
 const HOST_KEYS = new Set(['hostname', 'role', 'mac', 'ipv4', 'interface', 'disk_hint']);
 const SECRET_KEY = /secret|password|token|private.?key|credential/i;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -96,6 +99,17 @@ function text(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function pemText(value) {
+  return typeof value === 'string' ? value : '';
+}
+
+function legacyAssetUrl() {
+  for (const value of [process.env.OKD_PUBLIC_BASE_URL, (() => { try { return createSettings({ configRoot: CONFIG_ROOT }).get(); } catch { return null; } })(), 'https://192.168.7.1:8443/']) {
+    try { if (value) return validateOrigin(value); } catch { /* try the next migration source */ }
+  }
+  return 'https://192.168.7.1:8443/';
+}
+
 function sanitizeProfile(input) {
   if (!plain(input)) return null;
   const hosts = Array.isArray(input.hosts) ? input.hosts.slice(0, RELEASE_RECORD.maxHosts + 1).map((value) => {
@@ -122,6 +136,10 @@ function sanitizeProfile(input) {
     worker_count: Number.isInteger(input.worker_count) ? input.worker_count : Number(input.worker_count),
     api_vip: text(input.api_vip),
     ingress_vip: text(input.ingress_vip),
+    boot_mode: text(input.boot_mode) || 'pxe',
+    asset_url: text(input.asset_url) || (Object.hasOwn(input, 'boot_mode') ? '' : legacyAssetUrl()),
+    asset_certificate_bundle: pemText(input.asset_certificate_bundle),
+    additional_ca_bundle: pemText(input.additional_ca_bundle),
     hosts,
   };
   if (typeof input.saved_at === 'string') profile.saved_at = input.saved_at;
@@ -158,10 +176,14 @@ function dnsName(value, multiple) {
   return (multiple ? labels.length >= 2 : labels.length === 1) && labels.every((label) => DNS_LABEL.test(label));
 }
 
+const validSshPublicKey = sshKeys.validSshPublicKey;
+
 function validateProfile(input) {
   const errors = [];
   const add = (field, message) => errors.push({ field, message });
   if (!plain(input)) return [{ field: 'profile', message: 'Profile must be an object.' }];
+  try { if (Buffer.byteLength(JSON.stringify(input)) > PROFILE_LIMIT) add('profile', 'Profile exceeds 256 KiB.'); }
+  catch { return [{ field: 'profile', message: 'Profile must be a plain JSON object.' }]; }
   for (const key of Object.keys(input)) {
     if (!PROFILE_KEYS.has(key)) add(key, SECRET_KEY.test(key) ? 'Secret-like fields are not allowed in profiles.' : 'Unknown profile field.');
   }
@@ -176,19 +198,32 @@ function validateProfile(input) {
     });
   }
   const p = sanitizeProfile(input);
+  for (const field of ['id', 'release', 'platform', 'topology', 'cluster_name', 'base_domain', 'machine_network', 'rendezvous_ip', 'api_vip', 'ingress_vip', 'boot_mode', 'asset_url']) {
+    if (typeof input[field] === 'string' && Buffer.byteLength(input[field]) > STRING_LIMIT) add(field, 'Value exceeds 4 KiB.');
+  }
+  if (typeof input.ssh_public_key === 'string' && Buffer.byteLength(input.ssh_public_key) > SSH_KEY_LIMIT) add('ssh_public_key', 'SSH public key exceeds 16 KiB.');
+  if (Array.isArray(input.hosts)) input.hosts.forEach((host, i) => {
+    if (plain(host)) for (const field of HOST_KEYS) if (typeof host[field] === 'string' && Buffer.byteLength(host[field]) > STRING_LIMIT) add(`hosts.${i}.${field}`, 'Value exceeds 4 KiB.');
+  });
   if (!SLUG.test(p.id) || p.id.length > 63) add('id', 'Use a lowercase slug (letters, numbers, and single hyphens).');
   const release = p.release === RELEASE_RECORD.release ? RELEASE_RECORD : null;
   if (!release) add('release', `Select the supported release ${RELEASE}.`);
   if (!release || !Object.hasOwn(release.platforms, p.platform)) add('platform', 'Select a platform supported by this release: none or baremetal.');
   if (!release || !release.platforms[p.platform] || !release.platforms[p.platform].includes(p.topology)) add('topology', 'Select a topology supported by this release and platform.');
+  if (!['pxe', 'iso'].includes(p.boot_mode)) add('boot_mode', 'Boot mode must be pxe or iso.');
+  if (p.asset_url) { try { p.asset_url = validateOrigin(p.asset_url); } catch { add('asset_url', 'Enter a credential-free HTTPS root origin.'); } }
+  else if (p.boot_mode === 'pxe' && Object.hasOwn(input, 'boot_mode')) add('asset_url', 'PXE profiles require an Asset server URL.');
+  for (const field of ['asset_certificate_bundle', 'additional_ca_bundle']) {
+    try { certificates.parseBundle(p[field]); } catch (err) { add(field, err.message); }
+  }
   if (!dnsName(p.cluster_name, false)) add('cluster_name', 'Use a lowercase DNS label.');
   if (!dnsName(p.base_domain, true)) add('base_domain', 'Use a lowercase DNS domain such as example.com.');
   const cidr = parseCidr(p.machine_network);
   if (!cidr) add('machine_network', 'Enter a valid IPv4 CIDR such as 192.168.7.0/24.');
   if (ipv4Number(p.rendezvous_ip) === null) add('rendezvous_ip', 'Enter a valid IPv4 address.');
   else if (cidr && !inCidr(p.rendezvous_ip, cidr)) add('rendezvous_ip', 'Rendezvous IP must be inside the machine network.');
-  if (!/^(?:ssh-(?:rsa|ed25519)|ecdsa-sha2-[^ ]+) [A-Za-z0-9+/]+={0,3}(?: .*)?$/.test(p.ssh_public_key)) {
-    add('ssh_public_key', 'Enter an SSH public key (ssh-rsa, ssh-ed25519, or ssh-ecdsa).');
+  if (p.ssh_public_key && !validSshPublicKey(p.ssh_public_key)) {
+    add('ssh_public_key', 'Enter a parseable SSH public key (RSA, Ed25519, or ECDSA nistp256/384/521), or leave it empty.');
   }
   if (!Number.isInteger(p.worker_count) || p.worker_count < 0) add('worker_count', 'Worker count must be a non-negative integer.');
   if (p.worker_count > RELEASE_RECORD.maxWorkers) add('worker_count', `V1 supports at most ${RELEASE_RECORD.maxWorkers} workers.`);
@@ -305,6 +340,8 @@ function renderConfigs(profile, pullSecret = PUBLIC_PULL_SECRET, record = COMPAT
     } },
     publish: 'External', pullSecret, sshKey: profile.ssh_public_key,
   };
+  const trust = certificates.mergeBundles(profile.asset_certificate_bundle, profile.additional_ca_bundle);
+  if (trust) install.additionalTrustBundle = trust;
   const agent = {
     apiVersion: schema.agentConfigApiVersion, kind: schema.agentConfigKind,
     metadata: { name: profile.cluster_name }, rendezvousIP: profile.rendezvous_ip,
@@ -314,7 +351,9 @@ function renderConfigs(profile, pullSecret = PUBLIC_PULL_SECRET, record = COMPAT
     })),
   };
   const options = { noRefs: true, lineWidth: -1, sortKeys: false };
-  return { installConfig: yaml.dump(install, options), agentConfig: yaml.dump(agent, options) };
+  const result = { installConfig: yaml.dump(install, options), agentConfig: yaml.dump(agent, options) };
+  for (const [name, content] of Object.entries(result)) if (Buffer.byteLength(content) > TEMPLATE_LIMIT) throw Object.assign(new Error(`${name} exceeds 256 KiB.`), { code: 'TEMPLATE_INVALID' });
+  return result;
 }
 
 function validateTemplate(name, content) {
@@ -347,8 +386,8 @@ function effectiveContext(profile, templates) {
   const expectedInstall = yaml.load(generated.installConfig, { schema: yaml.JSON_SCHEMA });
   const expectedAgent = yaml.load(generated.agentConfig, { schema: yaml.JSON_SCHEMA });
   const reject = (field) => { throw Object.assign(new Error(`Safety-critical YAML field ${field} must match the profile. Change it in the form and Save; supplemental NMState/mirror settings remain editable.`), { code: 'TEMPLATE_INVALID' }); };
-  for (const key of Object.keys(install)) if (!Object.hasOwn(expectedInstall, key) && !['additionalTrustBundle', 'imageContentSources', 'imageDigestSources', 'imageTagSources', 'proxy'].includes(key)) reject(`install.${key}`);
-  for (const key of ['apiVersion', 'metadata', 'baseDomain', 'compute', 'controlPlane', 'networking', 'platform', 'publish', 'sshKey']) {
+  for (const key of Object.keys(install)) if (!Object.hasOwn(expectedInstall, key) && !['imageContentSources', 'imageDigestSources', 'imageTagSources', 'proxy'].includes(key)) reject(`install.${key}`);
+  for (const key of ['apiVersion', 'metadata', 'baseDomain', 'compute', 'controlPlane', 'networking', 'platform', 'publish', 'sshKey', 'additionalTrustBundle']) {
     if (!isDeepStrictEqual(install[key], expectedInstall[key])) reject(`install.${key}`);
   }
   for (const key of ['apiVersion', 'kind', 'metadata', 'rendezvousIP']) {
@@ -372,6 +411,12 @@ function effectiveContext(profile, templates) {
 function legacyRevision(profile) {
   const content = { ...profile }; delete content.revision; delete content.saved_at;
   return crypto.createHash('sha256').update(JSON.stringify(content)).digest('hex');
+}
+
+function preMediaRevision(profile, templates) {
+  const content = { ...profile }; delete content.revision; delete content.saved_at;
+  for (const key of ['boot_mode', 'asset_url', 'asset_certificate_bundle', 'additional_ca_bundle']) delete content[key];
+  return crypto.createHash('sha256').update(JSON.stringify(content)).update('\0').update(templates.installConfig).update('\0').update(templates.agentConfig).digest('hex');
 }
 
 async function writeProfileFiles(dir, writes, removeDirOnFailure = false) {
@@ -433,7 +478,7 @@ async function getProfileUnlocked(id) {
   let value;
   try {
     if (!await guardProfile(id)) throw Object.assign(new Error('Profile not found.'), { code: 'NOT_FOUND' });
-    value = yaml.load(await fs.promises.readFile(profileFile(id), 'utf8'));
+    value = yaml.load(await require('./safeFile').readBounded(profileFile(id), PROFILE_LIMIT));
   } catch (err) {
     if (err.code === 'ENOENT') throw Object.assign(new Error('Profile not found.'), { code: 'NOT_FOUND' });
     throw err;
@@ -447,15 +492,10 @@ async function getProfileUnlocked(id) {
     lstatOrNull(path.join(dir, 'install-config.yaml')), lstatOrNull(path.join(dir, 'agent-config.yaml')),
   ]);
   if (!installStat && !agentStat) {
-    if (!profile || !/^[a-f0-9]{64}$/.test(profile.revision || '') || profile.revision !== legacyRevision(profile)) errors.push({ field: 'revision', message: 'Stored legacy profile revision is invalid.' });
+    const legacy = plain(value) ? { ...value } : {}; delete legacy.revision; delete legacy.saved_at;
+    const storedLegacyRevision = crypto.createHash('sha256').update(JSON.stringify(legacy)).digest('hex');
+    if (!profile || !/^[a-f0-9]{64}$/.test(profile.revision || '') || profile.revision !== storedLegacyRevision) errors.push({ field: 'revision', message: 'Stored legacy profile revision is invalid.' });
     if (errors.length) throw Object.assign(new Error('Stored profile is invalid.'), { code: 'INVALID_PROFILE', errors });
-    const templates = renderConfigs(profile);
-    profile.revision = effectiveRevision(profile, templates); profile.saved_at = new Date().toISOString();
-    await writeProfileFiles(dir, [
-      [path.join(dir, 'install-config.yaml'), templates.installConfig],
-      [path.join(dir, 'agent-config.yaml'), templates.agentConfig],
-      [profileFile(id), yaml.dump(profile, { noRefs: true })],
-    ]);
     return profile;
   }
   let templates;
@@ -467,7 +507,8 @@ async function getProfileUnlocked(id) {
     if (err.code === 'UNSAFE_PATH') throw err;
     errors.push({ field: 'templates', message: 'Stored profile templates are invalid.' });
   }
-  if (!profile || !templates || !/^[a-f0-9]{64}$/.test(profile.revision || '') || profile.revision !== effectiveRevision(profile, templates)) errors.push({ field: 'revision', message: 'Stored profile revision is invalid.' });
+  const legacyMedia = value && !Object.hasOwn(value, 'boot_mode');
+  if (!profile || !templates || !/^[a-f0-9]{64}$/.test(profile.revision || '') || ![effectiveRevision(profile, templates), ...(legacyMedia ? [preMediaRevision(profile, templates)] : [])].includes(profile.revision)) errors.push({ field: 'revision', message: 'Stored profile revision is invalid.' });
   if (errors.length) throw Object.assign(new Error('Stored profile is invalid.'), { code: 'INVALID_PROFILE', errors });
   return profile;
 }
@@ -484,24 +525,32 @@ async function listProfiles() {
   for (const id of ids.sort()) {
     if (!SLUG.test(id)) continue;
     try { profiles.push(await getProfile(id)); } catch (err) {
-      if (err.code !== 'NOT_FOUND') throw err;
+      // A single unreadable profile must not hide every valid one. Skip it and
+      // log so it stays discoverable; direct getProfile(id) still fails closed.
+      if (err.code === 'NOT_FOUND' || err.code === 'INVALID_PROFILE') {
+        if (err.code === 'INVALID_PROFILE') console.error(`[WARN] Skipping unreadable OKD profile ${id}.`);
+        continue;
+      }
+      throw err;
     }
   }
   return profiles;
 }
 
 async function saveProfileUnlocked(input, existingId = null, expectedRevision = null) {
+  if (plain(input) && !Object.hasOwn(input, 'boot_mode')) input = { ...input, boot_mode: 'pxe', asset_url: legacyAssetUrl(), asset_certificate_bundle: '', additional_ca_bundle: '' };
   if (existingId !== null && (!SLUG.test(existingId) || !plain(input) || input.id !== existingId)) {
     throw Object.assign(new Error('Profile ID cannot be changed.'), { code: 'IMMUTABLE_ID', errors: [{ field: 'id', message: 'Profile ID cannot be changed.' }] });
   }
   const errors = validateProfile(input);
   if (errors.length) throw Object.assign(new Error('Profile validation failed.'), { code: 'VALIDATION', errors });
   const profile = sanitizeProfile(input);
+  profile.asset_url = profile.asset_url ? validateOrigin(profile.asset_url) : '';
+  profile.asset_certificate_bundle = certificates.parseBundle(profile.asset_certificate_bundle).pem;
+  profile.additional_ca_bundle = certificates.parseBundle(profile.additional_ca_bundle).pem;
   delete profile.saved_at;
   delete profile.revision;
-  const templates = renderConfigs(profile);
-  profile.revision = effectiveRevision(profile, templates);
-  profile.saved_at = new Date().toISOString();
+  let templates = renderConfigs(profile);
   const file = profileFile(profile.id);
   await fs.promises.mkdir(PROFILES_ROOT, { recursive: true });
   if ((await fs.promises.lstat(PROFILES_ROOT)).isSymbolicLink()) throw unsafePath('Refusing unsafe OKD root directory.');
@@ -521,12 +570,37 @@ async function saveProfileUnlocked(input, existingId = null, expectedRevision = 
       throw Object.assign(new Error('Profile changed since it was loaded. Reload it before saving.'), { code: 'STALE_REVISION' });
     }
   }
+  try {
+    if (!profile.ssh_public_key) profile.ssh_public_key = await sshKeys.ensureSshPublicKey(profile.id);
+  } catch (err) {
+    if (existingId === null) await fs.promises.rm(dir, { recursive: true, force: true });
+    throw err;
+  }
+  if (profile.ssh_public_key !== input.ssh_public_key) templates = renderConfigs(profile);
+  profile.revision = effectiveRevision(profile, templates);
+  profile.saved_at = new Date().toISOString();
+  const profileYaml = yaml.dump(profile, { noRefs: true });
+  if (Buffer.byteLength(profileYaml) > PROFILE_LIMIT) throw Object.assign(new Error('Profile exceeds 256 KiB.'), { code: 'VALIDATION', errors: [{ field: 'profile', message: 'Profile exceeds 256 KiB.' }] });
   const writes = [
     [path.join(dir, 'install-config.yaml'), templates.installConfig],
     [path.join(dir, 'agent-config.yaml'), templates.agentConfig],
-    [file, yaml.dump(profile, { noRefs: true })],
+    [file, profileYaml],
   ];
   await writeProfileFiles(dir, writes, existingId === null);
+  return profile;
+}
+
+async function prepareProfileTrust(input) {
+  if (!plain(input)) return input;
+  const profile = { ...input };
+  if (!Object.hasOwn(profile, 'boot_mode')) Object.assign(profile, { boot_mode: 'pxe', asset_url: legacyAssetUrl(), asset_certificate_bundle: '', additional_ca_bundle: '' });
+  if (profile.boot_mode !== 'pxe') return profile;
+  const inspected = await certificates.inspectEndpoint({ origin: profile.asset_url, configRoot: CONFIG_ROOT, storedPem: profile.asset_certificate_bundle || '', additionalPem: profile.additional_ca_bundle || '' });
+  if (!inspected.metadata.hostnameMatch || inspected.metadata.validity !== 'current' || inspected.metadata.storedMismatch) throw Object.assign(new Error('Asset certificate is invalid, does not match, or differs from the confirmed certificate.'), { code: 'CERTIFICATE_MISMATCH', errors: [{ field: 'asset_certificate_bundle', message: 'Inspect and explicitly resolve the current Asset server certificate.' }] });
+  if (!inspected.metadata.systemTrusted && !profile.asset_certificate_bundle && !inspected.metadata.additionalCaMatch) {
+    if (inspected.metadata.localCertificateMatch && inspected.caPem) profile.asset_certificate_bundle = inspected.caPem;
+    else throw Object.assign(new Error('Untrusted Asset certificate requires explicit confirmation.'), { code: 'CERTIFICATE_CONFIRMATION_REQUIRED', errors: [{ field: 'asset_certificate_bundle', message: 'Confirm the inspected CA certificate before saving.' }] });
+  }
   return profile;
 }
 
@@ -537,6 +611,9 @@ function saveProfile(input, existingId = null, expectedRevision = null) {
 async function getTemplatesUnlocked(id, expectedRevision = null) {
   const profile = await getProfileUnlocked(id);
   if (expectedRevision !== null && expectedRevision !== profile.revision) throw Object.assign(new Error('Profile templates changed since they were loaded.'), { code: 'STALE_REVISION' });
+  const dir = path.dirname(profileFile(id));
+  const [install, agent] = await Promise.all([lstatOrNull(path.join(dir, 'install-config.yaml')), lstatOrNull(path.join(dir, 'agent-config.yaml'))]);
+  if (!install && !agent) return { ...renderConfigs(profile), revision: profile.revision };
   return { ...(await readTemplates(id)), revision: profile.revision };
 }
 
@@ -584,5 +661,5 @@ function deleteProfile(id, isProfileActive = () => false) {
 
 module.exports = {
   RELEASE, RELEASE_RECORD, COMPATIBILITY_RECORD, PULL_SECRET_PLACEHOLDER,
-  sanitizeProfile, validateProfile, renderConfigs, effectiveContext, listProfiles, getProfile, saveProfile, getTemplates, saveTemplates, deleteProfile,
+  sanitizeProfile, validateProfile, validSshPublicKey, renderConfigs, effectiveContext, listProfiles, getProfile, saveProfile, getTemplates, saveTemplates, deleteProfile, legacyAssetUrl, prepareProfileTrust,
 };

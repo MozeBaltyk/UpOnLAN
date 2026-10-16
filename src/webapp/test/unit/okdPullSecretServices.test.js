@@ -21,7 +21,7 @@ describe('OKD pull-secret storage', () => {
   it('resolves the public default without writing or exposing credentials, then prefers internal and external secrets', async () => {
     const svc = service();
     expect(await svc.resolve()).toEqual({ raw: '{"auths":{"fake":{"auth":"aWQ6cGFzcwo="}}}', parsed: { auths: { fake: { auth: 'aWQ6cGFzcwo=' } } }, source: 'default' });
-    expect(await svc.status()).toEqual({ status: 'ready', source: 'default', exists: false, writable: true, disabledReasons: [] });
+    expect(await svc.status()).toEqual({ status: 'ready', source: 'default', exists: false, writable: true, authenticationConfigured: true, disabledReasons: [] });
     expect(fs.readdirSync(root)).toEqual([]);
     await svc.save(first);
     expect(await svc.resolve()).toMatchObject({ raw: first, source: 'internal' });
@@ -56,8 +56,8 @@ describe('OKD pull-secret storage', () => {
     expect(fs.statSync(path.dirname(internal)).mode & 0o777).toBe(0o700);
     expect(fs.statSync(internal).mode & 0o777).toBe(0o600);
     const status = await svc.status();
-    expect(status).toEqual({ status: 'ready', source: 'internal', exists: true, writable: true, disabledReasons: [] });
-    expect(JSON.stringify(status)).not.toMatch(/first-private-value|quay\.io|auth/);
+    expect(status).toEqual({ status: 'ready', source: 'internal', exists: true, writable: true, authenticationConfigured: true, disabledReasons: [] });
+    expect(JSON.stringify(status)).not.toMatch(/first-private-value|quay\.io|"auths"|"raw"|"parsed"/);
     await svc.save(second);
     expect(oldAtRename).toBe(first);
     expect(fs.readFileSync(internal, 'utf8')).toBe(second);
@@ -78,11 +78,24 @@ describe('OKD pull-secret storage', () => {
     expect(fs.readFileSync(outside, 'utf8')).toBe(first);
   });
 
-  it('requires complete web authentication only for mutation', async () => {
+  it('allows internal management without web authentication when persistence is ready', async () => {
     const svc = service({ authConfigured: () => false });
-    await expect(svc.save(first)).rejects.toMatchObject({ code: 'AUTH_REQUIRED' });
-    expect(await svc.status()).toMatchObject({ status: 'ready', source: 'default', exists: false, writable: false });
-    expect((await svc.resolve()).source).toBe('default');
+    expect(await svc.status()).toMatchObject({ status: 'ready', source: 'default', exists: false, writable: true, authenticationConfigured: false, disabledReasons: [] });
+    expect(await svc.save(first)).toMatchObject({ status: 'ready', source: 'internal', writable: true, authenticationConfigured: false });
+    expect(await svc.resolve()).toMatchObject({ raw: first, source: 'internal' });
+  });
+
+  it('explains that shell-style outer quotes are not JSON without echoing input', async () => {
+    const input = `'${first}'`;
+    const error = await service().save(input).catch((err) => err);
+    expect(error).toMatchObject({ code: 'PULL_SECRET_INVALID', message: expect.stringContaining('without surrounding shell-style quotes') });
+    expect(error.message).not.toContain('first-private-value');
+  });
+
+  it('explains that JSON encoded as a quoted string is not a pull-secret object', async () => {
+    const error = await service().save(JSON.stringify(first)).catch((err) => err);
+    expect(error).toMatchObject({ code: 'PULL_SECRET_INVALID', message: expect.stringContaining('not quoted JSON') });
+    expect(error.message).not.toContain('first-private-value');
   });
 
   it('requires persistent config storage for mutation', async () => {

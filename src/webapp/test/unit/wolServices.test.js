@@ -2,7 +2,8 @@
 // Real fixture config file, no mocks — only the shell exec is avoided by
 // testing the validation paths, which fail before exec is ever reached.
 import path from 'path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import fs from 'fs';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { createFixtureRoot } from '../helpers/fixtures.js';
 
 let wol;
@@ -144,5 +145,28 @@ describe('wolServices.pingHost', () => {
     await expect(wol.pingHost('not-an-ip')).resolves.toBe(false);
     await expect(wol.pingHost('999.999.999.999')).resolves.toBe(false);
     await expect(wol.pingHost('')).resolves.toBe(false);
+  });
+});
+
+describe('wolServices persistence and scheduler failures', () => {
+  it('preserves the previous file when the atomic rename fails', () => {
+    const file = path.join(process.env.UPONLAN_CONFIG, 'wol.yml');
+    const before = fs.readFileSync(file, 'utf8');
+    const rename = vi.spyOn(fs, 'renameSync').mockImplementationOnce(() => { throw new Error('disk failure'); });
+    expect(() => wol.addWolEntry({ default_mac: '12:34:56:78:9A:BC', hostname: 'not saved' })).toThrow('disk failure');
+    expect(fs.readFileSync(file, 'utf8')).toBe(before);
+    expect(fs.readdirSync(process.env.UPONLAN_CONFIG).some((name) => name.startsWith('.wol.'))).toBe(false);
+    rename.mockRestore();
+  });
+
+  it('catches and logs scheduler interval errors', () => {
+    const file = path.join(process.env.UPONLAN_CONFIG, 'wol.yml');
+    const before = fs.readFileSync(file, 'utf8');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fs.writeFileSync(file, ': invalid: yaml: [');
+    expect(() => wol.runScheduledWakes()).not.toThrow();
+    expect(error).toHaveBeenCalledWith('WOL scheduler failed:', expect.any(String));
+    fs.writeFileSync(file, before);
+    error.mockRestore();
   });
 });

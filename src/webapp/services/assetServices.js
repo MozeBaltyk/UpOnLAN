@@ -18,10 +18,12 @@ function genericAssetPath(input) {
       value = decoded.replaceAll('\\', '/');
     }
   } catch { return null; }
-  value = value.replace(/^\/+/, '').replace(/^assets\//i, '');
+  value = value.replace(/^\/+/, '');
   const normalized = path.posix.normalize(`/${value}`).slice(1);
   if (!normalized || normalized === '..' || normalized.startsWith('../')) return null;
-  if ((normalized.split('/')[0] || '').toLowerCase() === 'okd') return null;
+  const parts = normalized.split('/');
+  if ((parts[0] || '').toLowerCase() === 'okd' ||
+      ((parts[0] || '').toLowerCase() === 'assets' && (parts[1] || '').toLowerCase() === 'okd')) return null;
   return normalized;
 }
 
@@ -73,16 +75,21 @@ async function dlremote(dlfiles, callback, socket) {
   const endpoints = loadEndpoints();
   const dlarray = [];
   const origin = asset_url.replace(/\/+$/, '');
-  for (let dlfile of dlfiles) {
-    if (!genericAssetPath(dlfile)) throw new Error('That asset path is reserved or unsafe.');
-    const safePath = dlfile.replace(/^\/+/, '');
+  for (const dlfile of dlfiles) {
+    const safePath = genericAssetPath(dlfile);
+    if (!safePath) throw new Error('That asset path is reserved or unsafe.');
     // The endpoints.yml path is a URL path relative to the origin. The local
     // mirror serves assets under /assets/download/... on the origin, but the
     // container stores them under /assets/download/... (nginx serves /assets at
     // its root), so drop the leading "assets/" namespace when mapping to the
     // filesystem. GitHub paths (/releases/download/...) have no such prefix.
-    const fsRel = safePath.replace(/^assets\//, '');
-    const dlpath = path.join(ASSETS_ROOT, path.dirname(fsRel));
+    const fsRel = safePath.replace(/^assets\//i, '');
+    const assetsRoot = path.resolve(ASSETS_ROOT);
+    const destination = path.resolve(assetsRoot, fsRel);
+    if (destination === assetsRoot || !destination.startsWith(assetsRoot + path.sep)) {
+      throw new Error('That asset path is reserved or unsafe.');
+    }
+    const dlpath = path.dirname(destination);
 
     fs.mkdirSync(dlpath, { recursive: true });
 

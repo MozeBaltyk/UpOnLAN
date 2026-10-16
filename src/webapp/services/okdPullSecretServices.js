@@ -15,7 +15,8 @@ async function lstat(target) {
 function validate(raw) {
   if (typeof raw !== 'string' || !raw.length || Buffer.byteLength(raw) > MAX_BYTES) throw coded('Pull secret must be nonempty JSON no larger than 1 MiB.', 'PULL_SECRET_INVALID');
   let parsed;
-  try { parsed = JSON.parse(raw); } catch { throw coded('Pull secret is not valid JSON.', 'PULL_SECRET_INVALID'); }
+  try { parsed = JSON.parse(raw); } catch { throw coded('Pull secret is not valid JSON. Paste the JSON object directly without surrounding shell-style quotes, for example: {"auths":{"fake":{"auth":"aWQ6cGFzcwo="}}}.', 'PULL_SECRET_INVALID'); }
+  if (typeof parsed === 'string') throw coded('Pull secret must be a JSON object, not quoted JSON. Paste the JSON object directly without surrounding quotes.', 'PULL_SECRET_INVALID');
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !parsed.auths || typeof parsed.auths !== 'object' || Array.isArray(parsed.auths)
     || !Object.keys(parsed.auths).length || Object.values(parsed.auths).some((entry) => !entry || typeof entry !== 'object' || Array.isArray(entry)
       || ![entry.auth, entry.identitytoken].some((credential) => typeof credential === 'string' && credential.length))) {
@@ -72,18 +73,19 @@ function createPullSecretService({
   async function status() {
     const disabledReasons = (source) => source === 'external'
       ? ['External secret is authoritative and read-only; update the mount and restart for rotation.']
-      : [!authConfigured() && 'Configure both WEBAPP_USER and WEBAPP_PASS to manage the internal secret.', !persistenceReady && 'Configure persistent config storage.'].filter(Boolean);
+      : [!persistenceReady && 'Configure persistent config storage.'].filter(Boolean);
+    const authenticationConfigured = authConfigured();
     let externalStat;
     try { externalStat = await lstat(externalFile); }
-    catch { return { status: 'invalid', source: 'external', exists: true, writable: false, disabledReasons: disabledReasons('external') }; }
+    catch { return { status: 'invalid', source: 'external', exists: true, writable: false, authenticationConfigured, disabledReasons: disabledReasons('external') }; }
     const expectedSource = externalConfigured || externalStat ? 'external' : 'internal';
     try {
       const value = await resolve();
-      return { status: 'ready', source: value.source, exists: value.source !== 'default', writable: value.source !== 'external' && authConfigured() && persistenceReady, disabledReasons: disabledReasons(value.source) };
+      return { status: 'ready', source: value.source, exists: value.source !== 'default', writable: value.source !== 'external' && persistenceReady, authenticationConfigured, disabledReasons: disabledReasons(value.source) };
     } catch (err) {
       const internalStat = expectedSource === 'internal' ? await lstat(internalFile).catch(() => false) : null;
       const exists = expectedSource === 'external' ? !!externalStat : !!internalStat;
-      return { status: err.code === 'PULL_SECRET_UNAVAILABLE' && !exists && expectedSource === 'internal' ? 'missing' : 'invalid', source: expectedSource, exists, writable: expectedSource === 'internal' && authConfigured() && persistenceReady, disabledReasons: disabledReasons(expectedSource) };
+      return { status: err.code === 'PULL_SECRET_UNAVAILABLE' && !exists && expectedSource === 'internal' ? 'missing' : 'invalid', source: expectedSource, exists, writable: expectedSource === 'internal' && persistenceReady, authenticationConfigured, disabledReasons: disabledReasons(expectedSource) };
     }
   }
 
@@ -103,7 +105,6 @@ function createPullSecretService({
   }
 
   async function save(raw) {
-    if (!authConfigured()) throw coded('Web authentication is required to manage an internal pull secret.', 'AUTH_REQUIRED');
     if (!persistenceReady) throw coded('Persistent config storage is required to manage an internal pull secret.', 'PERSISTENCE_REQUIRED');
     if (externalConfigured || await lstat(externalFile)) throw coded('The pull secret is externally managed and read-only.', 'EXTERNALLY_MANAGED');
     validate(raw);
@@ -124,7 +125,7 @@ function createPullSecretService({
       await renameFile(temp, internalFile);
       const dir = await fs.promises.open(secretsDir, fs.constants.O_RDONLY);
       try { await dir.sync(); } finally { await dir.close(); }
-      return { status: 'ready', source: 'internal', exists: true, writable: true };
+      return { status: 'ready', source: 'internal', exists: true, writable: true, authenticationConfigured: authConfigured(), disabledReasons: [] };
     } finally {
       if (handle) await handle.close().catch(() => {});
       await fs.promises.rm(temp, { force: true }).catch(() => {});

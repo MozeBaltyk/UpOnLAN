@@ -57,7 +57,12 @@ describe('assetServices OKD namespace reservation', () => {
   });
 
   it('keeps ordinary generic asset paths available', () => {
-    expect(genericAssetPath('/assets/talos-v1/vmlinuz')).toBe('talos-v1/vmlinuz');
+    expect(genericAssetPath('/assets/talos-v1/vmlinuz')).toBe('assets/talos-v1/vmlinuz');
     expect(genericAssetPath('/releases/download/test/file')).toBe('releases/download/test/file');
+  });
+
+  it('normalizes traversal before callers map URL and filesystem paths', () => {
+    expect(genericAssetPath('/assets/old/../talos-v1/vmlinuz')).toBe('assets/talos-v1/vmlinuz');
+    expect(genericAssetPath('/assets/%2e%2e/okd/secret')).toBeNull();
   });
 });

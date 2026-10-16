@@ -4,14 +4,28 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const readdirp = require('readdirp');
-const { getMenuOrigin, getLocalNginx, getMenuVersion, getAssetOrigin } = require('../services/utilServices');
+const { getMenuOrigin, getLocalAssetUrl, getMenuVersion, getAssetOrigin } = require('../services/utilServices');
 const { dlremote, genericAssetPath } = require('../services/assetServices');
 const { listProvisioningAssets } = require('../services/provisioningServices');
+const settings = require('../services/localAssetSettings');
+const okdArtifacts = require('../services/okdArtifactServices');
 
 const CONFIG_ROOT = process.env.UPONLAN_CONFIG || '/config';
 const ASSETS_ROOT = process.env.UPONLAN_ASSETS || '/assets';
 
 module.exports = function registerAssetHandlers(socket, io) {
+  socket.on('localAssets:get', (reply) => {
+    if (typeof reply !== 'function') return;
+    try {
+      reply({ ok: true, data: { assetUrl: settings.get(), overrideActive: !!process.env.OKD_PUBLIC_BASE_URL } });
+    }
+    catch { reply({ ok: false, message: 'Unable to read stored Asset server URL. Save a valid HTTPS origin; check config storage permissions.' }); }
+  });
+  socket.on('localAssets:save', (request, reply) => {
+    if (typeof reply !== 'function') return;
+    try { reply({ ok: true, data: settings.save(request) }); }
+    catch { reply({ ok: false, code: 'PUBLIC_URL_INVALID', message: 'Unable to save Asset server URL. Use a node-reachable, credential-free HTTPS root origin (not localhost); check config storage permissions.' }); }
+  });
   // Download remote files
   socket.on('dlremote', (files) => {
     dlremote(files, (err, result) => {
@@ -32,11 +46,15 @@ module.exports = function registerAssetHandlers(socket, io) {
       const localfiles = await readdirp.promise(ASSETS_ROOT + '/.');
       const assets = localfiles.filter((f) => genericAssetPath(f.path)).map(f => '/' + f.path);
       const provisioning = await listProvisioningAssets();
+      const okd = await okdArtifacts.listAssets();
       const menuversion = getMenuVersion();
       const menuorigin = getMenuOrigin();
       const assetorigin = getAssetOrigin();
-      const localNginx = getLocalNginx();
-      io.sockets.in(socket.id).emit('renderlocal', endpoints, assets, menuversion, menuorigin, assetorigin, localNginx, provisioning);
+      let localSettings;
+      try { localSettings = { assetUrl: settings.get(), error: '' }; }
+      catch { localSettings = { assetUrl: null, error: 'Stored Asset URL is invalid. Save a valid HTTPS origin.' }; }
+      const localNginx = localSettings.error ? '' : getLocalAssetUrl();
+      io.sockets.in(socket.id).emit('renderlocal', endpoints, assets, menuversion, menuorigin, assetorigin, localNginx, provisioning, localSettings, okd);
     } catch (error) {
       console.error('getlocal error:', error.stack || error);
       socket.emit('error', 'Failed to load local assets: ' + error.message);
@@ -49,7 +67,7 @@ module.exports = function registerAssetHandlers(socket, io) {
       for (let  file of dlfiles) {
         const cleanPath = genericAssetPath(file);
         if (!cleanPath) continue;
-        const fullPath = path.resolve(ASSETS_ROOT, cleanPath);
+        const fullPath = path.resolve(ASSETS_ROOT, cleanPath.replace(/^assets\//i, ''));
 
         // Prevent directory traversal
         if (!fullPath.startsWith(path.resolve(ASSETS_ROOT) + path.sep)) {

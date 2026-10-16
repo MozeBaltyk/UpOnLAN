@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const yaml = require('js-yaml');
 const { exec, execFile } = require('child_process');
 
@@ -32,7 +33,13 @@ function readWolConfig() {
 }
 
 function writeWolConfig(data) {
-  fs.writeFileSync(WOL_CONFIG, yaml.dump(data));
+  const temp = path.join(CONFIG_ROOT, `.wol.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`);
+  try {
+    fs.writeFileSync(temp, yaml.dump(data), { flag: 'wx', mode: 0o600 });
+    fs.renameSync(temp, WOL_CONFIG);
+  } finally {
+    fs.rmSync(temp, { force: true });
+  }
 }
 
 function getWolEntries() {
@@ -146,6 +153,11 @@ function checkScheduledWakes(now = new Date()) {
   return fired;
 }
 
+function runScheduledWakes() {
+  try { return checkScheduledWakes(); }
+  catch (err) { console.error('WOL scheduler failed:', err.message); return 0; }
+}
+
 module.exports = {
   getWolEntries,
   addWolEntry,
@@ -158,10 +170,11 @@ module.exports = {
   pingHost,
   getWolEntriesWithStatus,
   computeDueWakes,
-  checkScheduledWakes
+  checkScheduledWakes,
+  runScheduledWakes
 };
 
 // Background one-shot wake scheduler (skipped under test so no stray timers)
 if (process.env.NODE_ENV !== 'test') {
-  setInterval(checkScheduledWakes, 30000);
+  setInterval(runScheduledWakes, 30000);
 }

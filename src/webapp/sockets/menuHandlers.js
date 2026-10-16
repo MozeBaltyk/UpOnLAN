@@ -1,7 +1,7 @@
 // ./sockets/menuHandlers.js
 'use strict';
 const { 
-  getLocalNginx, 
+  getLocalAssetUrl,
   getMenuVersion, 
   logWithTimestamp, 
   errorWithTimestamp,
@@ -73,7 +73,7 @@ module.exports = function registerMenuHandlers(socket, io) {
       const { local_files, remote_files } = await getipxefiles();
       const { list_rom_files } = await getromfiles();
       const { list_index_files } = await getindexfiles();
-      const local_nginx_url = getLocalNginx();
+      const local_nginx_url = getLocalAssetUrl();
       const menu_version = getMenuVersion();
 
       socket.emit('renderconfig', remote_files, local_files, list_rom_files, list_index_files, local_nginx_url, menu_version);

@@ -18,7 +18,7 @@ function clearAppCache() {
   }
 }
 
-async function bootApp({ user = 'admin', pass = 'secret', persistenceReady = false, fixtures, toolService } = {}) {
+async function bootApp({ user = 'admin', pass = 'secret', subfolder = '/', persistenceReady = false, fixtures, toolService } = {}) {
   const root = createFixtureRoot(fixtures);
 
   Object.assign(process.env, {
@@ -27,7 +27,7 @@ async function bootApp({ user = 'admin', pass = 'secret', persistenceReady = fal
     UPONLAN_DOCS: path.join(root, 'docs'),
     UPONLAN_LOGS: path.join(root, 'logs'),
     NODE_ENV: 'test',
-    SUBFOLDER: '/',
+    SUBFOLDER: subfolder,
     WEBAPP_USER: user,
     WEBAPP_PASS: pass,
     OKD_PERSISTENCE_READY: String(persistenceReady),

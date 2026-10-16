@@ -12,8 +12,8 @@
 {{- if and $anyOkdPvc (not $allOkdPvcs) -}}
 {{- fail "OKD persistence requires all four config/assets/menu/logs persistentVolumeClaims" -}}
 {{- end }}
-{{- if and (eq .Values.deployAs "Deployment") $allOkdPvcs (ne (int .Values.replicas) 1) -}}
-{{- fail "OKD persistent generation requires replicas=1" -}}
+{{- if and (eq .Values.deployAs "Deployment") (ne (int .Values.replicas) 1) -}}
+{{- fail "Deployment requires replicas=1 because app state and Socket.IO sessions are process-local" -}}
 {{- end }}
 {{- if and (eq .Values.deployAs "Deployment") (not (empty .Values.okd.pullSecret.hostPath)) -}}
 {{- fail "okd.pullSecret.hostPath is supported only with deployAs=Pod" -}}

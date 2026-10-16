@@ -8,8 +8,12 @@ const profiles = require('./okdServices');
 const tools = require('./okdToolServices');
 const artifacts = require('./okdArtifactServices');
 const pullSecrets = require('./okdPullSecretServices');
+const { createSshKeyService } = require('./okdSshKeyServices');
 
 const ACTIVE = new Set(['queued', 'running', 'finalizing', 'cancelling']);
+const STATES = new Set([...ACTIVE, 'succeeded', 'failed', 'cancelled', 'interrupted', 'persistence_failed']);
+const SHA256 = /^[a-f0-9]{64}$/;
+const MESSAGES = new Set(['Generation queued.', 'Installer is running.', 'Installer completed; artifacts are being verified.', 'Installer artifacts finalized.', 'Generation cancelled.', 'Installer was terminated unexpectedly.', 'Installer generation failed.', 'Job state could not be persisted safely.', 'Generation was interrupted by an application restart.', 'Cancellation requested.']);
 const LOG_LIMIT = 256 * 1024;
 const READ_LIMIT = 64 * 1024;
 
@@ -17,11 +21,13 @@ function coded(message, code, errors) {
   return Object.assign(new Error(message), { code, errors: errors || [] });
 }
 
-function installerEnv() {
+function installerEnv(workspace) {
   const env = {};
-  for (const key of ['PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy', 'SSL_CERT_FILE', 'SSL_CERT_DIR']) {
+  for (const key of ['PATH', 'TMPDIR', 'LANG', 'LC_ALL', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy', 'SSL_CERT_FILE', 'SSL_CERT_DIR']) {
     if (process.env[key] !== undefined) env[key] = process.env[key];
   }
+  env.HOME = workspace;
+  env.XDG_CACHE_HOME = path.join(workspace, '.cache');
   return env;
 }
 
@@ -63,7 +69,6 @@ function createJobService({
   logsRoot = process.env.UPONLAN_LOGS || '/logs',
   pullSecretFile = process.env.OKD_PULL_SECRET_FILE || '/run/secrets/okd-pull-secret',
   pullSecretService = null,
-  publicBaseUrl = process.env.OKD_PUBLIC_BASE_URL || '',
   persistenceReady = process.env.OKD_PERSISTENCE_READY === 'true',
   getProfile = profiles.getProfile,
   getTemplates = profiles.getTemplates,
@@ -71,21 +76,25 @@ function createJobService({
   getVerifiedOc = tools.getVerifiedOc,
   finalizeArtifacts = artifacts.finalizeArtifacts,
   spawnProcess = spawn,
+  runKeyCommand,
+  renameKeyDirectory = fs.promises.rename,
   writeJobFile = fs.promises.writeFile,
   renameRecord = fs.promises.rename,
   killGroup = (pid, signal) => process.kill(-pid, signal),
   cancelTimeoutMs = 30000,
   now = () => new Date().toISOString(),
-  jobId = () => crypto.randomUUID(),
   auditEvent = async () => {},
 } = {}) {
   const jobsRoot = path.join(configRoot, 'okd', 'jobs');
   const workspacesRoot = path.join(configRoot, 'okd', 'workspaces');
+  const sequencesRoot = path.join(configRoot, 'okd', 'sequences');
+  const generationLockFile = path.join(configRoot, 'okd', 'generation.lock');
   const logRoot = path.join(logsRoot, 'okd');
   const secretService = pullSecretService || pullSecrets.createPullSecretService({
     configRoot, externalFile: pullSecretFile,
     externalConfigured: Object.hasOwn(process.env, 'OKD_PULL_SECRET_FILE') || pullSecretFile !== '/run/secrets/okd-pull-secret',
   });
+  const keyService = createSshKeyService({ configRoot, ...(runKeyCommand ? { runKeyCommand } : {}), renameKeyDirectory });
   let initialized;
   let active = null;
   let starting = false;
@@ -94,9 +103,20 @@ function createJobService({
   const volatileRecords = new Map();
 
   function publicRecord(record) {
-    if (!record || !/^[0-9a-f-]{16,64}$/.test(record.id || '') || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(record.profileId || '')) return null;
+    if (!record || !/^v[1-9][0-9]*$/.test(record.mediaVersion || '') || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(record.profileId || '')
+      || record.release !== profiles.COMPATIBILITY_RECORD.release || !SHA256.test(record.profileRevision || '') || !STATES.has(record.state)
+      || !SHA256.test(record.installerArchiveSha256 || '') || !SHA256.test(record.installerBinarySha256 || '')
+      || record.releaseImage !== profiles.COMPATIBILITY_RECORD.releaseImage || record.releaseDigest !== profiles.COMPATIBILITY_RECORD.releaseDigest
+      || record.compatibilityRevision !== profiles.COMPATIBILITY_RECORD.revision || !Number.isFinite(Date.parse(record.createdAt))
+      || ![record.startedAt, record.finishedAt].every((value) => value === null || value === undefined || Number.isFinite(Date.parse(value)))) return null;
+    let destinationUrl = null;
+    try {
+      const value = new URL(record.destinationUrl);
+      const suffix = `/okd/${record.profileId}/${record.release}/${record.mediaVersion}/`;
+      if (value.protocol === 'https:' && !value.username && !value.password && !value.search && !value.hash && value.pathname.endsWith(suffix)) destinationUrl = value.toString();
+    } catch { /* ISO and malformed persisted destinations remain absent. */ }
     return {
-      id: record.id, profileId: record.profileId, profileRevision: record.profileRevision,
+      profileId: record.profileId, profileRevision: record.profileRevision, mediaVersion: record.mediaVersion,
       state: record.state, createdAt: record.createdAt, startedAt: record.startedAt || null,
       finishedAt: record.finishedAt || null, release: record.release,
       releaseImage: record.releaseImage, releaseDigest: record.releaseDigest,
@@ -104,10 +124,10 @@ function createJobService({
       installerArchiveSha256: record.installerArchiveSha256,
       installerBinarySha256: record.installerBinarySha256,
       mode: ['pxe', 'iso'].includes(record.mode) ? record.mode : 'pxe',
-      versionId: /^[0-9a-f-]{16,64}$/.test(record.versionId || '') ? record.versionId : null,
+      destinationUrl,
+      versionId: /^v[1-9][0-9]*$/.test(record.versionId || '') ? record.versionId : null,
       errorCode: ['ARTIFACT_FINALIZATION_FAILED', 'PERSISTENCE_FAILED'].includes(record.errorCode) ? record.errorCode : null,
-      log: record.log === `${record.id}.log` ? record.log : `${record.id}.log`,
-      message: typeof record.message === 'string' ? record.message.slice(0, 500) : '',
+      message: MESSAGES.has(record.message) ? record.message : '',
       ...(record.context && /^[a-z0-9.-]{1,253}$/.test(record.context.clusterName || '') && /^[a-z0-9.-]{1,253}$/.test(record.context.baseDomain || '')
         && ['sno', 'compact', 'standard'].includes(record.context.topology) && Array.isArray(record.context.hosts) && record.context.hosts.length <= 23
         && record.context.hosts.every((host) => host && /^[a-z0-9-]{1,63}$/.test(host.hostname || '') && ['master', 'worker'].includes(host.role)
@@ -134,11 +154,52 @@ function createJobService({
     if (resolvedDir !== resolvedBase) await fs.promises.chmod(resolvedDir, 0o700);
   }
 
+  async function acquireGenerationLock() {
+    await safeRoot(configRoot, path.dirname(generationLockFile));
+    const processStart = async (pid) => {
+      const stat = await fs.promises.readFile(`/proc/${pid}/stat`, 'utf8');
+      return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+    };
+    for (;;) {
+      const token = crypto.randomBytes(16).toString('hex');
+      try {
+        await fs.promises.writeFile(generationLockFile, `${JSON.stringify({ pid: process.pid, started: await processStart(process.pid), token })}\n`, { flag: 'wx', mode: 0o600 });
+        return { token };
+      } catch (err) {
+        if (err.code !== 'EEXIST') throw coded('Generation lock could not be acquired safely.', 'PERSISTENCE_FAILED');
+        let owner;
+        try { owner = JSON.parse(await require('./safeFile').readBounded(generationLockFile, 1024)); } catch { throw coded('Generation lock is invalid.', 'PERSISTENCE_FAILED'); }
+        if (!Number.isSafeInteger(owner.pid) || owner.pid < 1 || typeof owner.started !== 'string' || typeof owner.token !== 'string') throw coded('Generation lock is invalid.', 'PERSISTENCE_FAILED');
+        try {
+          process.kill(owner.pid, 0);
+          if (await processStart(owner.pid) === owner.started) throw coded('Another generation process is active.', 'JOB_ACTIVE');
+        }
+        catch (probe) {
+          if (probe.code === 'JOB_ACTIVE' || probe.code === 'EPERM') throw coded('Another generation process is active.', 'JOB_ACTIVE');
+          if (!['ESRCH', 'ENOENT'].includes(probe.code)) throw probe;
+        }
+        await fs.promises.rm(generationLockFile, { force: true });
+      }
+    }
+  }
+
+  async function releaseGenerationLock(lock) {
+    if (!lock) return;
+    try {
+      const owner = JSON.parse(await require('./safeFile').readBounded(generationLockFile, 1024));
+      if (owner.token === lock.token) await fs.promises.rm(generationLockFile);
+    } catch (err) { if (err.code !== 'ENOENT') throw err; }
+  }
+
   async function atomicRecord(record) {
+    // publicRecord() drops any record it cannot fully validate. Persisting that
+    // as literal `null` would silently erase the job from disk, so fail closed.
+    const safe = publicRecord(record);
+    if (!safe) throw coded('Job state could not be persisted safely.', 'PERSISTENCE_FAILED');
     const file = path.join(jobsRoot, `${record.id}.json`);
     const temp = path.join(jobsRoot, `.${record.id}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`);
     try {
-      await writeJobFile(temp, `${JSON.stringify(publicRecord(record), null, 2)}\n`, { flag: 'wx', mode: 0o600 });
+      await writeJobFile(temp, `${JSON.stringify(safe, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
       await renameRecord(temp, file);
     } finally { await fs.promises.rm(temp, { force: true }); }
   }
@@ -147,12 +208,14 @@ function createJobService({
     await safeRoot(configRoot, jobsRoot);
     const records = [];
     for (const name of await fs.promises.readdir(jobsRoot)) {
-      if (!/^[0-9a-f-]+\.json$/.test(name)) continue;
+      if (!/^[a-z0-9.-]+--v[1-9][0-9]*\.json$/.test(name)) continue;
       const file = path.join(jobsRoot, name);
       const stat = await fs.promises.lstat(file);
       if (stat.isSymbolicLink() || !stat.isFile()) continue;
       try {
-        const record = publicRecord(JSON.parse(await fs.promises.readFile(file, 'utf8')));
+        const value = JSON.parse(await fs.promises.readFile(file, 'utf8'));
+        const record = publicRecord(value);
+        if (record) record.id = name.slice(0, -5);
         if (record) records.push(record);
       } catch { /* ignore invalid records */ }
     }
@@ -166,7 +229,7 @@ function createJobService({
   async function initialize() {
     if (initialized) return initialized;
     initialized = (async () => {
-      await Promise.all([safeRoot(configRoot, jobsRoot), safeRoot(configRoot, workspacesRoot), safeRoot(logsRoot, logRoot)]);
+      await Promise.all([safeRoot(configRoot, jobsRoot), safeRoot(configRoot, workspacesRoot), safeRoot(configRoot, sequencesRoot), safeRoot(logsRoot, logRoot)]);
       for (const record of await readRecords()) {
         if (ACTIVE.has(record.state)) {
           record.state = 'interrupted';
@@ -179,29 +242,53 @@ function createJobService({
     return initialized;
   }
 
-  function validateEnvironment() {
+  function validateEnvironment(profile) {
     const errors = [];
     if (!persistenceReady) errors.push({ field: 'persistence', message: 'Persistent OKD config and log storage is not configured.' });
-    try {
-      const url = new URL(publicBaseUrl);
-      if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('invalid');
-    } catch { errors.push({ field: 'public_base_url', message: 'Configure a credential-free HTTPS OKD_PUBLIC_BASE_URL origin.' }); }
-    return errors;
+    if (profile && profile.boot_mode === 'pxe') try { require('./localAssetSettings').validateOrigin(profile.asset_url); }
+    catch (err) { errors.push({ field: 'asset_url', message: err.message }); }
+    return { errors };
   }
 
   async function preflight(profileId, revision) {
     await initialize();
-    const errors = validateEnvironment();
-    let profile;
+    const errors = []; let profile;
     try {
       profile = await getProfile(profileId);
       if (!/^[a-f0-9]{64}$/.test(revision || '') || profile.revision !== revision) errors.push({ field: 'revision', message: 'Save or reload the changed profile before generation.' });
     } catch (err) { errors.push({ field: 'profile', message: err.message }); }
+    errors.push(...validateEnvironment(profile).errors);
     try { await secretService.resolve(); } catch (err) { errors.push({ field: 'pull_secret', message: err.message }); }
     try { await getVerifiedInstaller(); } catch (err) { errors.push({ field: 'installer', message: err.message }); }
     try { await getVerifiedOc(); } catch (err) { errors.push({ field: 'oc', message: err.message }); }
     if (active) errors.push({ field: 'job', message: `Another generation job for profile ${active.record.profileId} is active on this instance.` });
-    return { ready: errors.length === 0, errors, profileRevision: profile && profile.revision };
+    if (profile && profile.boot_mode === 'pxe' && !errors.some((error) => ['profile', 'asset_url'].includes(error.field))) try {
+      const inspected = await require('./assetCertificateServices').inspectEndpoint({ origin: profile.asset_url, configRoot, storedPem: profile.asset_certificate_bundle, additionalPem: profile.additional_ca_bundle });
+      if (!inspected.metadata.hostnameMatch || inspected.metadata.validity !== 'current' || inspected.metadata.storedMismatch
+        || (!inspected.metadata.systemTrusted && !profile.asset_certificate_bundle && !inspected.metadata.additionalCaMatch)) errors.push({ field: 'asset_certificate_bundle', message: 'Asset server certificate must be inspected and explicitly resolved.' });
+    } catch (err) { errors.push({ field: 'asset_certificate_bundle', message: err.message }); }
+    return { ready: errors.length === 0, errors, profileRevision: profile && profile.revision, mode: profile && profile.boot_mode,
+      destination: profile && profile.boot_mode === 'pxe' ? `${profile.asset_url}okd/${profile.id}/${profile.release}/<next-media-version>/` : null };
+  }
+
+  async function allocateVersion(profile) {
+    const dir = path.join(sequencesRoot, profile.id); await safeRoot(sequencesRoot, dir);
+    const file = path.join(dir, `${profile.release}.json`); let next = 1;
+    try { const value = JSON.parse(await require('./safeFile').readBounded(file, 64 * 1024)); if (Number.isSafeInteger(value.next) && value.next > 0) next = value.next; } catch (err) { if (err.code !== 'ENOENT') throw coded('Media version sequence is invalid.', 'PERSISTENCE_FAILED'); }
+    const escapedRelease = profile.release.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    for (const name of await fs.promises.readdir(dir)) { const match = new RegExp(`^${escapedRelease}--v([1-9][0-9]*)\\.allocated$`).exec(name); if (match) next = Math.max(next, Number(match[1]) + 1); }
+    const artifactsRoot = path.join(process.env.UPONLAN_ASSETS || '/assets', 'okd', profile.id, profile.release);
+    try { for (const name of await fs.promises.readdir(artifactsRoot)) if (/^v[1-9][0-9]*$/.test(name)) next = Math.max(next, Number(name.slice(1)) + 1); } catch (err) { if (err.code !== 'ENOENT') throw err; }
+    let mediaVersion;
+    for (;;) {
+      mediaVersion = `v${next}`;
+      try { await fs.promises.writeFile(path.join(dir, `${profile.release}--${mediaVersion}.allocated`), '', { flag: 'wx', mode: 0o600 }); break; }
+      catch (err) { if (err.code !== 'EEXIST') throw coded('Media version could not be allocated.', 'PERSISTENCE_FAILED'); next += 1; }
+    }
+    const temp = `${file}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`;
+    try { await fs.promises.writeFile(temp, `${JSON.stringify({ next: next + 1 })}\n`, { flag: 'wx', mode: 0o600 }); await fs.promises.rename(temp, file); }
+    finally { await fs.promises.rm(temp, { force: true }); }
+    return mediaVersion;
   }
 
   async function appendLog(file, text, state) {
@@ -211,29 +298,31 @@ function createJobService({
     state.logBytes += chunk.length;
   }
 
-  async function startUnlocked({ profileId, revision, confirmed, mode = 'pxe' }) {
+  async function startUnlocked({ profileId, revision, confirmed }, generationLock) {
     await initialize();
     if (confirmed !== true) throw coded('Confirm that generation targets the declared disks and may lead to destructive installation.', 'CONFIRMATION_REQUIRED');
-    if (!['pxe', 'iso'].includes(mode)) throw coded('Generation mode must be pxe or iso.', 'BAD_REQUEST');
     const check = await preflight(profileId, revision);
     if (!check.ready) throw coded('OKD generation preflight failed.', 'PREFLIGHT_FAILED', check.errors);
     const profile = await getProfile(profileId);
+    const mode = profile.boot_mode;
+    const effectiveOrigin = mode === 'pxe' ? profile.asset_url : null;
     if (profile.revision !== revision) throw coded('OKD generation preflight failed.', 'PREFLIGHT_FAILED', [{ field: 'revision', message: 'Save or reload the changed profile before generation.' }]);
     const pullSecret = await secretService.resolve();
     const installer = await getVerifiedInstaller();
     const oc = await getVerifiedOc();
-    const id = jobId();
-    if (!/^[0-9a-f-]{16,64}$/.test(id)) throw coded('Generated job ID is invalid.', 'INTERNAL');
-    const profileRoot = path.join(workspacesRoot, profile.id);
-    const workspace = path.join(profileRoot, id);
+    const sshPublicKey = profile.ssh_public_key || await keyService.ensureSshPublicKey(profile.id);
+    const mediaVersion = await allocateVersion(profile);
+    const id = `${profile.id}--${profile.release}--${mediaVersion}`;
+    const profileRoot = path.join(workspacesRoot, profile.id, profile.release);
+    const workspace = path.join(profileRoot, mediaVersion);
     const record = {
-      id, profileId: profile.id, profileRevision: profile.revision, state: 'queued', createdAt: now(),
-      startedAt: null, finishedAt: null, release: profiles.COMPATIBILITY_RECORD.release,
+      id, profileId: profile.id, profileRevision: profile.revision, mediaVersion, state: 'queued', createdAt: now(),
+      startedAt: null, finishedAt: null, release: profile.release,
       releaseImage: profiles.COMPATIBILITY_RECORD.releaseImage, releaseDigest: profiles.COMPATIBILITY_RECORD.releaseDigest,
       compatibilityRevision: profiles.COMPATIBILITY_RECORD.revision,
       installerArchiveSha256: installer.metadata.archiveSha256,
       installerBinarySha256: installer.metadata.binarySha256,
-      mode, versionId: null, errorCode: null,
+      mode, destinationUrl: mode === 'pxe' ? `${effectiveOrigin}okd/${profile.id}/${profile.release}/${mediaVersion}/` : null, versionId: null, errorCode: null,
       log: `${id}.log`, message: 'Generation queued.',
     };
     const logFile = path.join(logRoot, record.log);
@@ -245,8 +334,10 @@ function createJobService({
       record.context = profiles.effectiveContext(profile, templates);
       const installConfig = yaml.load(templates.installConfig, { schema: yaml.JSON_SCHEMA });
       installConfig.pullSecret = pullSecret.raw;
+      installConfig.sshKey = sshPublicKey;
       const agentConfig = yaml.load(templates.agentConfig, { schema: yaml.JSON_SCHEMA });
-      if (mode === 'pxe') agentConfig.bootArtifactsBaseURL = `${new URL(publicBaseUrl).toString()}okd/${profile.id}/${id}`;
+      if (mode === 'pxe') agentConfig.bootArtifactsBaseURL = `${effectiveOrigin}okd/${profile.id}/${profile.release}/${mediaVersion}`;
+      else delete agentConfig.bootArtifactsBaseURL;
       await Promise.all([
         writeJobFile(path.join(workspace, 'install-config.yaml'), yaml.dump(installConfig, { noRefs: true, lineWidth: -1, sortKeys: false }), { flag: 'wx', mode: 0o600 }),
         writeJobFile(path.join(workspace, 'agent-config.yaml'), yaml.dump(agentConfig, { noRefs: true, lineWidth: -1, sortKeys: false }), { flag: 'wx', mode: 0o600 }),
@@ -255,7 +346,7 @@ function createJobService({
       await atomicRecord(record);
       try {
         child = spawnProcess(installer.path, ['agent', 'create', mode === 'iso' ? 'image' : 'pxe-files', '--dir', workspace], {
-          cwd: workspace, env: { ...installerEnv(), PATH: `${path.dirname(oc.path)}${path.delimiter}${process.env.PATH || '/usr/bin:/bin'}` }, detached: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'],
+          cwd: workspace, env: { ...installerEnv(workspace), PATH: `${path.dirname(oc.path)}${path.delimiter}${process.env.PATH || '/usr/bin:/bin'}` }, detached: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'],
         });
       } catch { throw coded('Installer could not be started.', 'SPAWN_FAILED'); }
     } catch (err) {
@@ -300,7 +391,7 @@ function createJobService({
               record.state = 'failed'; record.errorCode = 'PERSISTENCE_FAILED'; record.message = 'Job state could not be persisted safely.';
             }
             if (!record.errorCode) try {
-              const version = await finalizeArtifacts({ workspace, profile, job: record, mode });
+               const version = await finalizeArtifacts({ workspace, profile, job: record, mode, publicBaseUrl: effectiveOrigin });
               record.state = 'succeeded'; record.versionId = version.versionId; record.message = 'Installer artifacts finalized.';
             } catch {
               record.state = 'failed'; record.errorCode = 'ARTIFACT_FINALIZATION_FAILED'; record.message = 'Installer artifacts could not be finalized safely.';
@@ -314,10 +405,11 @@ function createJobService({
         }
       } finally {
         clearTimeout(running.killTimer);
-        if (active === running) active = null;
+        await releaseGenerationLock(generationLock).catch(() => {});
         await audit('generation.result', record.state === 'succeeded' ? 'succeeded' : record.state, {
-          profileId: record.profileId, versionId: record.versionId, jobId: record.id, mode: record.mode,
+          profileId: record.profileId, release: record.release, mediaVersion: record.mediaVersion, mode: record.mode,
         }).catch(() => {});
+        if (active === running) active = null;
         finishResolve(record);
       }
     };
@@ -334,29 +426,41 @@ function createJobService({
     return record;
   }
 
-  function start(request) {
+  async function start(request) {
     if (starting || active) return Promise.reject(coded('Another generation job is active on this instance.', 'JOB_ACTIVE'));
     starting = true;
     startingProfileId = request && request.profileId;
-    return startUnlocked(request).finally(() => { starting = false; startingProfileId = null; });
+    let generationLock;
+    try {
+      generationLock = await acquireGenerationLock();
+      return await startUnlocked(request, generationLock);
+    } catch (err) {
+      await releaseGenerationLock(generationLock).catch(() => {});
+      throw err;
+    } finally { starting = false; startingProfileId = null; }
   }
 
-  async function cancel(id) {
+  async function cancel(identity) {
     await initialize();
-    if (!active || active.id !== id || !active.child) throw coded('That installer process is not active on this application instance.', 'NOT_ACTIVE');
+    if (!identity || !active || active.record.profileId !== identity.profileId || active.record.release !== identity.release || active.record.mediaVersion !== identity.mediaVersion || !active.child) throw coded('That installer process is not active on this application instance.', 'NOT_ACTIVE');
     const running = active;
     const pid = running.child.pid;
     running.record.state = 'cancelling'; running.record.message = 'Cancellation requested.';
     await atomicRecord(running.record);
     try { killGroup(pid, 'SIGTERM'); } catch (err) { if (err.code !== 'ESRCH') throw err; }
     let timer;
-    await Promise.race([
-      running.finished,
-      new Promise((resolve, reject) => { timer = setTimeout(() => {
-        if (active === running && running.child) { try { killGroup(pid, 'SIGKILL'); } catch (err) { if (err.code !== 'ESRCH') { reject(err); return; } } }
-        resolve();
-      }, cancelTimeoutMs); }),
-    ]).finally(() => clearTimeout(timer));
+    try {
+      await Promise.race([
+        running.finished,
+        new Promise((resolve, reject) => { timer = setTimeout(() => {
+          if (active === running && running.child) { try { killGroup(pid, 'SIGKILL'); } catch (err) { if (err.code !== 'ESRCH') { reject(err); return; } } }
+          resolve();
+        }, cancelTimeoutMs); }),
+      ]);
+      // The exit handler persists the terminal state before resolving, so wait
+      // for it rather than returning a stale "cancelling" record.
+      await running.finished;
+    } finally { clearTimeout(timer); }
     return running.record;
   }
 
@@ -366,7 +470,7 @@ function createJobService({
     const current = active && (!profileId || active.record.profileId === profileId)
       ? { ...publicRecord(active.record), cancellable: !!active.child } : null;
     const blocking = active && profileId && active.record.profileId !== profileId
-      ? { id: active.record.id, profileId: active.record.profileId, state: active.record.state, mode: active.record.mode } : null;
+      ? { profileId: active.record.profileId, release: active.record.release, mediaVersion: active.record.mediaVersion, state: active.record.state, mode: active.record.mode } : null;
     return { current, blocking, history };
   }
 
@@ -377,24 +481,25 @@ function createJobService({
   function isActive() { return starting || !!active; }
   function setAuditSink(sink) { audit = typeof sink === 'function' ? sink : async () => {}; }
 
-  async function readLog(id, maxBytes = READ_LIMIT) {
+  async function readLog(identity, maxBytes = READ_LIMIT) {
     await initialize();
-    if (!/^[0-9a-f-]{16,64}$/.test(id)) throw coded('Invalid job ID.', 'BAD_REQUEST');
+    if (!identity || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(identity.profileId || '') || identity.release !== profiles.COMPATIBILITY_RECORD.release || !/^v[1-9][0-9]*$/.test(identity.mediaVersion || '')) throw coded('Invalid generation identity.', 'BAD_REQUEST');
+    const id = `${identity.profileId}--${identity.release}--${identity.mediaVersion}`;
     const limit = Math.min(READ_LIMIT, Math.max(1, Number(maxBytes) || READ_LIMIT));
     const file = path.join(logRoot, `${id}.log`);
     let handle;
     try {
-      handle = await fs.promises.open(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
-      const stat = await handle.stat();
+      const opened = await require('./safeFile').openRegular(file); handle = opened.handle;
+      const stat = opened.stat;
       if (!stat.isFile() || stat.nlink !== 1) throw coded('Job log is unsafe.', 'UNSAFE_PATH');
       const length = Math.min(limit, stat.size);
       const buffer = Buffer.alloc(length);
       await handle.read(buffer, 0, length, Math.max(0, stat.size - length));
-      return { jobId: id, text: buffer.toString('utf8'), truncated: stat.size > length };
+      return { profileId: identity.profileId, release: identity.release, mediaVersion: identity.mediaVersion, text: buffer.toString('utf8'), truncated: stat.size > length };
     } catch (err) {
       if (err.code === 'ENOENT') throw coded('Job log not found.', 'NOT_FOUND');
-      if (err.code === 'ELOOP') throw coded('Job log is unsafe.', 'UNSAFE_PATH');
-      throw err;
+      if (err.code === 'BAD_REQUEST' || err.code === 'UNSAFE_PATH') throw err;
+      throw coded('Job log is unsafe.', 'UNSAFE_PATH');
     } finally { if (handle) await handle.close(); }
   }
 

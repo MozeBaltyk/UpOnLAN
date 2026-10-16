@@ -41,6 +41,14 @@ HTTPS termination is built in and on by default. `init.sh` uses a mounted server
 - `8443/TCP` — asset serving (`/`, `/rom/`, `/status`).
 - `3443/TCP` — the webapp, reverse-proxied over TLS to the Node app (socket.io WebSocket upgrade included).
 
+Each OKD profile owns its boot mode and, for PXE, its final production Asset
+server URL. Configure that credential-free HTTPS root under **OKD → Profiles →
+Installation media** before generation. It may name this deployment's asset
+listener or an external server where the portable PXE archive will be extracted.
+Profile Save inspects the endpoint certificate and requires explicit confirmation
+for untrusted public CA material. Saving does not configure DNS/TLS, prove target
+trust, or rewrite existing finalized media. See [OKD origin and recovery](Kubernetes/OKD/05-Reference-and-Troubleshooting.md).
+
 iPXE boot clients fetch kernel/initrd over HTTPS (`${local_endpoint}` = `https://<boot-host>:8443/`), so the iPXE ROMs must embed this deployment's trust anchor. They are built automatically by `init.sh` on first boot (embedded `TRUST` = `/config/tls/server.crt`), or on demand via the webapp Build UI / `TRUST=<your-ca.pem> scripts/build_ipxe_roms.sh`.
 
 To use your own cert, drop it at those two paths (in the host `./config` directory that the chart mounts at `/config`) before deploying — a mounted pair is never overwritten. The self-signed cert is only a bootstrap fallback; replace it with a real cert (Let's Encrypt, internal CA) for anything beyond a homelab.
@@ -54,7 +62,7 @@ To use your own cert, drop it at those two paths (in the host `./config` directo
 The chart renders either a bare `Pod` or a `Deployment` depending on `deployAs`:
 
 - `deployAs: Pod` (default) — for `podman play kube`; binds host ports `8443`, `3443`, `69/udp` and uses the podman `emptyDir.path` extension so data survives `--replace`.
-- `deployAs: Deployment` — for a real cluster; `replicas: 1` (set `replicas` as needed), no host ports, and plain `emptyDir` volumes (swap in `hostPath` or a PVC if config/assets/logs must persist). Expose the service with a `Service`/`Ingress`. The libvirt socket mount remains opt-in via `libvirt.enabled` and only works on the node that owns `/var/run/libvirt/libvirt-sock`.
+- `deployAs: Deployment` — for a real cluster; no host ports, with ephemeral `emptyDir` volumes by default. OKD generation requires all four existing config/assets/menu/logs PVCs, one replica, and UID/GID 911 write access; the Deployment uses Recreate to avoid overlapping writers. See [OKD storage and recovery](Kubernetes/OKD/05-Reference-and-Troubleshooting.md). Expose the service with a `Service`/`Ingress`. The libvirt socket mount remains opt-in via `libvirt.enabled` and only works on the node that owns `/var/run/libvirt/libvirt-sock`.
 
 For Kubernetes, store web credentials in a Secret rather than direct Helm values. Create it from protected files so values do not appear in command arguments, then reference it in chart values:
 

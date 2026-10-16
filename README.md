@@ -94,6 +94,13 @@ Use `asset_target` to build just one asset set while debugging.
 
 See [Deployment](docs/UpOnLAN.xyz/02-Deployment.md) for remote and local deployment, ports, security, and release artifacts. See [Operations](docs/UpOnLAN.xyz/03-Operations.md) for logs, recovery, backup, and destructive-operation behavior.
 
+## Installing OKD
+
+Follow the [OKD operator journey](docs/Kubernetes/00-Overview.md): understand the
+Agent installation, prepare infrastructure, generate ISO/PXE in UpOnLAN, then boot
+and verify. Start with one disposable DHCP SNO lab using ISO. Media generation is
+not cluster installation; booting Agent media can automatically overwrite target disks.
+
 ## Custom iPXE ROM/media builds
 
 Editing a served iPXE menu does not normally require a new ROM: an existing iPXE boot binary can chain to the menu. Build when the boot binary itself must embed UpOnLAN.xyz's wrapper or start a custom default boot flow, or when you need boot media for a machine that cannot use the existing network-boot path.
